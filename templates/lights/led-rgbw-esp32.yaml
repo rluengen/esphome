@@ -15,7 +15,7 @@ output:
     frequency: 1000 Hz
     id: pwm_b
   - platform: ledc
-    pin: GPIO15
+    pin: GPIO25  # Other good options: GPIO26, GPIO27
     frequency: 1000 Hz
     id: pwm_w
 

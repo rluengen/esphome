@@ -18,6 +18,8 @@ output:
     pin: GPIO15
     frequency: 1000 Hz
     id: pwm_w
+    # Note: GPIO15 has a pull-down resistor and must be LOW at boot on ESP8266
+    # If this causes boot issues, consider using GPIO16 instead
 
 light:
   - platform: rgbw
