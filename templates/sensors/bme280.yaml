@@ -1,0 +1,26 @@
+# BME280 Temperature, Humidity and Pressure Sensor Template
+# BME280 I2C sensor
+# Connections: SCL to GPIO22, SDA to GPIO21 (ESP32 default)
+#              SCL to GPIO5, SDA to GPIO4 (ESP8266 default)
+
+i2c:
+  sda: GPIO21  # Change for ESP8266: GPIO4
+  scl: GPIO22  # Change for ESP8266: GPIO5
+  scan: true
+
+sensor:
+  - platform: bme280
+    temperature:
+      name: "${friendly_name} Temperature"
+      oversampling: 16x
+      accuracy_decimals: 1
+    pressure:
+      name: "${friendly_name} Pressure"
+      oversampling: 16x
+      accuracy_decimals: 1
+    humidity:
+      name: "${friendly_name} Humidity"
+      oversampling: 16x
+      accuracy_decimals: 1
+    address: 0x76  # or 0x77
+    update_interval: 60s

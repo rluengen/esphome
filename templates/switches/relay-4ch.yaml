@@ -1,0 +1,29 @@
+# Multi-Relay Template (4 channels)
+# Common for Sonoff 4CH or similar multi-relay boards
+
+switch:
+  - platform: gpio
+    name: "${friendly_name} Relay 1"
+    pin: GPIO12
+    id: relay_1
+    restore_mode: RESTORE_DEFAULT_OFF
+
+  - platform: gpio
+    name: "${friendly_name} Relay 2"
+    pin: GPIO5
+    id: relay_2
+    restore_mode: RESTORE_DEFAULT_OFF
+
+  - platform: gpio
+    name: "${friendly_name} Relay 3"
+    pin: GPIO4
+    id: relay_3
+    restore_mode: RESTORE_DEFAULT_OFF
+
+  - platform: gpio
+    name: "${friendly_name} Relay 4"
+    pin: GPIO15
+    id: relay_4
+    restore_mode: RESTORE_DEFAULT_OFF
+    # Note: GPIO15 has a pull-down resistor and must be LOW at boot on ESP8266
+    # If this causes issues with your relay, consider using GPIO16 instead

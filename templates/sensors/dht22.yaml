@@ -1,0 +1,19 @@
+# DHT22 Temperature and Humidity Sensor Template
+# DHT22 (also works with DHT11, DHT21)
+# Connection: Connect data pin to GPIO pin specified below
+
+sensor:
+  - platform: dht
+    pin: GPIO2  # Change this to your GPIO pin (GPIO2 works on both ESP8266 and ESP32)
+    model: DHT22  # Options: DHT11, DHT22, DHT21, AM2302
+    temperature:
+      name: "${friendly_name} Temperature"
+      accuracy_decimals: 1
+      filters:
+        - offset: 0.0  # Calibration offset if needed
+    humidity:
+      name: "${friendly_name} Humidity"
+      accuracy_decimals: 1
+      filters:
+        - offset: 0.0  # Calibration offset if needed
+    update_interval: 60s
