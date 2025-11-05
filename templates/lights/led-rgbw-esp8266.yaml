@@ -1,20 +1,20 @@
-# RGBW LED Strip Template
-# PWM controlled RGBW LED strip (with separate white channel)
+# RGBW LED Strip Template - ESP8266
+# PWM controlled RGBW LED strip (with separate white channel) using ESP8266 PWM
 
 output:
-  - platform: esp8266_pwm  # Use ledc for ESP32
+  - platform: esp8266_pwm
     pin: GPIO14
     frequency: 1000 Hz
     id: pwm_r
-  - platform: esp8266_pwm  # Use ledc for ESP32
+  - platform: esp8266_pwm
     pin: GPIO12
     frequency: 1000 Hz
     id: pwm_g
-  - platform: esp8266_pwm  # Use ledc for ESP32
+  - platform: esp8266_pwm
     pin: GPIO13
     frequency: 1000 Hz
     id: pwm_b
-  - platform: esp8266_pwm  # Use ledc for ESP32
+  - platform: esp8266_pwm
     pin: GPIO15
     frequency: 1000 Hz
     id: pwm_w

@@ -91,10 +91,13 @@ Located in `templates/switches/`:
 
 Located in `templates/lights/`:
 
-- **`led-single.yaml`** - Single color PWM LED strip
-- **`led-rgb.yaml`** - RGB LED strip (PWM)
-- **`led-rgbw.yaml`** - RGBW LED strip (PWM)
-- **`led-ws2812b.yaml`** - Addressable LED strip (WS2812B/NeoPixel)
+- **`led-single-esp8266.yaml`** - Single color PWM LED strip for ESP8266
+- **`led-single-esp32.yaml`** - Single color PWM LED strip for ESP32
+- **`led-rgb-esp8266.yaml`** - RGB LED strip (PWM) for ESP8266
+- **`led-rgb-esp32.yaml`** - RGB LED strip (PWM) for ESP32
+- **`led-rgbw-esp8266.yaml`** - RGBW LED strip (PWM) for ESP8266
+- **`led-rgbw-esp32.yaml`** - RGBW LED strip (PWM) for ESP32
+- **`led-ws2812b.yaml`** - Addressable LED strip (WS2812B/NeoPixel) - works on both platforms
 
 ## 💡 Complete Examples
 

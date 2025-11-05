@@ -25,3 +25,5 @@ switch:
     pin: GPIO15
     id: relay_4
     restore_mode: RESTORE_DEFAULT_OFF
+    # Note: GPIO15 has a pull-down resistor and must be LOW at boot on ESP8266
+    # If this causes issues with your relay, consider using GPIO16 instead
