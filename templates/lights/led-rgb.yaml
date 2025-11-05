@@ -1,0 +1,28 @@
+# RGB LED Strip Template
+# PWM controlled RGB LED strip
+
+output:
+  - platform: esp8266_pwm  # Use ledc for ESP32
+    pin: GPIO14
+    frequency: 1000 Hz
+    id: pwm_r
+  - platform: esp8266_pwm  # Use ledc for ESP32
+    pin: GPIO12
+    frequency: 1000 Hz
+    id: pwm_g
+  - platform: esp8266_pwm  # Use ledc for ESP32
+    pin: GPIO13
+    frequency: 1000 Hz
+    id: pwm_b
+
+light:
+  - platform: rgb
+    name: "${friendly_name} Light"
+    red: pwm_r
+    green: pwm_g
+    blue: pwm_b
+    # Optional effects:
+    effects:
+      - random:
+      - strobe:
+      - flicker:

@@ -1,0 +1,54 @@
+# Base Common Configuration
+# Include this in your device configs with: <<: !include templates/base/common.yaml
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: !secret api_encryption_key
+
+# Enable Over-The-Air updates
+ota:
+  password: !secret ota_password
+
+# Status LED (optional - uncomment if needed)
+# status_led:
+#   pin:
+#     number: GPIO2
+#     inverted: true
+
+# Binary sensors for device status
+binary_sensor:
+  - platform: status
+    name: "${friendly_name} Status"
+
+# Restart switch
+switch:
+  - platform: restart
+    name: "${friendly_name} Restart"
+
+# Uptime sensor
+sensor:
+  - platform: uptime
+    name: "${friendly_name} Uptime"
+    update_interval: 60s
+
+  - platform: wifi_signal
+    name: "${friendly_name} WiFi Signal"
+    update_interval: 60s
+
+# Text sensor for device information
+text_sensor:
+  - platform: version
+    name: "${friendly_name} ESPHome Version"
+    hide_timestamp: true
+  
+  - platform: wifi_info
+    ip_address:
+      name: "${friendly_name} IP Address"
+    ssid:
+      name: "${friendly_name} Connected SSID"
+    bssid:
+      name: "${friendly_name} Connected BSSID"

@@ -1,0 +1,16 @@
+# BH1750 Light Sensor Template
+# I2C ambient light sensor
+# Connections: SCL to GPIO22, SDA to GPIO21 (ESP32 default)
+#              SCL to GPIO5, SDA to GPIO4 (ESP8266 default)
+
+i2c:
+  sda: GPIO21  # Change for ESP8266: GPIO4
+  scl: GPIO22  # Change for ESP8266: GPIO5
+  scan: true
+
+sensor:
+  - platform: bh1750
+    name: "${friendly_name} Illuminance"
+    address: 0x23  # or 0x5C
+    update_interval: 30s
+    accuracy_decimals: 1
