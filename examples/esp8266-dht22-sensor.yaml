@@ -1,6 +1,6 @@
 # Complete Example: ESP8266 Temperature & Humidity Sensor
 # Hardware: ESP8266 (NodeMCU v2) + DHT22 sensor
-# DHT22 data pin connected to GPIO23
+# DHT22 data pin connected to GPIO2 (D4 on NodeMCU)
 
 substitutions:
   devicename: bedroom_sensor
@@ -20,7 +20,7 @@ esp8266:
 # DHT22 Temperature and Humidity Sensor
 sensor:
   - platform: dht
-    pin: GPIO23
+    pin: GPIO2  # D4 on NodeMCU
     model: DHT22
     temperature:
       name: "${friendly_name} Temperature"

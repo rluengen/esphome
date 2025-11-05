@@ -2,7 +2,7 @@
 # One-wire temperature sensor, supports multiple sensors on one pin
 
 dallas:
-  - pin: GPIO23  # Change this to your GPIO pin
+  - pin: GPIO2  # Change this to your GPIO pin (GPIO2 works on both ESP8266 and ESP32)
     update_interval: 60s
 
 sensor:
