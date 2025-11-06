@@ -1,0 +1,271 @@
+#https://www.waveshare.com/esp32-s3-poe-eth-8di-8do.htm?___SID=U
+
+substitutions:
+substitutions:
+  device_name: waveshare-di8-do8
+  device_comment: "WaveShare ESP32-S3-POE-ETH-8DI-8DO Device"
+  friendly_name: "WaveShare DI8-DO8"
+
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
+  min_version: 2025.5.0
+  comment: ${device_comment}
+  name_add_mac_suffix: false
+  on_boot:
+    then:
+      - pcf85063.read_time:
+          id: pcf85063_time
+
+esp32:
+  board: esp32s3box
+  flash_size: 16MB
+  framework:
+    type: esp-idf
+
+psram:
+  mode: octal
+  speed: 80MHz
+
+logger:
+
+api:
+
+ota:
+  - platform: esphome
+
+<<: !include ../templates/base/wifi.yaml
+
+i2c:
+  sda: GPIO42
+  scl: GPIO41
+  frequency: 100kHz
+  id: i2cbus
+  scan: false
+
+# 8-bit expander that drives DO1..DO8
+pca9554:
+  - id: tca9554_hub
+    address: 0x20
+
+### CANbus
+##canbus:
+##  - platform: esp32_can
+##    tx_pin: GPIO2
+##    rx_pin: GPIO3
+##    can_id: 4
+##    bit_rate: 125kbps
+
+# ==========================================================
+# Accessories
+# ==========================================================
+# Real-time Clock
+time:
+  - platform: homeassistant
+    id: ha_time
+    on_time_sync:
+      then:
+        # Update the RTC when the synchronization was successful
+        - pcf85063.write_time:
+  - platform: pcf85063
+    id: pcf85063_time
+
+# Buzzer
+output:
+  - platform: ledc
+    id: buzzer
+    pin:
+      number: GPIO46
+      ignore_strapping_warning: true
+
+rtttl:
+  id: rtttl_buzzer
+  output: buzzer
+  gain: 30%
+
+# RGB LED
+light:
+  - platform: esp32_rmt_led_strip
+    id: rgb_led
+    name: "RGB LED"
+    chipset: WS2812
+    rgb_order: RGB
+    pin: GPIO38
+    num_leds: 1
+
+# ==========================================================
+# Sensors
+# ==========================================================
+binary_sensor:
+  - platform: gpio
+    name: "Boot Button"
+    pin:
+      number: GPIO0
+      ignore_strapping_warning: true
+      mode:
+        input: true
+      inverted: true
+    disabled_by_default: true
+
+# --- Digital Inputs -----------------------------------------
+  - platform: gpio
+    id: di1
+    name: "Digital Input 1"
+    pin:
+      number: GPIO4
+      mode: INPUT_PULLUP
+      inverted: true
+    filters:
+      - delayed_on_off: 10ms
+
+  - platform: gpio
+    id: di2
+    name: "Digital Input 2"
+    pin:
+      number: GPIO5
+      mode: INPUT_PULLUP
+      inverted: true
+    filters:
+      - delayed_on_off: 10ms
+
+  - platform: gpio
+    id: di3
+    name: "Digital Input 3"
+    pin:
+      number: GPIO6
+      mode: INPUT_PULLUP
+      inverted: true
+    filters:
+      - delayed_on_off: 10ms
+
+  - platform: gpio
+    id: di4
+    name: "Digital Input 4"
+    pin:
+      number: GPIO7
+      mode: INPUT_PULLUP
+      inverted: true
+    filters:
+      - delayed_on_off: 10ms
+
+  - platform: gpio
+    id: di5
+    name: "Digital Input 5"
+    pin:
+      number: GPIO8
+      mode: INPUT_PULLUP
+      inverted: true
+    filters:
+      - delayed_on_off: 10ms
+
+  - platform: gpio
+    id: di6
+    name: "Digital Input 6"
+    pin:
+      number: GPIO9
+      mode: INPUT_PULLUP
+      inverted: true
+    filters:
+      - delayed_on_off: 10ms
+
+  - platform: gpio
+    id: di7
+    name: "Digital Input 7"
+    pin:
+      number: GPIO10
+      mode: INPUT_PULLUP
+      inverted: true
+    filters:
+      - delayed_on_off: 10ms
+
+  - platform: gpio
+    id: di8
+    name: "Digital Input 8"
+    pin:
+      number: GPIO11
+      mode: INPUT_PULLUP
+      inverted: true
+    filters:
+      - delayed_on_off: 10ms
+
+# --- Digital Outputs ----------------------------------------
+switch:
+  - platform: gpio
+    name: "Digital Output 1"
+    id: do1
+    pin:
+      pca9554: tca9554_hub
+      number: 0
+      mode:
+        output: true
+    inverted: true
+
+  - platform: gpio
+    name: "Digital Output 2"
+    id: do2
+    pin:
+      pca9554: tca9554_hub
+      number: 1
+      mode:
+        output: true
+    inverted: true
+
+  - platform: gpio
+    name: "Digital Output 3"
+    id: do3
+    pin:
+      pca9554: tca9554_hub
+      number: 2
+      mode:
+        output: true
+    inverted: true
+
+  - platform: gpio
+    name: "Digital Output 4"
+    id: do4
+    pin:
+      pca9554: tca9554_hub
+      number: 3
+      mode:
+        output: true
+    inverted: true
+
+  - platform: gpio
+    name: "Digital Output 5"
+    id: do5
+    pin:
+      pca9554: tca9554_hub
+      number: 4
+      mode:
+        output: true
+    inverted: true
+
+  - platform: gpio
+    name: "Digital Output 6"
+    id: do6
+    pin:
+      pca9554: tca9554_hub
+      number: 5
+      mode:
+        output: true
+    inverted: true
+
+  - platform: gpio
+    name: "Digital Output 7"
+    id: do7
+    pin:
+      pca9554: tca9554_hub
+      number: 6
+      mode:
+        output: true
+    inverted: true
+
+  - platform: gpio
+    name: "Digital Output 8"
+    id: do8
+    pin:
+      pca9554: tca9554_hub
+      number: 7
+      mode:
+        output: true
+    inverted: true

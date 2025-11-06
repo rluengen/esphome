@@ -1,0 +1,118 @@
+# https://quinled.info/quinled-an-penta-deca-esphome-configuration-example/
+
+substitutions:
+  device_name: quinled-an-penta-deca
+  friendly_name: QuinLED An-Penta-Deca LED Controller
+
+wifi: !include ../templates/base/wifi.yaml
+time: !include ../templates/base/time.yaml
+common: !include ../templates/base/common.yaml
+
+i2c:
+  sda: 15
+  scl: 16
+  scan: true
+
+switch:
+  - platform: restart
+    name: ${esphome_name}-restart
+    id: restart_switch
+
+output:
+  - platform: ledc
+    pin: 27
+    frequency: 19531Hz
+    id: LED_channel_1
+
+  - platform: ledc
+    pin: 26
+    frequency: 19531Hz
+    id: LED_channel_2
+
+  - platform: ledc
+    pin: 25
+    frequency: 19531Hz
+    id: LED_channel_3
+
+  - platform: ledc
+    pin: 23
+    frequency: 19531Hz
+    id: LED_channel_4
+
+  - platform: ledc
+    pin: 22
+    frequency: 19531Hz
+    id: LED_channel_5
+
+  - platform: ledc
+    pin: 21
+    frequency: 19531Hz
+    id: LED_channel_6
+
+  - platform: ledc
+    pin: 19
+    frequency: 19531Hz
+    id: LED_channel_7
+
+  - platform: ledc
+    pin: 18
+    frequency: 19531Hz
+    id: LED_channel_8
+
+  - platform: ledc
+    pin: 17
+    frequency: 19531Hz
+    id: LED_channel_9
+
+  - platform: ledc
+    pin: 14
+    frequency: 19531Hz
+    id: LED_channel_10
+
+  - platform: ledc
+    pin: 13
+    frequency: 19531Hz
+    id: LED_channel_11
+
+  - platform: ledc
+    pin: 12
+    frequency: 19531Hz
+    id: LED_channel_12
+
+  - platform: ledc
+    pin: 5
+    frequency: 19531Hz
+    id: LED_channel_13
+
+  - platform: ledc
+    pin: 4
+    frequency: 19531Hz
+    id: LED_channel_14
+
+  - platform: ledc
+    pin: 2
+    frequency: 19531Hz
+    id: LED_channel_15
+
+sensor:
+  - platform: uptime
+    name: "${esphome_name}_Uptime Sensor"
+
+binary_sensor:
+  - platform: gpio
+    pin: 36
+    name: Button_1
+    filters:
+      - invert:
+
+  - platform: gpio
+    pin: 39
+    name: Button_2
+    filters:
+      - invert:
+
+  - platform: gpio
+    pin: 34
+    name: Button_3
+    filters:
+      - invert:

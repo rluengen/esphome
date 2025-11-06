@@ -1,0 +1,130 @@
+# https://devices.esphome.io/devices/kincony-kc868-a2v3/
+
+esphome:
+  name: a2v3
+  friendly name: a2v3
+
+esp32:
+  board: esp32-s3-devkitc-1
+  framework:
+    type: arduino
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+
+ethernet:
+  type: W5500
+  clk_pin: GPIO42
+  mosi_pin: GPIO43
+  miso_pin: GPIO44
+  cs_pin: GPIO41
+  interrupt_pin: GPIO2
+  reset_pin: GPIO1
+
+  # todo: can this use movement sensors to detect that the awning is moving?
+cover:
+  - platform: feedback
+    name: Cover
+    id: cranky_cover
+    icon: "mdi:awning"
+    device_class: awning
+    assumed_state: false
+    max_duration: 60s
+    infer_endstop_from_movement: true
+    direction_change_wait_time: 1ms
+
+    open_action:
+      - switch.turn_on: winopen
+    open_duration:  ${open_duration}
+    #open_sensor: awning_moving_sensor
+    
+    close_action:
+      - switch.turn_on: winclose
+    close_duration: ${close_duration}
+    #close_sensor: awning_moving_sensor
+    
+    stop_action:
+      - switch.turn_off: winclose
+      - switch.turn_off: winopen
+
+i2c:
+   - id: bus_a
+     sda: 48
+     scl: 47
+     scan: true
+     frequency: 400kHz
+
+switch:
+  - platform: gpio
+    pin: 40
+    name: "A2v3-Relay1"
+    disabled_by_default: true
+
+  - platform: gpio
+    pin: 39
+    name: "A2v3-Relay2"
+    disabled_by_default: true
+
+binary_sensor:
+  - platform: gpio
+    name: "A2v3-input1"
+    pin:
+      number: 16
+      inverted: true
+
+  - platform: gpio
+    name: "A2v3-input2"
+    pin:
+      number: 17
+      inverted: true
+
+  - platform: gpio
+    name: "IO18"
+    pin:
+      number: 18
+      inverted: true
+
+  - platform: gpio
+    name: "IO8"
+    pin:
+      number: 8
+      inverted: true
+
+  - platform: gpio
+    name: "IO4"
+    pin:
+      number: 4
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+
+  - platform: gpio
+    name: "IO5"
+    pin:
+      number: 5
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+
+  - platform: gpio
+    name: "IO6"
+    pin:
+      number: 6
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+
+  - platform: gpio
+    name: "IO38"
+    pin:
+      number: 38
+      mode:
+        input: true
+        pullup: true
+      inverted: true

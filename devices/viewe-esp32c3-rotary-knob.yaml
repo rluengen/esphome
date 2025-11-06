@@ -1,0 +1,71 @@
+# https://community.home-assistant.io/t/1-28-inch-240-240-esp32c3-round-display-with-rotary-knob-uedx24240013-md50e-by-viewe-company/786687
+# https://github.com/dmit2k/viewe-knob-display-esphome
+
+substitutions:
+  device_name: display-knob
+  friendly_name: Rotary Knob Display
+
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
+  platform: ESP32
+  board: esp32c3_devkitm_1
+
+packages:
+  - !include ../templates/common.yaml
+  - !include ../templates/network/wifi.yaml
+
+# to extend package, using ! https://esphome.io/components/packages/#extend
+
+
+lvgl:
+
+spi:
+  id: spi_bus
+  clk_pin: 1
+  mosi_pin: 0
+
+display:
+  - platform: ili9xxx
+    model: GC9A01A
+    cs_pin: 10
+    dc_pin: 4
+    reset_pin: 2
+    rotation: 0
+    id: round_display
+    spi_id: spi_bus
+    invert_colors: true
+    auto_clear_enabled: false
+    update_interval: never
+
+output:
+  - platform: ledc
+    id: backlight_output
+    inverted: True
+    pin: 8
+    frequency: 5000Hz
+
+light:
+  - platform: monochromatic
+    name: "Display Backlight"
+    output: backlight_output
+    restore_mode: RESTORE_DEFAULT_ON
+
+sensor:
+  - platform: rotary_encoder
+    id: my_rotary_encoder
+    name: "Rotary Encoder"
+    pin_a: 6
+    pin_b: 7
+    resolution: 2
+
+binary_sensor:
+  - platform: gpio
+    id: encoder_button
+    pin: 
+      number: 9
+      inverted: true
+    name: "Rotary Encoder Button"
+    filters:
+      - delayed_on: 50ms
+      - delayed_off: 50ms

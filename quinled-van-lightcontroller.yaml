@@ -1,0 +1,91 @@
+# https://esphome.io/components/
+
+project_version: "1.0.0"
+hidden_ssid: true
+
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
+  project:
+    name: ${project_name}
+    version: ${project_version}
+
+light:
+  - platform: monochromatic
+    name: "${esphome_name}-L1"
+    default_transition_length: 1s
+    id: LED1
+    output: LED_channel_1
+  - platform: monochromatic
+    name: "${esphome_name}-L2"
+    default_transition_length: 1s
+    id: LED2
+    output: LED_channel_2
+  - platform: monochromatic
+    name: "${esphome_name}-L3"
+    default_transition_length: 1s
+    id: LED3
+    output: LED_channel_3
+  - platform: monochromatic
+    name: "${esphome_name}-L4"
+    default_transition_length: 1s
+    id: LED4
+    output: LED_channel_4
+    
+  - platform: monochromatic
+    name: "${esphome_name}-L5"
+    default_transition_length: 1s
+    id: LED5
+    output: LED_channel_5
+  - platform: monochromatic
+    name: "${esphome_name}-L6"
+    default_transition_length: 1s
+    id: LED6
+    output: LED_channel_6
+  - platform: monochromatic
+    name: "${esphome_name}-L7"
+    default_transition_length: 1s
+    id: LED7
+    output: LED_channel_7
+  - platform: monochromatic
+    name: "${esphome_name}-L8"
+    default_transition_length: 1s
+    id: LED8
+    output: LED_channel_8
+  - platform: monochromatic
+    name: "${esphome_name}-L9"
+    default_transition_length: 1s
+    id: LED9
+    output: LED_channel_9
+    
+  - platform: monochromatic
+    name: "${esphome_name}-L10"
+    default_transition_length: 1s
+    id: LED10
+    output: LED_channel_10
+  - platform: monochromatic
+    name: "${esphome_name}-L11"
+    default_transition_length: 1s
+    id: LED11
+    output: LED_channel_11
+  - platform: monochromatic
+    name: "${esphome_name}-L12"
+    default_transition_length: 1s
+    id: LED12
+    output: LED_channel_12
+  - platform: monochromatic
+    name: "${esphome_name}-L13"
+    default_transition_length: 1s
+    id: LED13
+    output: LED_channel_13
+  - platform: monochromatic
+    name: "${esphome_name}-L14"
+    default_transition_length: 1s
+    id: LED14
+    output: LED_channel_14
+    
+  - platform: monochromatic
+    name: "${esphome_name}-L15"
+    default_transition_length: 1s
+    id: LED15
+    output: LED_channel_15
