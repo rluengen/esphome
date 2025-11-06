@@ -10,82 +10,115 @@ esphome:
     name: ${project_name}
     version: ${project_version}
 
+# The QuinLED An-Penta-Deca comes with 6x 6.3A positive terminals. These should be divided evenly.
+# The negative side is 15 "medium" power channels at max 5A.
 light:
+  - platform: cwww
+    cold_white: LED_channel_1
+    warm_white: LED_channel_2
+    id: cwww_led_strip_1
+    name: "${device_name}-cct1"
+    default_transition_length: 500ms
+    cold_white_color_temperature: 6500 K
+    warm_white_color_temperature: 2700 K
+
   - platform: monochromatic
-    name: "${esphome_name}-L1"
-    default_transition_length: 1s
-    id: LED1
-    output: LED_channel_1
-  - platform: monochromatic
-    name: "${esphome_name}-L2"
-    default_transition_length: 1s
-    id: LED2
-    output: LED_channel_2
-  - platform: monochromatic
-    name: "${esphome_name}-L3"
+    name: "${device_name}-l3"
     default_transition_length: 1s
     id: LED3
     output: LED_channel_3
+
   - platform: monochromatic
-    name: "${esphome_name}-L4"
+    name: "${device_name}-l4"
     default_transition_length: 1s
     id: LED4
     output: LED_channel_4
     
   - platform: monochromatic
-    name: "${esphome_name}-L5"
+    name: "${device_name}-l5"
     default_transition_length: 1s
     id: LED5
     output: LED_channel_5
+
   - platform: monochromatic
-    name: "${esphome_name}-L6"
+    name: "${device_name}-l6"
     default_transition_length: 1s
     id: LED6
     output: LED_channel_6
+
   - platform: monochromatic
-    name: "${esphome_name}-L7"
+    name: "${device_name}-l7"
     default_transition_length: 1s
     id: LED7
     output: LED_channel_7
+
   - platform: monochromatic
-    name: "${esphome_name}-L8"
+    name: "${device_name}-l8"
     default_transition_length: 1s
     id: LED8
     output: LED_channel_8
+
   - platform: monochromatic
-    name: "${esphome_name}-L9"
+    name: "${device_name}-L9"
     default_transition_length: 1s
     id: LED9
     output: LED_channel_9
     
   - platform: monochromatic
-    name: "${esphome_name}-L10"
+    name: "${device_name}-L10"
     default_transition_length: 1s
     id: LED10
     output: LED_channel_10
+
   - platform: monochromatic
-    name: "${esphome_name}-L11"
+    name: "${device_name}-L11"
     default_transition_length: 1s
     id: LED11
     output: LED_channel_11
+
   - platform: monochromatic
-    name: "${esphome_name}-L12"
+    name: "${device_name}-L12"
     default_transition_length: 1s
     id: LED12
     output: LED_channel_12
+
   - platform: monochromatic
-    name: "${esphome_name}-L13"
+    name: "${device_name}-L13"
     default_transition_length: 1s
     id: LED13
     output: LED_channel_13
+
   - platform: monochromatic
-    name: "${esphome_name}-L14"
+    name: "${device_name}-L14"
     default_transition_length: 1s
     id: LED14
     output: LED_channel_14
     
   - platform: monochromatic
-    name: "${esphome_name}-L15"
+    name: "${device_name}-L15"
     default_transition_length: 1s
     id: LED15
     output: LED_channel_15
+    output: LED_channel_15
+
+binary_sensor:
+  - platform: gpio
+    pin: 36
+    name: Button_1
+    id: button_1
+    filters:
+      - invert:
+
+  - platform: gpio
+    pin: 39
+    name: Button_2
+    id: button_2
+    filters:
+      - invert:
+
+  - platform: gpio
+    pin: 34
+    name: Button_3
+    id: button_3
+    filters:
+      - invert:
