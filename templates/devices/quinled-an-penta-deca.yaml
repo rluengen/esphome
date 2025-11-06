@@ -4,9 +4,15 @@ substitutions:
   device_name: quinled-an-penta-deca
   friendly_name: QuinLED An-Penta-Deca LED Controller
 
-wifi: !include ../templates/base/wifi.yaml
-time: !include ../templates/base/time.yaml
-common: !include ../templates/base/common.yaml
+packages:
+  device: !include ../templates/device.yaml
+  time: !include  ../templates/time/homeassistant.yaml
+  network: !include ../templates/network/wifi.yaml
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
 
 i2c:
   sda: 15
@@ -101,18 +107,18 @@ sensor:
 binary_sensor:
   - platform: gpio
     pin: 36
-    name: Button_1
+    name: button_1
     filters:
       - invert:
 
   - platform: gpio
     pin: 39
-    name: Button_2
+    name: button_2
     filters:
       - invert:
 
   - platform: gpio
     pin: 34
-    name: Button_3
+    name: button_3
     filters:
       - invert:
