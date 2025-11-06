@@ -14,12 +14,6 @@ api:
 ota:
   password: !secret ota_password
 
-# Status LED (optional - uncomment if needed)
-# status_led:
-#   pin:
-#     number: GPIO2
-#     inverted: true
-
 # Binary sensors for device status
 binary_sensor:
   - platform: status
