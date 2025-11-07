@@ -1,0 +1,13 @@
+# Template for a dial controller using ESP32 with a rotary encoder and display.
+
+substitutions:
+  device_name: light-dial-controller
+  friendly_name: Light Dial Controller
+
+project_version: "1.0.0"
+
+packages:
+  - !include templates/common.yaml
+  - !include templates/network/wifi.yaml
+  - !include templates/time/homeassistant.yaml
+  - !include devices/viewe-esp32c3-rotary-knob.yaml

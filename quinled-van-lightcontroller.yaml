@@ -1,17 +1,28 @@
 # https://esphome.io/components/
 
+substitutions:
+  device_name: quinled-van-lightcontroller
+  friendly_name: QuinLED An-Penta-Deca LED Controller
+
 project_version: "1.0.0"
 hidden_ssid: true
 
+packages:
+  - !include templates/common.yaml
+  - !include templates/network/wifi.yaml
+  - !include templates/time/homeassistant.yaml
+  - !include devices/kincony-kc868-a2v3-sp32-s3.yaml
+
 esphome:
-  name: ${name}
-  friendly_name: ${friendly_name}
+  name: ${device_name}
+  friendly name: ${friendly_name}
   project:
     name: ${project_name}
     version: ${project_version}
 
 # The QuinLED An-Penta-Deca comes with 6x 6.3A positive terminals. These should be divided evenly.
 # The negative side is 15 "medium" power channels at max 5A.
+
 light:
   - platform: cwww
     cold_white: LED_channel_1
@@ -99,26 +110,25 @@ light:
     default_transition_length: 1s
     id: LED15
     output: LED_channel_15
-    output: LED_channel_15
 
 binary_sensor:
   - platform: gpio
     pin: 36
-    name: Button_1
+    name: Button 1
     id: button_1
     filters:
       - invert:
 
   - platform: gpio
     pin: 39
-    name: Button_2
+    name: Button 2
     id: button_2
     filters:
       - invert:
 
   - platform: gpio
     pin: 34
-    name: Button_3
+    name: Button 3
     id: button_3
     filters:
       - invert:

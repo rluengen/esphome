@@ -1,0 +1,9 @@
+# https://esphome.io/components/time/homeassistant/
+# https://esphome.io/components/time/#base_time_config
+
+time:
+  - platform: homeassistant
+    id: time_entity
+    on_time_sync:
+      then:
+        - logger.log: "Synchronized system clock"

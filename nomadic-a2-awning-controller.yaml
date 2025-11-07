@@ -1,0 +1,91 @@
+# Template for a ESP32 Home Assistant Awning Controller controlling the Nomadic A2 Awning
+# through a Kincony KC868-A2V3 board.
+
+substitutions:
+  device_name: nomadic-a2-awning
+  friendly_name: Nomadic A2 Awning
+
+esphome:
+  name: ${device_name}
+  friendly name: ${friendly_name}
+
+packages:
+  - !include packages/common.yaml
+  - !include packages/network/wifi.yaml
+  - !include packages/time/homeassistant.yaml
+  - !include devices/kincony-kc868-a2v3-sp32-s3.yaml
+
+# The awning motor is controlled by two relays to set the motor direction.
+# relay1     relay2    motor     state
+# off        off       -  -      stopped
+# on         off       +  -      opening
+# off        on        -  +      closing
+# on         on        +  +      stopped
+
+# relay common values will be attached to the motor power
+# Ground is attached to the normally closed pin of both relays.
+# Positive voltage is attached to the normally open pin of both relays.
+
+# Feedback sensor is used to detect when the awning stops moving when current
+# is no longer being drawn from the motor. This implies that the awning has hit an
+# internal limit switch and is fully open or fully closed. This current sensor output
+# relay is connected to input_1 on the Kincony board.
+#
+# 0-10A DC Current Sensor Module Relay
+
+number:
+  - platform: template
+    name: "Awning Open Duration"
+    id: open_duration_number
+    min_value: 10
+    max_value: 120
+    step: 1
+    unit_of_measurement: "s"
+    icon: "mdi:timer-sand"
+    optimistic: true
+    initial_value: 60
+    restore_value: true
+
+  - platform: template
+    name: "Awning Close Duration"
+    id: close_duration_number
+    min_value: 10
+    max_value: 120
+    step: 1
+    unit_of_measurement: "s"
+    icon: "mdi:timer-sand"
+    optimistic: true
+    initial_value: 60
+    restore_value: true
+
+# The feedback cover platform allows you to create covers with position control that can optionally have
+# feedback from sensors to detect the fully-open and fully-closed states (endstops), and from sensors to 
+# detect actual movement (opening/closing).
+cover:
+  - platform: feedback
+    name: Nomadic A2 Awning Cover
+    id: nomadic_a2_awning_cover
+    icon: "mdi:awning"
+    device_class: awning
+    assumed_state: false
+    max_duration: 60s
+    infer_endstop_from_movement: true
+    direction_change_wait_time: 1s
+
+    open_action:
+      - switch.turn_on: relay1
+      - switch.turn_off: relay2
+    open_duration:
+      - lambda: 'return (uint32_t)(id(open_duration_number).state * 1000.0f);'
+    open_sensor: input_1
+    
+    close_action:
+      - switch.turn_off: relay1
+      - switch.turn_on: relay2
+    close_duration:
+      - lambda: 'return (uint32_t)(id(close_duration_number).state * 1000.0f);'
+    close_sensor: input_1
+    
+    stop_action:
+      - switch.turn_off: relay1
+      - switch.turn_off: relay2

@@ -2,7 +2,6 @@
 time:
   - platform: sntp
     id: time_entity
-    timezone: !secret time_zone
     servers:
       - 0.pool.ntp.org
       - 1.pool.ntp.org

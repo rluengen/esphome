@@ -1,0 +1,118 @@
+# Recreational Vehicle Programmable Special Module (PSM) Configuration for ESPHome
+# using the waveshare esp32 s3 8di 8do board.
+
+# Programmable Special Module Standard Programs
+# https://www.mbvans.com/en/upfitter/resources/psm-programs
+
+substitutions:
+  device_name: rv-psm-module
+  friendly_name: RV PSM Module
+
+project_version: "1.0.0"
+
+packages:
+  - !include templates/common.yaml
+  - !include templates/network/wifi.yaml
+  - !include templates/time/homeassistant.yaml
+  - !include devices/waveshare-esp32-s3-8di-8do.yaml
+
+# https://www.mbvans.com/content/dam/mb-vans/us/upfitter/psm-programs/MY25_RV_Software_Specification_V4.pdf
+# outputs:
+# hazard warning lights
+# vehicle lock
+
+#inputs:
+# gear in park
+
+binary_sensor:
+  - platform: template
+    id: any-door-open
+    name: "Any Door Open"
+    icon: "mdi:car-door"
+    lambda: |-
+      if (id(passenger_door_open).state || id(driver_door_open).state || id(sliding_door_open).state || id(rear_door_open).state) {
+        return true;
+      } else {
+        return false;
+      }
+
+  - id: !extend di3
+    name: "Passenger Door Open"
+    comment: "Connector 2, Pin 12, High"
+    icon: "mdi:car-door"
+    on_state:
+      - component.update: any-door-open
+
+  - id: !extend di3
+    name: "Driver Door Open"
+    comment: "Connector , Pin , High"
+    icon: "mdi:car-door"
+    on_state:
+      - component.update: any-door-open
+
+  - id: !extend di3
+    name: "Sliding Door Open"
+    comment: "Connector , Pin , High"
+    icon: "mdi:car-door"
+    on_state:
+      - component.update: any-door-open
+
+  - id: !extend di3
+    name: "Rear Door Open"
+    comment: "Connector , Pin , High"
+    icon: "mdi:car-door"
+    on_state:
+      - component.update: any-door-open
+
+
+  - id: !extend di3
+    name: "Vehicle Locked"
+    comment: "Connector , Pin , High"
+    icon: "mdi:car-lock"
+
+  - id: !extend di3
+    name: "Vehicle Unlocked"
+    comment: "Connector , Pin , High"
+    icon: "mdi:car-lock"
+
+
+  - id: !extend di1
+    name: "Gear in 'P'"
+    icon: "mdi:car-shift-pattern"
+
+    # Gear NOT in 'P'
+    # Gear in 'R'
+
+    # Vehicle Speed > 0 mph
+    # Ignition On
+    # Park Brake ON
+
+    # Brake Lights
+    # Left Turn Signal
+    # Right Turn Signal
+
+
+switch:
+  - id: !extend do1
+    name: "Vehicle Lock"
+    comment: "Connector 3, Pin 30"
+    icon: "mdi:car-lock"
+    device_class: lock
+
+  - id: !extend do2
+    name: "Hazard Lights"
+    icon: "mdi:car-hazard"
+    device_class: safety
+
+  - id: !extend do3
+    disabled_by_default: true
+  - id: !extend do4
+    disabled_by_default: true
+  - id: !extend do5
+    disabled_by_default: true
+  - id: !extend do6
+    disabled_by_default: true
+  - id: !extend do7
+    disabled_by_default: true
+  - id: !extend do8
+    disabled_by_default: true
