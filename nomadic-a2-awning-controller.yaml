@@ -9,6 +9,8 @@ esphome:
   name: ${device_name}
   friendly name: ${friendly_name}
 
+# https://esphome.io/components/cover/current_based/
+
 packages:
   - !include packages/common.yaml
   - !include packages/network/wifi.yaml
@@ -33,6 +35,7 @@ packages:
 #
 # 0-10A DC Current Sensor Module Relay
 
+# do I need this if I have a current sensor that listens to the motor current draw?
 number:
   - platform: template
     name: "Awning Open Duration"
