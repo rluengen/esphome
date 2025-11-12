@@ -60,15 +60,17 @@ select:
     options:
       - "All Lights"
       - "Front Can Lights"
-      - "Rear Can Lights"
-      - "Capsule Lights"
+      - "Bed Can Lights"
+      - "Capsule Lights" # driver and passenger areas
       - "Exterior Lights"
     set_action:
       - lambda: |-
           auto s = id(device_select).state;
-          if (s == "Living Room") { id(selected_idx) = 0; }
-          else if (s == "Desk")   { id(selected_idx) = 1; }
-          else if (s == "Lamp")   { id(selected_idx) = 2; }
+          if (s == "All Lights") { id(selected_idx) = 0; }
+          else if (s == "Front Can Lights")   { id(selected_idx) = 1; }
+          else if (s == "Bed Can Lights")   { id(selected_idx) = 2; }
+          else if (s == "Capsule Lights")   { id(selected_idx) = 3; }
+          else if (s == "Exterior Lights")   { id(selected_idx) = 4; }
       - script.execute: sync_from_ha_for_selected
 
 
