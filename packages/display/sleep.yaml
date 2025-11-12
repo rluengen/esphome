@@ -1,0 +1,83 @@
+touchscreen:
+# - id: !extend touchscreen
+  on_touch:
+    - script.execute: bump_activity
+
+globals:
+  - id: last_input_ms
+    type: uint32_t
+    restore_value: no
+    initial_value: "0"
+
+  - id: screen_is_off
+    type: bool
+    restore_value: no
+
+interval:
+  - interval: 1s
+    then:
+      - lambda: |-
+          const uint32_t now = millis();
+          // Initialize at boot
+          if (id(last_input_ms) == 0) id(last_input_ms) = now;
+
+          const uint32_t idle_ms = now - id(last_input_ms);
+          if (!id(screen_is_off) && idle_ms > (uint32_t) atoi("${SCREEN_IDLE_MS}")) {
+            id(enter_screen_off).execute();
+          }
+
+script:
+  # Call whenever user interacts (touch / button)
+  - id: bump_activity
+    then:
+      - lambda: |-
+          id(last_input_ms) = millis();
+      - if:
+          condition:
+            lambda: 'return id(screen_is_off);'
+          then:
+            - script.execute: exit_screen_off
+
+  # Turn off: pick A or B or both
+  - id: enter_screen_off
+    then:
+      # Optionally tell LVGL to go to sleep (reduces CPU draw)
+      - lvgl.sleep.enable
+      # Option A: cut panel EN
+      - if:
+          condition:
+            lambda: 'return true;'  # set false if you don’t use EN
+          then:
+            - switch.turn_off: panel_power
+      # Option B: panel sleep via display action
+      - if:
+          condition:
+            lambda: 'return true;'  # set false if you don’t use display actions
+          then:
+            - display.turn_off: disp
+      - lambda: |-
+          id(screen_is_off) = true;
+
+  # Turn on again (first tap wakes; second tap interacts)
+  - id: exit_screen_off
+    then:
+      # Power first (if using EN)
+      - if:
+          condition:
+            lambda: 'return true;'  # set false if no EN
+          then:
+            - switch.turn_on: panel_power
+            - delay: 60ms   # give panel rails time to rise
+      # Wake panel
+      - if:
+          condition:
+            lambda: 'return true;'  # set false if not using display actions
+          then:
+            - display.turn_on: disp
+      # Re-enable LVGL rendering
+      - lvgl.sleep.disable
+      # Force a redraw so the first frame is crisp
+      - lvgl.redraw
+      - lambda: |-
+          id(screen_is_off) = false;
+          id(last_input_ms) = millis();   // restart the idle timer

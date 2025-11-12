@@ -8,9 +8,9 @@ project_version: "1.0.0"
 hidden_ssid: true
 
 packages:
-  - !include templates/common.yaml
-  - !include templates/network/wifi.yaml
-  - !include templates/time/homeassistant.yaml
+  - !include packages/common.yaml
+  - !include packages/network/wifi.yaml
+  - !include packages/time/homeassistant.yaml
   - !include devices/kincony-kc868-a2v3-sp32-s3.yaml
 
 esphome:

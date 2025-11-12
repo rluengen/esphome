@@ -47,6 +47,8 @@ sensor:
     pin_a: 6
     pin_b: 7
     resolution: 2
+    filters:
+      - debounce: 5ms
 
 binary_sensor:
   - platform: gpio
@@ -58,3 +60,14 @@ binary_sensor:
     filters:
       - delayed_on: 50ms
       - delayed_off: 50ms
+    on_click:
+      - min_length: 50ms
+        max_length: 500ms
+        then:
+          - logger.log: "Rotary encoder button clicked"
+      - min_length: 500ms
+        then:
+          - logger.log: "Rotary encoder button long pressed"
+    on_double_click:
+      then:
+        - logger.log: "Rotary encoder button double clicked"
