@@ -1,0 +1,320 @@
+# https://www.waveshare.com/esp32-s3-touch-amoled-1.75.htm
+# https://devices.esphome.io/devices/waveshare-esp32-s3-touch-amoled-1.75/
+
+# functionality:
+# turn the water pump on/off via manual control or automations based on water level
+# display water level on the screen
+# turn on drain valve to drain the tank
+# rotate the valves to fill from a dirty water source or a clean water source
+
+substitutions:
+  device_name: water-tank-display
+  friendly_name: Water Tank Display Controller
+
+project_version: "1.0.0"
+
+packages:
+  - !include packages/common.yaml
+  - !include packages/network/wifi.yaml
+  - !include packages/time/homeassistant.yaml
+  - !include packages/display/sleep.yaml
+  - !include devices/esp32-s3-touch-amoled-1.75.yaml
+
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
+  comment: "ESP32-S3 + CO5300 (QSPI) 466x466 + CST9217 touch"
+  project:
+    name: "waveshare.esp32-s3-touch-amoled-1_75"
+    version: "1.0"
+  platformio_options:
+    board_build.flash_mode: dio
+    board_build.f_flash: 80000000L
+    board_build.f_cpu: 240000000L
+
+number:
+  - platform: template
+    name: "Water Tank Level"
+    id: water_tank_level
+    unit_of_measurement: "%"
+    icon: "mdi:water-percent"
+    min_value: 0
+    max_value: 100
+    step: 1
+    optimistic: true
+    initial_value: 0
+    restore_value: true
+    on_value:
+      then:
+        - lambda: |-
+            // Update overall gauge when number changes
+            const int pct = (int)x;
+            id(update_gauge).execute(pct);
+
+  - platform: template
+    name: "Water Capacity"
+    id: water_capacity_gallons
+    unit_of_measurement: "gal"
+    icon: "mdi:water"
+    accuracy_decimals: 1
+    update_interval: 1s
+    lambda: "return id(tank_percent).state;"   # input is percent
+
+    filters:
+      - calibrate_linear:
+          # percent -> gallons (measure at several levels while filling)
+          - 0    -> 0
+          - 10   -> 3.0
+          - 25   -> 10.0
+          - 50   -> 26.0
+          - 75   -> 40.0
+          - 90   -> 46.0
+
+
+# --- Resistive sender ? ADC (example wiring) ---
+# Wire the unknown sensor resistance (R_sensor) as a divider with a known R_fixed to 3.3V.
+# Read the midpoint on an ADC-capable pin.
+sensor:
+  - platform: adc
+    id: adc_water
+    pin: GPIO1              # <-- pick a real ADC pin on your S3
+    attenuation: 11db       # gives up to ~3.3V reading range
+    update_interval: 1s
+    filters:
+      - median:
+          window_size: 7
+          send_every: 1
+          send_first_at: 1
+    accuracy_decimals: 3
+
+
+  # Convert ADC voltage -> sensor resistance (Ohm).
+  # Assumptions: adc_water returns volts (ESPHome does). If you configured it to return ratio,
+  # multiply by 3.3 first.
+  - platform: template
+    id: water_sensor_ohms
+    name: "Water Sensor ?"
+    unit_of_measurement: "?"
+    update_interval: 1s
+    accuracy_decimals: 1
+    lambda: |-
+      const float Vref   = 3.30f;     // ESP32 ADC reference
+      const float R_fixed = 1000.0f;  // <-- your known series resistor (Ohm)
+      const float v = id(adc_water).state;  // volts
+      // Avoid divide-by-zero near full-scale
+      if (v <= 0.01f || v >= (Vref - 0.01f)) return NAN;
+      float R = R_fixed * (v / (Vref - v));
+      return R;
+
+
+  - platform: template
+    id: tank_percent
+    name: "Water Level %"
+    unit_of_measurement: "%"
+    update_interval: 1s
+    accuracy_decimals: 0
+    lambda: "return id(water_sensor_ohms).state;"
+    filters:
+      # Replace the pairs below with your sender's actual calibration points.
+      # Format: measured_ohms -> percent
+      - calibrate_linear:
+          - 33.0  -> 100.0   # full
+          - 240.0 -> 0.0     # empty
+      - clamp:
+          min_value: 0.0
+          max_value: 100.0
+    on_value:
+      then:
+        # Keep the UI in sync from the physical sensor, too.
+        - script.execute:
+            id: ui_update_from_percent
+            pct: !lambda "return (int)x;"
+        # Optionally mirror it into the number template so HA shows the same value:
+        - number.set:
+            id: gauge_percent
+            value: !lambda "return x;"
+
+  # Gallons remaining (linear tank). If your tank isn’t linear, see Section C.2 below.
+  - platform: template
+    id: tank_gallons
+    name: "Water Remaining"
+    unit_of_measurement: "gal"
+    accuracy_decimals: 1
+    update_interval: 1s
+    lambda: |-
+      const float cap = id(tank_capacity_gal).state;
+      const float pct = id(tank_percent).state;
+      if (isnan(cap) || isnan(pct)) return NAN;
+      return cap * (pct / 100.0f);
+    on_value:
+      then:
+        - script.execute:
+            id: ui_update_from_percent
+            pct: !lambda "return (int) id(tank_percent).state;"
+
+font:
+  - file: "gfonts://Montserrat"
+    id: f_text_28
+    size: 28
+    bpp: 4
+  - file: "gfonts://Montserrat"
+    id: f_value_64
+    size: 64
+    bpp: 4
+
+# https://docs.lvgl.io/master/details/widgets/base_widget.html
+lvgl:
+  displays:
+    - display_id: display
+  touchscreens:
+    - touchscreen_id: touchscreen
+
+  on_ready:
+    then:
+      - lvgl.screen.create:
+          id: scr_main
+          bg_color: 0x000000
+
+      - lvgl.widget.create:
+          type: tabview
+          id: tv
+          parent: scr_main
+          width: 466
+          height: 466
+          x: 0
+          y: 0
+          tabbar_hidden: true
+          swipe: true
+
+      - lvgl.tab.create:
+          tabview_id: tv
+          id: tab_water_level
+          title: "Water Level"
+
+      - lvgl.tab.create:
+          tabview_id: tv
+          id: tab_other
+          title: ""
+
+      - lvgl.widget.create:
+          type: arc
+          id: gauge_arc
+          parent: tab_gauge
+          x: 23
+          y: 23
+          width: 420
+          height: 420
+          arc_width: 26
+          arc_color: 0x00D1B2 # Caribbean Green
+          range_from: 0
+          range_to: 100
+          value: 0
+          bg_angles: { start: 135, end: 405 } # 270° arc
+
+      - lvgl.widget.create:
+          type: label
+          id: gauge_value
+          parent: tab_gauge
+          text: "0%"
+          align: CENTER
+          text_color: 0xFFFFFF
+          text_font: f_value_64
+          
+      - lvgl.widget.create:
+          type: label
+          id: other_title
+          parent: tab_other
+          text: "Other Mode"
+          align: TOP_MID
+          x: 0
+          y: 20
+          text_color: 0xFFFFFF
+          text_font: f_text_36
+
+          
+      - lvgl.widget.create:
+          type: obj
+          id: tap_layer
+          parent: scr_main
+          width: 466
+          height: 466
+          x: 0
+          y: 0
+          bg_opa: TRANSP
+          clickable: true
+
+
+      - lvgl.event:
+          target: tap_layer
+          type: clicked
+          then:
+            - lambda: |-
+                uint16_t idx = lv_tabview_get_tab_act(id(tv));
+                lv_tabview_set_act(id(tv), (idx == 0) ? 1 : 0, LV_ANIM_ON);
+
+      - lvgl.screen.load: scr_main
+
+
+
+script:
+  - id: update_gauge
+    mode: restart
+    parameters:
+      pct: int
+    then:
+      - lambda: |-
+          // Grab screen children: we’ll search by type; or cache pointers in statics.
+          // (We cached arc/label in the on_ready block as statics; retrieve them here.)
+          extern "C" {
+            // Access the statics by re-declaring them (file-scope in generated C++).
+            // The compiler will merge them if names match; ESPHome inlines per component.
+          }
+          // As a practical approach in ESPHome, re-find by order:
+          //   The 2nd arc is our value arc; the centered big label is our value text.
+          // For robustness, we’ll remember across calls with static pointers:
+          static lv_obj_t* arc_val = nullptr;
+          static lv_obj_t* lbl_val = nullptr;
+
+          if (!arc_val || !lbl_val) {
+            // Find by scanning screen children once
+            lv_obj_t* scr = lv_scr_act();
+            lv_obj_t* child = lv_obj_get_child(scr, 0);
+            while (child) {
+              if (lv_obj_check_type(child, &lv_arc_class)) {
+                // Heuristic: the second arc we created is the value arc (thicker/rounded)
+                static int arc_count = 0;
+                arc_count++;
+                if (arc_count == 2) arc_val = child;
+              } else if (lv_obj_check_type(child, &lv_label_class)) {
+                // The big label (value) has our big font; we can just take first centered label.
+                // Simpler: first label we created after arcs.
+                if (!lbl_val) lbl_val = child;
+              }
+              child = lv_obj_get_child(scr, 0); // NOTE: LVGL v9 uses different iterator; ESPHome wraps; this is illustrative
+              // In ESPHome it’s often easier to create via `lvgl.widget.create` and refer by IDs.
+            }
+          }
+
+          int val = pct;
+          if (val < 0) val = 0;
+          if (val > 100) val = 100;
+
+          // Animate arc value
+          if (arc_val) {
+            lv_anim_t a;
+            lv_anim_init(&a);
+            lv_anim_set_var(&a, arc_val);
+            lv_anim_set_values(&a, lv_arc_get_value(arc_val), val);
+            lv_anim_set_time(&a, 300);
+            lv_anim_set_exec_cb(&a, [](void* obj, int32_t v){
+              lv_arc_set_value((lv_obj_t*)obj, v);
+            });
+            lv_anim_start(&a);
+          }
+
+          // Update label text
+          if (lbl_val) {
+            char buf[8];
+            snprintf(buf, sizeof(buf), "%d%%", val);
+            lv_label_set_text(lbl_val, buf);
+          }

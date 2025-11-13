@@ -11,9 +11,9 @@ substitutions:
 project_version: "1.0.0"
 
 packages:
-  - !include templates/common.yaml
-  - !include templates/network/wifi.yaml
-  - !include templates/time/homeassistant.yaml
+  - !include packages/common.yaml
+  - !include packages/network/wifi.yaml
+  - !include packages/time/homeassistant.yaml
   - !include devices/waveshare-esp32-s3-8di-8do.yaml
 
 # https://www.mbvans.com/content/dam/mb-vans/us/upfitter/psm-programs/MY25_RV_Software_Specification_V4.pdf

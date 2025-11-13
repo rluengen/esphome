@@ -1,0 +1,33 @@
+globals:
+  - id: current_brightness_${light_id}
+    type: int
+    restore_value: yes
+    initial_value: '50'  # fallback if HA not yet known
+
+# ---- Import current brightness from Home Assistant light ----
+# brightness attribute in HA is 0..255; we'll convert to % with a template sensor
+sensor:
+  - platform: homeassistant
+    id: ha_light_${light_id}_brightness_raw
+    entity_id: ${entity_id}}
+    attribute: brightness                   # returns 0..255 or null if off
+    on_value:
+      then:
+        - lambda: |-
+            // Convert 0..255 -> %
+            float raw = id(ha_light_brightness_raw).state;
+            if (!isnan(raw)) {
+              int pct = (int) roundf((raw / 255.0f) * 100.0f);
+              id(current_brightness) = pct;
+            }
+  # Exposed % (optional—for debugging/visibility in HA)
+  - platform: template
+    id: ha_light_${light_id}_brightness_pct
+    unit_of_measurement: "%"
+    accuracy_decimals: 0
+    update_interval: 1s
+    lambda: |-
+      // If HA brightness is unavailable and the light is off, return 0
+      float raw = id(ha_light_${light_id}_brightness_raw).state;
+      if (isnan(raw)) return NAN;
+      return (raw / 255.0f) * 100.0f;

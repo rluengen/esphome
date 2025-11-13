@@ -1,0 +1,89 @@
+
+sp32:
+  board: esp32-s3-devkitc-1
+  flash_size: 16MB
+  framework:
+    type: esp-idf
+  psram:
+    mode: octal
+    speed: 80MHz
+
+# ---------- External component for CST9217 touch ----------
+external_components:
+  - source:
+      type: git
+      url: https://github.com/shelson/esphome-cst9217
+    refresh: 0s  # always pull latest on build
+
+# ---------- I²C (CST9217 touch, codecs, etc.) ----------
+i2c:
+  id: bus_i2c0
+  sda: GPIO15
+  scl: GPIO14
+  scan: true
+  frequency: 400kHz
+  
+# ---------- QSPI (CO5300) ----------
+# The CO5300 panel is driven via MIPI-over-SPI with 4 data lines (quad mode).
+spi:
+  - id: display_qspi
+    type: quad
+    clk_pin: GPIO38
+    data_pins:
+      - GPIO4   # D0
+      - GPIO5   # D1
+      - GPIO6   # D2
+      - GPIO7   # D3
+
+# ---------- Display: CO5300 in quad SPI mode ----------
+display:
+  - platform: mipi_spi
+    id: display
+    model: CO5300
+    bus_mode: quad
+    spi_id: display_qspi
+    cs_pin: GPIO12
+    reset_pin: GPIO39
+    dimensions:
+      width: 466
+      height: 466
+    rotation: 0
+    color_order: RGB
+    update_interval: never       # LVGL will drive flushes
+    auto_clear_enabled: false
+
+# TODO: are these the correct output/switch to turn the panel power off?
+# or should - display.turn_off be used?
+output:
+  - platform: gpio
+    id: pin_panel_en
+    pin: GPIO21   # <-- set to your board’s AMOLED EN / power enable
+
+switch:
+  - platform: output
+    id: panel_power
+    name: "Panel Power"
+    output: pin_panel_en
+
+# ---------- Touch: CST9217 over I²C ----------
+touchscreen:
+  - platform: cst9217
+    id: touchscreen
+    i2c_id: bus_i2c0
+    interrupt_pin: GPIO13     # INT (per board ref); change if your PCB differs
+    reset_pin: GPIO40         # RST (per board ref)
+    # Map to the panel resolution:
+    transform:
+      width: 466
+      height: 466
+      swap_xy: false
+      invert_x: false
+      invert_y: false
+    on_touch:
+      - lambda: |-
+          if (t.touches.size()) {
+            const auto &p = t.touches[0];
+            ESP_LOGI("touch", "Touch: x=%d y=%d state=%d", p.x, p.y, (int)p.state);
+          }
+
+
