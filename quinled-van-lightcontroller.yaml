@@ -6,21 +6,37 @@
 
 # Channel       Description
 # ------        ----
-# 1
-# 2
-# 3
-# 4
-# 5
-# 6
-# 7
-# 8
-# 9
-# 10
-# 11
-# 12
-# 13
-# 14
-# 15
+# 1             Cabin Can Lights (x4)
+# 2             Bed Can Lights (x4)
+# 3             Sliding Door Light Strip
+# 4             Dog Crate Light Strip
+# 5             Garage Light Strip
+# 6             Capsule Light Strip (Warm)
+# 7             Capsule Light Strip (Cool)
+# 8             <OPEN>
+# 9             Awning Outside Light Strip
+# 10            Awning Inside Light Strip
+# 11            Exterior Capsule Driver Flood Light
+# 12            Exterior Capsule Passenger Flood Light
+# 13            Roof Passenger Flood Lights
+# 14            Roof Driver Flood Lights
+# 15            Roof Rear Flood Lights
+
+# Cabin Buttons - hooked in through the pcf8574 GPIO expander
+# Upper Driver Roof Lights      Turn upper and lower driver roof lights on while pressed
+# Lower Driver Capsule Lights   Turn lower driver capsule lights on while pressed
+# Rear Roof Lights              Toggle upper rear roof lights on tap, turn on all exterior lights on double tap, turn off all exterior lights on press and hold
+# Upper Passenger Roof Lights   Turn upper and lower passenger roof lights on while pressed
+# Lower Passenger Roof Lights   Turn lower passenger capsule lights on while pressed
+
+# Garage Pushbutton             Toggle garage lights on press
+# Cabin Pushbutton              Toggle cabin can lights on press, turn on interior lights to preset on double tap, turn off all interior lights on press and hold
+
+# todo: Do I have a direct light switch for the rest of the interior lights? Seems like I should have a toggle button somewhere...
+
+# Cabin Dial Controller - connected to home assistant to control brightness of various light groups
+# Bed Dial Controller - connected to home assistant to control brightness of various light groups
+
 
 
 substitutions:
