@@ -11,6 +11,7 @@ api:
 
 # Enable Over-The-Air updates
 ota:
+  platform: esphome
   password: ${ota_password}
 
 # Binary sensors for device status
