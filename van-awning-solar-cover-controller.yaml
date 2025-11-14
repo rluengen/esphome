@@ -1,5 +1,8 @@
 # The Van Awning and Solar cover controller uses a BEVRLink 4 Relay + 4 Button
 # controller to control the cover states for two awnings.
+esphome:
+  name: van-cover-relay-controller
+  friendly name: "Van Cover Controller"
 
 packages:
   common: !include packages/common.yaml
@@ -43,7 +46,3 @@ packages:
       current_gpio_pin: GPIO1
       relay_1_id: relay_3
       relay_2_id: relay_4
-
-esphome:
-  name: van-cover-relay-controller
-  friendly name: "Van Cover Controller"
