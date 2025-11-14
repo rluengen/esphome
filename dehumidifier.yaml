@@ -33,7 +33,7 @@ sensor:
       reference_resistance: 10kOhm
       nominal_resistance: 10kOhm
     name: "Defrost Temperature"
-    id: defrost_temp
+    id: defrost_temp_c
     unit_of_measurement: "°C"
     update_interval: never
 
@@ -88,22 +88,61 @@ binary_sensor:
     name: "Defrost Mode"
     id: defrost_mode
     lambda: |-
-      return id(defrost_temp).state < 2.0;
+      return id(defrost_temp_c).state < 2.0;
+
+  - platform: template
+    name: "Compressor"
+    id: compressor_active
+    lambda: 'return id(compressor_relay_switch).state;'
+    device_class: power
+    entity_category: diagnostic   # Optional grouping
+
+  - platform: template
+    name: "Fan"
+    id: fan_active
+    lambda: 'return id(fan_relay_switch).state;'
+    device_class: power
+    entity_category: diagnostic
 
 switch:
   - platform: gpio
     pin: GPIO22
     name: "Compressor Relay"
-    id: compressor
+    id: compressor_relay_switch
+    internal: true
 
   - platform: gpio
     pin: GPIO23
     name: "Fan Relay"
-    id: fan_relay
+    id: fan_relay_switch
+    internal: true
 
   - platform: gpio
     pin: D0
     id: ntc_vcc
+    internal: true
+
+  - platform: template
+    name: "Dehumidifier"
+    id: dehumidifier_power
+    icon: "mdi:air-humidifier"
+    lambda: |-
+      // Report ON if either relay is energized.
+      return id(compressor_relay_switch).state || id(fan_relay_switch).state;
+    on_turn_on:
+      - if:
+          condition:
+            binary_sensor.is_off: defrost_mode
+            lambda: 'return id(ambient_humidity).state > id(humidity_target).state;'
+          then:
+            - switch.turn_on: fan_relay_switch
+            - switch.turn_on: compressor_relay_switch
+          else:
+            - logger.log: "Dehumidifier blocked (defrost mode active)"
+    on_turn_off:
+      - switch.turn_off: compressor_relay_switch
+      - switch.turn_off: fan_relay_switch
+    restore_mode: RESTORE_DEFAULT_OFF
 
 # https://esphome.io/components/sensor/ntc/#self-heating
 interval:
@@ -121,13 +160,14 @@ automation:
     condition:
       - condition: not
         binary_sensor.is_on: defrost_mode
+      - switch.is_on: dehumidifier_power 
     action:
       - if:
           condition:
             lambda: 'return id(ambient_humidity).state > id(humidity_target).state;'
           then:
-            - switch.turn_on: compressor
-            - switch.turn_on: dehumidifier_fan
+            - switch.turn_on: compressor_relay_switch
+            - switch.turn_on: fan_relay_switch
           else:
-            - switch.turn_off: compressor
-            - switch.turn_off: dehumidifier_fan
+            - switch.turn_off: compressor_relay_switch
+            - switch.turn_off: fan_relay_switch
