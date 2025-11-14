@@ -12,11 +12,6 @@ substitutions:
   button_4_press_action: ""
   button_4_release_action: ""
 
-esp32:
-  board: esp32-c6-devkitc-1
-  framework:
-    type: esp-idf
-
 binary_sensor:
   - platform: gpio
     name: ${button_1_name}

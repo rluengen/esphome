@@ -7,11 +7,11 @@ logger:
 # Enable Home Assistant API
 api:
   encryption:
-    key: !secret api_encryption_key
+    key: ${api_encryption_key}
 
 # Enable Over-The-Air updates
 ota:
-  password: !secret ota_password
+  password: ${ota_password}
 
 # Binary sensors for device status
 binary_sensor:
