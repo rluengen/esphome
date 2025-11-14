@@ -1,0 +1,94 @@
+# The awning motor is controlled by two relays to set the motor direction.
+# relay1     relay2    motor     state
+# off        off       -  -      stopped
+# on         off       +  -      opening
+# off        on        -  +      closing
+# on         on        +  +      stopped
+
+# Relay common values should be attached to the motor power.
+# Ground is attached to the normally closed pin of both relays.
+# Positive voltage is attached to the normally open pin of both relays.
+
+substitutions:
+  cover_name: "Default Cover"
+  cover_id: default_cover
+  current_gpio_pin: GPIO34
+  relay_1_id: relay_1
+  relay_2_id: relay_2
+
+number:
+  - platform: template
+    name: ${cover_name} Open Duration
+    id: ${cover_id}_open_duration_number
+    min_value: 10
+    max_value: 120
+    step: 1
+    unit_of_measurement: "s"
+    icon: "mdi:timer-sand"
+    optimistic: true
+    initial_value: 60
+    restore_value: true
+
+  - platform: template
+    name: ${cover_name} Close Duration
+    id: ${cover_id}_close_duration_number
+    min_value: 10
+    max_value: 120
+    step: 1
+    unit_of_measurement: "s"
+    icon: "mdi:timer-sand"
+    optimistic: true
+    initial_value: 60
+    restore_value: true
+
+# current sensor is a 20A ACS712
+# VCC -> Power (5v)
+# Out -> ADC Capable GPIO, IE GPIO34
+# GND -> GND
+
+# GPIO 34 and 35 are good pins for measuring motor current
+
+# But according to https://esphome.io/components/sensor/adc/#adc-esp32_pins on an ESP32-C6 GPIO0-GPIO6 are valid pins
+
+# Analog to digital sensor to measure the motor current.
+sensor:
+  - platform: adc
+    pin: ${current_gpio_pin}
+    name: ${cover_name} Current
+    id: ${cover_id}_motor_current
+    update_interval: 500s
+    filters:
+      - calibrate_linear:
+          - 0.5 -> 0.0  # Adjust based on your sensor's zero-current voltage
+          - 2.5 -> 10.0 # Example: 2.5V = 10A
+      - multiply: 1.0   # Optional fine-tuning
+    unit_of_measurement: "A"
+    accuracy_decimals: 2
+
+cover:
+  - platform: current_based
+    name: ${cover_name}
+    id: ${cover_id}
+    device_class: awning
+
+    open_action:
+      - switch.turn_on: ${relay_1_id}
+      - switch.turn_off: ${relay_2_id}
+
+    open_duration:
+      - lambda: 'return (uint32_t)(id(${cover_id}_open_duration_number).state * 1000.0f);'
+
+    close_action:
+      - switch.turn_off: ${relay_1_id}
+      - switch.turn_on: ${relay_2_id}
+
+    close_duration:
+      - lambda: 'return (uint32_t)(id(${cover_id}_close_duration_number).state * 1000.0f);'
+
+    stop_action:
+      - switch.turn_off: ${relay_1_id}
+      - switch.turn_off: ${relay_2_id}
+
+    current_sensor: ${cover_id}_motor_current
+    max_duration: 20s
+    current_threshold: 0.2  # Amps — adjust based on motor idle current

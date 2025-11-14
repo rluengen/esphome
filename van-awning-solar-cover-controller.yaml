@@ -1,0 +1,49 @@
+# The Van Awning and Solar cover controller uses a BEVRLink 4 Relay + 4 Button
+# controller to control the cover states for two awnings.
+
+packages:
+  common: !include packages/common.yaml
+  wifi: !include packages/network/wifi.yaml
+  time: !include packages/time/homeassistant.yaml
+  board:
+    file: devices/bevrlink-4ch-esp32-relay.yaml
+    vars:
+      button_1_name: "Open Nomadic Awning"
+      button_1_press_action: |
+        - logger.log: "Open Nomadic Awning Button Pressed"
+        - cover.open: nomadic_awning_cover
+      button_2_name: "Close Nomadic Awning Button"
+      button_2_press_action: |
+        - logger.log: "Close Nomadic Awning Button Pressed"
+        - cover.close: nomadic_awning_cover
+
+      button_3_name: "Open Solar Panel"
+      button_3_press_action: |
+        - logger.log: "Open Solar Panel Button Pressed"
+        - cover.open: solar_panel_cover
+      button_4_name: "Close Solar Panel Button"
+      button_4_press_action: |
+        - logger.log: "Close Solar Panel Button Pressed"
+        - cover.close: solar_panel_cover
+
+  nomadic_awning_cover:
+    file: relay-current-cover-controller.yaml
+    vars:
+      cover_name: Nomadic Awning
+      cover_id: nomadic_awning_cover
+      current_gpio_pin: GPIO0
+      relay_1_id: relay_1
+      relay_2_id: relay_2
+
+  solar_panel_cover:
+    file: relay-current-cover-controller.yaml
+    vars:
+      cover_name: Solar Panel
+      cover_id: solar_panel_cover
+      current_gpio_pin: GPIO1
+      relay_1_id: relay_3
+      relay_2_id: relay_4
+
+esphome:
+  name: van-cover-relay-controller
+  friendly name: "Van Cover Controller"
