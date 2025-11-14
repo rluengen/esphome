@@ -1,4 +1,10 @@
 # Common Device Configuration
+substitutions:
+  log_level: INFO
+  api_encryption_key:
+  ota_password:
+  friendly_name:
+  device_name:
 
 # Enable logging
 logger:
