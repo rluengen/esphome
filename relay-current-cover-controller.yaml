@@ -91,4 +91,4 @@ cover:
 
     current_sensor: ${cover_id}_motor_current
     max_duration: 20s
-    current_threshold: 0.2  # Amps — adjust based on motor idle current
+    current_threshold: 0.2  # Amps, adjust based on motor idle current
