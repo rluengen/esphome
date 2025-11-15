@@ -76,18 +76,13 @@ cover:
       - switch.turn_on: ${relay_1_id}
       - switch.turn_off: ${relay_2_id}
 
-    open_duration:
-      - lambda: |-
-        char buffer[8];
-        sprintf(buffer, "%.0fs", id(${cover_id}_open_duration_number).state);
-        return std::string(buffer);
+    open_duration: 15s
 
     close_action:
       - switch.turn_off: ${relay_1_id}
       - switch.turn_on: ${relay_2_id}
 
-    close_duration:
-      - lambda: 'return (uint32_t)(id(${cover_id}_close_duration_number).state * 1000.0f);'
+    close_duration: 15s
 
     stop_action:
       - switch.turn_off: ${relay_1_id}
