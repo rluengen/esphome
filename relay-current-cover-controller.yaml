@@ -96,6 +96,4 @@ cover:
     close_obstacle_current_threshold: 0.8
 
     max_duration: 30s
-    lambda: |-
-      return COVER_CLOSED;  # This sets the initial state to closed
 
