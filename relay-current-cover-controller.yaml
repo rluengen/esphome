@@ -21,24 +21,24 @@ number:
     name: ${cover_name} Open Duration
     id: ${cover_id}_open_duration_number
     min_value: 10
-    max_value: 120
+    max_value: 60
     step: 1
     unit_of_measurement: "s"
     icon: "mdi:timer-sand"
     optimistic: true
-    initial_value: 60
+    initial_value: 30
     restore_value: true
 
   - platform: template
     name: ${cover_name} Close Duration
     id: ${cover_id}_close_duration_number
     min_value: 10
-    max_value: 120
+    max_value: 60
     step: 1
     unit_of_measurement: "s"
     icon: "mdi:timer-sand"
     optimistic: true
-    initial_value: 60
+    initial_value: 30
     restore_value: true
 
 # current sensor is a 20A ACS712
@@ -66,7 +66,8 @@ sensor:
     accuracy_decimals: 2
 
 cover:
-  - platform: current_based
+  - platform: feedback
+    infer_endstop_from_movement: true
     name: ${cover_name}
     id: ${cover_id}
     device_class: awning
@@ -89,6 +90,8 @@ cover:
       - switch.turn_off: ${relay_1_id}
       - switch.turn_off: ${relay_2_id}
 
-    current_sensor: ${cover_id}_motor_current
-    max_duration: 20s
+    direction_change_wait_time: 500ms
+    open_sensor: ${cover_id}_motor_current
+    close_sensor: ${cover_id}_motor_current
+    max_duration: 30s
     current_threshold: 0.2  # Amps, adjust based on motor idle current
