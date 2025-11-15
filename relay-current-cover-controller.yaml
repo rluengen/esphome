@@ -77,6 +77,10 @@ cover:
 
     open_duration: 15s
 
+    open_moving_current_threshold: 0.5
+    open_obstacle_current_threshold: 0.8
+    open_sensor: ${cover_id}_motor_current
+
     close_action:
       - switch.turn_off: ${relay_1_id}
       - switch.turn_on: ${relay_2_id}
@@ -87,11 +91,8 @@ cover:
       - switch.turn_off: ${relay_1_id}
       - switch.turn_off: ${relay_2_id}
 
-    direction_change_wait_time: 500ms
-    open_moving_current_threshold: 0.5
-    open_obstacle_current_threshold: 0.8
-    open_sensor: ${cover_id}_motor_current
     close_sensor: ${cover_id}_motor_current
     close_moving_current_threshold: 0.5
     close_obstacle_current_threshold: 0.8
+
     max_duration: 30s
