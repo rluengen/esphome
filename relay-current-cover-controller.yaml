@@ -67,7 +67,6 @@ sensor:
 
 cover:
   - platform: current_based
-    infer_endstop_from_movement: true
     name: ${cover_name}
     id: ${cover_id}
     device_class: awning
