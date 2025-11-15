@@ -1,16 +1,21 @@
 substitutions:
   button_1_name: "Button 1"
-  button_1_press_action: 
-  button_1_release_action: 
+  button_1_press_action: noop_script
+  button_1_release_action: noop_script
   button_2_name: "Button 2"
-  button_2_press_action: 
-  button_2_release_action: 
+  button_2_press_action: noop_script
+  button_2_release_action: noop_script
   button_3_name: "Button 3"
-  button_3_press_action: 
-  button_3_release_action: 
+  button_3_press_action: noop_script
+  button_3_release_action: noop_script
   button_4_name: "Button 4"
-  button_4_press_action: 
-  button_4_release_action: 
+  button_4_press_action: noop_script
+  button_4_release_action: noop_script
+
+script:
+  - id: noop_script
+    then:
+      - logger.log: "No-op script executed"
 
 binary_sensor:
   - platform: gpio
