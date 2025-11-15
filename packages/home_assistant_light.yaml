@@ -2,7 +2,7 @@ globals:
   - id: current_brightness_${light_id}
     type: int
     restore_value: yes
-    initial_value: '50'  # fallback if HA not yet known
+    initial_value: '0'  # fallback if HA not yet known
 
 # ---- Import current brightness from Home Assistant light ----
 # brightness attribute in HA is 0..255; we'll convert to % with a template sensor

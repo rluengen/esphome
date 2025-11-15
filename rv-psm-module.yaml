@@ -11,10 +11,20 @@ substitutions:
 project_version: "1.0.0"
 
 packages:
-  - !include packages/common.yaml
-  - !include packages/network/wifi.yaml
-  - !include packages/time/homeassistant.yaml
-  - !include devices/waveshare-esp32-s3-8di-8do.yaml
+  remote_packages:
+    url: https://github.com/rluengen/esphome
+    ref: main
+    refresh: always
+    files:
+      - path: packages/common.yaml
+        vars:
+          api_encryption_key: !secret encryption_key
+      - path: packages/network/wifi.yaml
+        vars:
+          wifi_ssid: !secret wifi_ssid
+          wifi_password: !secret wifi_password
+      - path: packages/time/homeassistant.yaml
+      - path: devices/waveshare-esp32-s3-8di-8do.yaml
 
 # https://www.mbvans.com/content/dam/mb-vans/us/upfitter/psm-programs/MY25_RV_Software_Specification_V4.pdf
 # outputs:
