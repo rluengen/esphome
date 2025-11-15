@@ -1,16 +1,16 @@
 substitutions:
   button_1_name: "Button 1"
-  button_1_press_action: ""
-  button_1_release_action: ""
+  button_1_press_action: 
+  button_1_release_action: 
   button_2_name: "Button 2"
-  button_2_press_action: ""
-  button_2_release_action: ""
+  button_2_press_action: 
+  button_2_release_action: 
   button_3_name: "Button 3"
-  button_3_press_action: ""
-  button_3_release_action: ""
+  button_3_press_action: 
+  button_3_release_action: 
   button_4_name: "Button 4"
-  button_4_press_action: ""
-  button_4_release_action: ""
+  button_4_press_action: 
+  button_4_release_action: 
 
 binary_sensor:
   - platform: gpio
@@ -21,10 +21,10 @@ binary_sensor:
       mode: INPUT_PULLUP
     on_press:
       then:
-        - ${button_1_press_action}
+        - script.execute: ${button_1_press_action}
     on_release:
       then:
-        - ${button_1_release_action}
+        - script.execute: ${button_1_release_action}
 
   - platform: gpio
     name: ${button_2_name}
@@ -34,10 +34,10 @@ binary_sensor:
       mode: INPUT_PULLUP
     on_press:
       then:
-        - ${button_2_press_action}
+        - script.execute: ${button_2_press_action}
     on_release:
       then:
-        - ${button_2_release_action}
+        - script.execute: ${button_2_release_action}
 
   - platform: gpio
     name: ${button_3_name}
@@ -47,10 +47,10 @@ binary_sensor:
       mode: INPUT_PULLUP
     on_press:
       then:
-        - ${button_3_press_action}
+        - script.execute: ${button_3_press_action}
     on_release:
       then:
-        - ${button_3_release_action}
+        - script.execute: ${button_3_release_action}
 
   - platform: gpio
     name: ${button_4_name}
@@ -60,10 +60,10 @@ binary_sensor:
       mode: INPUT_PULLUP
     on_press:
       then:
-        - ${button_4_press_action}
+        - script.execute: ${button_4_press_action}
     on_release:
       then:
-        - ${button_4_release_action}
+        - script.execute: ${button_4_release_action}
   
 switch:
   - platform: gpio
