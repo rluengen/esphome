@@ -38,11 +38,10 @@
 # Bed Dial Controller - connected to home assistant to control brightness of various light groups
 
 substitutions:
-  device_name: quinled-van-lightcontroller
+  device_name: quinled_van_lightcontroller
   friendly_name: QuinLED An-Penta-Deca LED Controller
-
-project_version: "1.0.0"
-hidden_ssid: true
+  project_name: Van Light Controller
+  project_version: "1.0.0"
 
 packages:
   remote_packages:
@@ -63,7 +62,7 @@ packages:
 
 esphome:
   name: ${device_name}
-  friendly name: ${friendly_name}
+  friendly_name: ${friendly_name}
   project:
     name: ${project_name}
     version: ${project_version}

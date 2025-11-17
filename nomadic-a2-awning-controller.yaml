@@ -7,7 +7,7 @@ substitutions:
 
 esphome:
   name: ${device_name}
-  friendly name: ${friendly_name}
+  friendly_name: ${friendly_name}
 
 # https://esphome.io/components/cover/current_based/
 
