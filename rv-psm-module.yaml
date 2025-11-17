@@ -3,6 +3,7 @@
 
 # Programmable Special Module Standard Programs
 # https://www.mbvans.com/en/upfitter/resources/psm-programs
+# https://www.mbvans.com/content/dam/mb-vans/us/upfitter/psm-programs/MY25_RV_Software_Specification_V4.pdf
 
 substitutions:
   device_name: rv-psm-module
@@ -34,6 +35,26 @@ packages:
 #inputs:
 # gear in park
 
+# If your Waveshare board outputs HIGH when triggered (e.g., 12V signal activates optocoupler), and the ESP32 pin sees 3.3V:
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: GPIO18
+      mode: INPUT
+    name: "Awning Open Trigger"
+    id: awning_open_trigger
+
+# If the signal is active-low (e.g., pulled to GND when triggered):
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: GPIO18
+      mode: INPUT_PULLUP
+      inverted: true
+    name: "Awning Open Trigger"
+    id: awning_open_trigger
+
+
 binary_sensor:
   - platform: template
     id: any-door-open
@@ -46,54 +67,73 @@ binary_sensor:
         return false;
       }
 
-  - id: !extend di3
+  - id: !extend di1
     name: "Passenger Door Open"
-    comment: "Connector 2, Pin 12, High"
+    comment: "Connector 2, Pin 7, High"
     icon: "mdi:car-door"
+    mode: INPUT_PULLDOWN
     on_state:
       - component.update: any-door-open
 
-  - id: !extend di3
+  - id: !extend di2
     name: "Driver Door Open"
-    comment: "Connector , Pin , High"
+    comment: "Connector 2, Pin 1, High"
     icon: "mdi:car-door"
+    mode: INPUT_PULLDOWN
     on_state:
       - component.update: any-door-open
 
   - id: !extend di3
     name: "Sliding Door Open"
-    comment: "Connector , Pin , High"
+    comment: "Connector 3, Pin 3, Low"
     icon: "mdi:car-door"
+    mode: INPUT_PULLUP
     on_state:
       - component.update: any-door-open
 
-  - id: !extend di3
+  - id: !extend di4
     name: "Rear Door Open"
-    comment: "Connector , Pin , High"
+    comment: "Connector 3, Pin 13, Low"
     icon: "mdi:car-door"
+    mode: INPUT_PULLUP
     on_state:
       - component.update: any-door-open
 
 
-  - id: !extend di3
+  - id: !extend di5
     name: "Vehicle Locked"
-    comment: "Connector , Pin , High"
+    comment: "Connector 3, Pin 31, High"
     icon: "mdi:car-lock"
+    mode: INPUT_PULLDOWN
 
-  - id: !extend di3
+  - id: !extend di6
     name: "Vehicle Unlocked"
-    comment: "Connector , Pin , High"
+    comment: "Connector 3, Pin 32, High"
     icon: "mdi:car-lock"
+    mode: INPUT_PULLDOWN
 
+
+  # - id: !extend di7
+  #   name: "Gear in 'P'"
+  #   comment: "Connector 2, Pin 6, High"
+  #   icon: "mdi:car-shift-pattern"
+
+  # - id: !extend di8
+  #   name: "Gear in 'R'"
+  #   comment: "Connector 2, Pin 9, High"
+  #   icon: "mdi:car-shift-pattern"
+
+  # - id: !extend di1
+  #   name: "Gear NOT in 'P'"
+  #   comment: "Connector 2, Pin 22, High"
+  #   icon: "mdi:car-shift-pattern"
 
   - id: !extend di1
-    name: "Gear in 'P'"
-    icon: "mdi:car-shift-pattern"
+    name: "Vehicle Speed > 0 mph"
+    comment: "Connector 3, Pin 21, High"
+    icon: "mdi:speedometer"
+    mode: INPUT_PULLDOWN
 
-    # Gear NOT in 'P'
-    # Gear in 'R'
-
-    # Vehicle Speed > 0 mph
     # Ignition On
     # Park Brake ON
 
@@ -110,7 +150,8 @@ switch:
     device_class: lock
 
   - id: !extend do2
-    name: "Hazard Lights"
+    name: "Hazard Warning Lights"
+    comment: "Connector 3, Pin 23"
     icon: "mdi:car-hazard"
     device_class: safety
 
