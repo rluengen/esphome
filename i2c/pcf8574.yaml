@@ -1,0 +1,29 @@
+# The PCF8574 component allows you to use PCF8574 or PCF8575 I/O expanders using I2C.
+# https://esphome.io/components/pcf8574/
+substitutions:
+  i2c_bus_id: i2c_bus
+
+pcf8574:
+  - id: pcf8574_hub
+    i2c_id: ${i2c_bus_id}
+    address: 0x20       # The I2C address of the driver. Defaults to 0x21.
+    pcf8575: false      # Whether this is a 16-pin PCF8575
+
+switch:
+  - platform: gpio
+    name: "PCF8574 Pin #0"
+    pin:
+      pcf8574: pcf8574_hub
+      number: 0
+      mode:
+        output: true
+      inverted: false
+
+  - platform: gpio
+    name: "PCF Button 1"
+    pin:
+      pcf8574: pcf8574_hub
+      number: 1
+      mode:
+        output: true
+      inverted: false

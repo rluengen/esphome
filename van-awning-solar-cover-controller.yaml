@@ -3,6 +3,9 @@
 esphome:
   name: van-cover-relay-controller
   friendly_name: "Van Cover Controller"
+  on_boot:
+    then:
+       # Indicate that the covers are both closed by default?
 
 esp32:
   board: esp32-c6-devkitc-1
@@ -23,13 +26,23 @@ packages:
           wifi_ssid: !secret wifi_ssid
           wifi_password: !secret wifi_password
       - path: packages/time/homeassistant.yaml
-      - path: relay-current-cover-controller.yaml
+
+      - path: packages/relay-current-cover-controller.yaml
         vars:
           cover_name: Nomadic Awning
           cover_id: nomadic_awning_cover
           current_gpio_pin: GPIO0
           relay_1_id: relay1
           relay_2_id: relay2
+
+      - path: packages/relay-current-cover-controller.yaml
+        vars:
+          cover_name: Solar Panel
+          cover_id: solar_panel_cover
+          current_gpio_pin: GPIO1
+          relay_1_id: relay3
+          relay_2_id: relay4
+
       - path: devices/bevrlink-4ch-esp32-relay.yaml
         vars:
           button_1_name: "Open Nomadic Awning"
@@ -40,13 +53,6 @@ packages:
           button_3_press_action: open_solar_awning_script
           button_4_name: "Close Solar Panel Button"
           button_4_press_action: close_solar_awning_script
-      - path: relay-current-cover-controller.yaml
-        vars:
-          cover_name: Solar Panel
-          cover_id: solar_panel_cover
-          current_gpio_pin: GPIO1
-          relay_1_id: relay3
-          relay_2_id: relay4
 
 script:
   - id: open_nomadic_awning_script

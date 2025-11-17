@@ -96,4 +96,3 @@ cover:
     close_obstacle_current_threshold: 0.8
 
     max_duration: 30s
-

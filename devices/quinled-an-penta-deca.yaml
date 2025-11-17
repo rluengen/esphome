@@ -1,13 +1,7 @@
+# The QuinLED An-Penta-Deca comes with 6x 6.3A positive terminals. These should be divided evenly.
+# The negative side is 15 "medium" power channels at max 5A.
+
 # https://quinled.info/quinled-an-penta-deca-esphome-configuration-example/
-
-substitutions:
-  device_name: quinled-an-penta-deca
-  friendly_name: QuinLED An-Penta-Deca LED Controller
-
-packages:
-  device: !include ../templates/device.yaml
-  time: !include  ../templates/time/homeassistant.yaml
-  network: !include ../templates/network/wifi.yaml
 
 esp32:
   board: esp32dev
@@ -15,14 +9,10 @@ esp32:
     type: esp-idf
 
 i2c:
+  id: i2c_bus
   sda: 15
   scl: 16
   scan: true
-
-switch:
-  - platform: restart
-    name: ${esphome_name}-restart
-    id: restart_switch
 
 output:
   - platform: ledc

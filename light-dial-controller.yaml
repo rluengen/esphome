@@ -20,14 +20,24 @@ substitutions:
   project_version: "1.0.0"
 
 packages:
+  remote_packages:
+    url: https://github.com/rluengen/esphome
+    ref: main
+    refresh: always
+    files:
+      - path: packages/common.yaml
+        vars:
+          api_encryption_key: !secret encryption_key
+      - path: packages/network/wifi.yaml
+        vars:
+          wifi_ssid: !secret wifi_ssid
+          wifi_password: !secret wifi_password
+      - path: packages/time/homeassistant.yaml
   - !include
     file: packages/home_assistant_light.yaml
     vars:
       light_id: rear_can_lights
       entity_id: light.rear_can_lights
-  - !include packages/common.yaml
-  - !include packages/network/wifi.yaml
-  - !include packages/time/homeassistant.yaml
   - !include packages/display/sleep.yaml
   - !include devices/viewe-esp32c3-rotary-knob.yaml
 
