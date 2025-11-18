@@ -62,7 +62,7 @@ esphome:
   name: ${device_name}
   friendly_name: ${friendly_name}
   project:
-    name: ${project_name}
+    name: smartvan.${project_name}
     version: ${project_version}
 
 light:
@@ -85,7 +85,6 @@ light:
     name: "Door Light"
     default_transition_length: 500ms
     output: led_channel_3
-    color_temperature: 4000 K
 
   - platform: cwww
     cold_white: led_channel_4
@@ -176,63 +175,51 @@ light:
 # This allows us to connect multiple buttons to the QuinLED An-Penta-Deca.
 
 binary_sensor:
-
-  # Helper for a tidy debounce you can reuse
-  - platform: template
-    id: _debounce_template
-    internal: true
-
   # Button 1 on P0
   - platform: gpio
-    name: "${dev_name} Btn 1"
-    id: btn1
+    name: "${friendly_name} Extended Button 0"
+    id: pcf8574_button_0
     pin:
-      pcf8574: pcf_buttons
-      number: 0            # P0
+      pcf8574: pcf8574_hub
+      number: 0
       mode:
         input: true
-        pullup: true       # expect external pull-up; keeps logic consistent
-    inverted: true         # pressed (to GND) ? ON
+      inverted: true
     filters:
       - delayed_on: 10ms
       - delayed_off: 10ms
-    on_single_click:
-      then:
-        - homeassistant.event:
-            event: esphome.pcf_button
-            data: { node: ${dev_name}, button: 1, click: single }
-    on_double_click:
-      then:
-        - homeassistant.event:
-            event: esphome.pcf_button
-            data: { node: ${dev_name}, button: 1, click: double }
+    on_press:
+      - light.turn_on:
+          id: light_exterior_roof_rear
+          brightness: 100%
+    on_release:
+      - light.turn_off:
+          id: light_exterior_roof_rear
 
 
 # a button which turns on a light while pressed. This works for the upper/lower passenger/driver roof lights
   - platform: gpio
-    pin: 36
-    name: Button 1
-    id: button_1
+    name: "${friendly_name} Extended Button 1"
+    id: pcf8574_button_1
+    pin:
+      pcf8574: pcf8574_hub
+      number: 1
+      mode:
+        input: true
+      inverted: true
     filters:
-      - invert:
-    on_press:
-      - light.turn_on:
-            id: cwww_led_strip_1
-            brightness: 100%
+      - delayed_on: 10ms
+      - delayed_off: 10ms
+    on_click:
+      - if:
+          condition:
+            light.is_on: light_exterior_roof_rear
+          then:
+            - light.turn_off: light_exterior_roof_rear
+          else:
+            - light.turn_on:
+                id: light_exterior_roof_rear
+                brightness: 100%
     on_release:
       - light.turn_off:
-                id: cwww_led_strip_1
-
-  - platform: gpio
-    pin: 39
-    name: Button 2
-    id: button_2
-    filters:
-      - invert:
-
-  - platform: gpio
-    pin: 34
-    name: Button 3
-    id: button_3
-    filters:
-      - invert:
+          id: light_exterior_roof_rear
