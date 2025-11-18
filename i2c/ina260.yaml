@@ -1,0 +1,19 @@
+# The ina260 sensor platform allows you to use your INA260 DC Current and Power Sensor 
+# sensors with ESPHome.
+# https://esphome.io/components/sensor/ina260/
+
+substitutions:
+  i2c_bus_id: i2c_bus
+  i2c_address: 0x40
+  ina260_sensor_id: ina260_sensor
+  ina260_current_sensor_id: ina260_current_sensor
+  ina260_current_sensor_name: INA260 Current
+
+sensor:
+  - platform: ina260
+    address: !sub '${i2c_address}'
+    id: !sub '${ina260_sensor_id}'
+    current:
+      id: !sub '${ina260_current_sensor_id}'
+      name: !sub '${ina260_current_sensor_name}'
+    update_interval: never

@@ -12,7 +12,7 @@
 substitutions:
   cover_name: "Default Cover"
   cover_id: default_cover
-  current_gpio_pin: GPIO34
+  current_sensor_id: 
   relay_1_id: relay_1
   relay_2_id: relay_2
 
@@ -58,21 +58,6 @@ switch:
   - id: ${relay_2_id}
     interlock: [${relay_1_id}]
 
-# Analog to digital sensor to measure the motor current.
-sensor:
-  - platform: adc
-    pin: ${current_gpio_pin}
-    name: ${cover_name} Current
-    id: ${cover_id}_motor_current
-    update_interval: 500s
-    filters:
-      - calibrate_linear:
-          - 0.5 -> 0.0  # Adjust based on your sensor's zero-current voltage
-          - 2.5 -> 10.0 # Example: 2.5V = 10A
-      - multiply: 1.0   # Optional fine-tuning
-    unit_of_measurement: "A"
-    accuracy_decimals: 2
-
 cover:
   - platform: current_based
     name: ${cover_name}
@@ -87,7 +72,7 @@ cover:
 
     open_moving_current_threshold: 0.5
     open_obstacle_current_threshold: 0.8
-    open_sensor: ${cover_id}_motor_current
+    open_sensor: ${current_sensor_id}
 
     close_action:
       - switch.turn_off: ${relay_1_id}
@@ -99,7 +84,7 @@ cover:
       - switch.turn_off: ${relay_1_id}
       - switch.turn_off: ${relay_2_id}
 
-    close_sensor: ${cover_id}_motor_current
+    close_sensor: ${current_sensor_id}
     close_moving_current_threshold: 0.5
     close_obstacle_current_threshold: 0.8
 
