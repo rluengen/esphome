@@ -9,10 +9,9 @@
 # 3             Sliding Door Light Strip
 # 4             Dog Crate Light Strip (warm)
 # 5             Dog Crate Light Strip (cold)
-# 5             Garage Light Strip
-# 6             Capsule Light Strip (Warm)
-# 7             Capsule Light Strip (Cool)
-# 8             <OPEN>
+# 6             Garage Light Strip
+# 7             Capsule Light Strip (Warm)
+# 8             Capsule Light Strip (Cool)
 # 9             Awning Outside Light Strip
 # 10            Awning Inside Light Strip
 # 11            Exterior Capsule Driver Flood Light
@@ -70,12 +69,14 @@ light:
   - platform: monochromatic
     id: main_can_lights
     name: "Main Can Lights"
+    icon: "mdi:light-recessed"
     default_transition_length: 500ms
     output: led_channel_1
 
   - platform: monochromatic
     id: bed_can_lights
     name: "Bed Can Lights"
+    icon: "mdi:light-recessed"
     default_transition_length: 500ms
     output: led_channel_2
 
@@ -84,43 +85,82 @@ light:
     name: "Door Light"
     default_transition_length: 500ms
     output: led_channel_3
+    color_temperature: 4000 K
 
   - platform: cwww
     cold_white: led_channel_4
     warm_white: led_channel_5
     id: cwww_led_dog_crate_lights
     name: "Dog Crate Lights"
+    icon: "mdi:led-strip"
     default_transition_length: 500ms
     cold_white_color_temperature: 6500 K
     warm_white_color_temperature: 2700 K
 
-  - platform: cwww
-    cold_white: led_channel_1
-    warm_white: led_channel_2
-    id: cwww_led_capsule_lights
-    name: "Bed Capsule Lights"
-    default_transition_length: 500ms
-    cold_white_color_temperature: 6500 K
-    warm_white_color_temperature: 2700 K
-
-   
   - platform: monochromatic
     id: garage_led_lights
     name: "Garage Lights"
     default_transition_length: 500ms
-    output: led_channel_5
+    output: led_channel_6
+
+  - platform: cwww
+    cold_white: led_channel_7
+    warm_white: led_channel_8
+    id: cwww_led_capsule_lights
+    name: "Bed Capsule Lights"
+    icon: "mdi:led-strip"
+    default_transition_length: 500ms
+    cold_white_color_temperature: 6500 K
+    warm_white_color_temperature: 2700 K
 
   - platform: monochromatic
-    id: exterior_driver_capsule_light
-    name: "Exterior Driver Capsule Light"
+    id: light_awning_outside_light
+    name: "Awning Outside Light Strip"
+    icon: "mdi:light-flood-down"
     default_transition_length: 500ms
     output: led_channel_9
 
   - platform: monochromatic
-    id: exterior_passenger_capsule_light
-    name: "Exterior Passenger Capsule Light"
+    id: light_awning_inside_light
+    name: "Awning Inside Light Strip"
+    icon: "mdi:light-flood-down"
     default_transition_length: 500ms
     output: led_channel_10
+
+  - platform: monochromatic
+    id: light_exterior_passenger_capsule
+    name: "Exterior Capsule Passenger Flood Light"
+    icon: "mdi:light-flood-down"
+    default_transition_length: 500ms
+    output: led_channel_11
+
+  - platform: monochromatic
+    id: light_exterior_driver_capsule
+    name: "Exterior Capsule Driver Flood Light"
+    icon: "mdi:light-flood-down"
+    default_transition_length: 500ms
+    output: led_channel_12
+
+  - platform: monochromatic
+    id: light_exterior_roof_passenger
+    name: "Exterior Roof Passenger Flood Light"
+    icon: "mdi:light-flood-down"
+    default_transition_length: 500ms
+    output: led_channel_13
+
+  - platform: monochromatic
+    id: light_exterior_roof_driver
+    name: "Exterior Roof Driver Flood Light"
+    icon: "mdi:light-flood-down"
+    default_transition_length: 500ms
+    output: led_channel_14
+
+  - platform: monochromatic
+    id: light_exterior_roof_rear
+    name: "Exterior Roof Rear Flood Light"
+    icon: "mdi:light-flood-down"
+    default_transition_length: 500ms
+    output: led_channel_15
 
 # Button    Pin         Name                            Action
 # ------    ------      -----                           ------
