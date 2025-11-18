@@ -40,8 +40,8 @@ packages:
       - path: devices/viewe-esp32c3-rotary-knob.yaml
 
 sensor:
-  - id: !extend knob_encoder_id
-    name: "Knob Encoder"
+  - id: !extend rotary_encoder_id
+    name: "Rotary Encoder"
     on_clockwise:
       then:
         - lambda: |-
