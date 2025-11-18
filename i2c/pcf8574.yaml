@@ -8,3 +8,100 @@ pcf8574:
     i2c_id: ${i2c_bus_id}
     address: 0x20       # The I2C address of the driver. Defaults to 0x21.
     pcf8575: false      # Whether this is a 16-pin PCF8575
+
+binary_sensor:
+  - platform: gpio
+    id: pcf8574_button_0
+    pin:
+      pcf8574: pcf8574_hub
+      number: 0
+      mode:
+        input: true
+      inverted: true
+    filters:
+      - delayed_on: 10ms
+      - delayed_off: 10ms
+
+  - platform: gpio
+    id: pcf8574_button_1
+    pin:
+      pcf8574: pcf8574_hub
+      number: 1
+      mode:
+        input: true
+      inverted: true
+    filters:
+      - delayed_on: 10ms
+      - delayed_off: 10ms
+
+  - platform: gpio
+    id: pcf8574_button_2
+    pin:
+      pcf8574: pcf8574_hub
+      number: 2
+      mode:
+        input: true
+      inverted: true
+    filters:
+      - delayed_on: 10ms
+      - delayed_off: 10ms
+
+  - platform: gpio
+    id: pcf8574_button_3
+    pin:
+      pcf8574: pcf8574_hub
+      number: 3
+      mode:
+        input: true
+      inverted: true
+    filters:
+      - delayed_on: 10ms
+      - delayed_off: 10ms
+
+  - platform: gpio
+    id: pcf8574_button_4
+    pin:
+      pcf8574: pcf8574_hub
+      number: 4
+      mode:
+        input: true
+      inverted: true
+    filters:
+      - delayed_on: 10ms
+      - delayed_off: 10ms
+
+  - platform: gpio
+    id: pcf8574_button_5
+    pin:
+      pcf8574: pcf8574_hub
+      number: 5
+      mode:
+        input: true
+      inverted: true
+    filters:
+      - delayed_on: 10ms
+      - delayed_off: 10ms
+
+  - platform: gpio
+    id: pcf8574_button_6
+    pin:
+      pcf8574: pcf8574_hub
+      number: 6
+      mode:
+        input: true
+      inverted: true
+    filters:
+      - delayed_on: 10ms
+      - delayed_off: 10ms
+
+  - platform: gpio
+    id: pcf8574_button_7
+    pin:
+      pcf8574: pcf8574_hub
+      number: 7
+      mode:
+        input: true
+      inverted: true
+    filters:
+      - delayed_on: 10ms
+      - delayed_off: 10ms

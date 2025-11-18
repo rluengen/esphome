@@ -182,19 +182,26 @@ binary_sensor:
       - logger.log: "hello world"
       - light.turn_on:
           id: light_exterior_roof_rear
+
+  - id: !extend button_2
+    on_press:
+      - logger.log: "hello world"
+      - light.turn_on:
+          id: light_exterior_roof_rear
+
+  - id: !extend button_3
+    on_press:
+      - logger.log: "hello world"
+      - light.turn_on:
+          id: light_exterior_roof_rear
+
+  - id: !extend button_4
+    on_press:
+      - logger.log: "hello world"
+      - light.turn_on:
+          id: light_exterior_roof_rear
   
-  - platform: gpio
-    name: "Extended Button 0"
-    id: pcf8574_button_0
-    pin:
-      pcf8574: pcf8574_hub
-      number: 0
-      mode:
-        input: true
-      inverted: true
-    filters:
-      - delayed_on: 10ms
-      - delayed_off: 10ms
+  - id: !extend pcf8574_button_0
     on_press:
       - light.turn_on:
           id: light_exterior_roof_rear
@@ -203,19 +210,7 @@ binary_sensor:
       - light.turn_off:
           id: light_exterior_roof_rear
 
-
-  - platform: gpio
-    name: "Extended Button 1"
-    id: pcf8574_button_1
-    pin:
-      pcf8574: pcf8574_hub
-      number: 1
-      mode:
-        input: true
-      inverted: true
-    filters:
-      - delayed_on: 10ms
-      - delayed_off: 10ms
+  - id: !extend pcf8574_button_1
     on_click:
       - if:
           condition:
@@ -228,6 +223,3 @@ binary_sensor:
             - light.turn_on:
                 id: light_exterior_roof_rear
                 brightness: 100%
-#    on_release:
-#      - light.turn_off:
-#          id: light_exterior_roof_rear
