@@ -12,6 +12,7 @@ pcf8574:
 switch:
   - platform: gpio
     name: "PCF8574 Pin #0"
+    id: pcf8574_switch_0
     pin:
       pcf8574: pcf8574_hub
       number: 0
@@ -21,6 +22,7 @@ switch:
 
   - platform: gpio
     name: "PCF Button 1"
+    id: pcf8574_switch_1
     pin:
       pcf8574: pcf8574_hub
       number: 1

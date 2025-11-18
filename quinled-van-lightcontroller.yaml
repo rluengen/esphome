@@ -1,5 +1,3 @@
-# https://esphome.io/components/
-
 # The QuinLED Van Light Controller leverages the QuinLED An-Penta-Deca hardware platform to provide
 # interior and exterior lighting in the van. It features 15 individually controllable LED channels,
 # controlling various lights such as roof lights, capsule lights, and rear lights.
@@ -9,7 +7,8 @@
 # 1             Cabin Can Lights (x4)
 # 2             Bed Can Lights (x4)
 # 3             Sliding Door Light Strip
-# 4             Dog Crate Light Strip
+# 4             Dog Crate Light Strip (warm)
+# 5             Dog Crate Light Strip (cold)
 # 5             Garage Light Strip
 # 6             Capsule Light Strip (Warm)
 # 7             Capsule Light Strip (Cool)
@@ -68,6 +67,33 @@ esphome:
     version: ${project_version}
 
 light:
+  - platform: monochromatic
+    id: main_can_lights
+    name: "Main Can Lights"
+    default_transition_length: 500ms
+    output: led_channel_1
+
+  - platform: monochromatic
+    id: bed_can_lights
+    name: "Bed Can Lights"
+    default_transition_length: 500ms
+    output: led_channel_2
+
+  - platform: monochromatic
+    id: door_light
+    name: "Door Light"
+    default_transition_length: 500ms
+    output: led_channel_3
+
+  - platform: cwww
+    cold_white: led_channel_4
+    warm_white: led_channel_5
+    id: cwww_led_dog_crate_lights
+    name: "Dog Crate Lights"
+    default_transition_length: 500ms
+    cold_white_color_temperature: 6500 K
+    warm_white_color_temperature: 2700 K
+
   - platform: cwww
     cold_white: led_channel_1
     warm_white: led_channel_2
@@ -77,38 +103,12 @@ light:
     cold_white_color_temperature: 6500 K
     warm_white_color_temperature: 2700 K
 
-  - platform: monochromatic
-    id: bed_can_lights
-    name: "Bed Can Lights"
-    default_transition_length: 500ms
-    output: led_channel_3
-
-  - platform: monochromatic
-    id: main_can_lights
-    name: "Main Can Lights"
-    default_transition_length: 500ms
-    output: led_channel_4
-    
+   
   - platform: monochromatic
     id: garage_led_lights
     name: "Garage Lights"
     default_transition_length: 500ms
     output: led_channel_5
-
-  - platform: cwww
-    cold_white: led_channel_6
-    warm_white: led_channel_7
-    id: cwww_led_dog_crate_lights
-    name: "Dog Crate Lights"
-    default_transition_length: 500ms
-    cold_white_color_temperature: 6500 K
-    warm_white_color_temperature: 2700 K
-
-  - platform: monochromatic
-    id: door_light
-    name: "Door Light"
-    default_transition_length: 500ms
-    output: led_channel_8
 
   - platform: monochromatic
     id: exterior_driver_capsule_light

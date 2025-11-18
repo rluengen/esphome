@@ -1,17 +1,133 @@
 # https://www.waveshare.com/esp32-s3-touch-amoled-1.75.htm
 # https://devices.esphome.io/devices/waveshare-esp32-s3-touch-amoled-1.75/
 
+substitutions:
+  device_name: water-tank-display
+  friendly_name: Water Tank Display Controller
+
+# PCF85063 RTC Chip
+# QMI8658 IMU Chip
+# CO5300 1.75" 466x466 AMOLED Display with CST9217 Touch Controller
+# AXP2101 Power Management IC
+
+# Since the board includes only 3 GPIO ports (18, 17, and 16), we either need to use I2C
+# or do something else, since we have 3 valves to control (2 relays per reversing valve, 1 relay for auto-reverse valve),
+# plus the water pump relay, plus the water level input (ADC).
+
+
 # functionality:
 # turn the water pump on/off via manual control or automations based on water level
 # display water level on the screen
 # turn on drain valve to drain the tank
 # rotate the valves to fill from a dirty water source or a clean water source
 
-substitutions:
-  device_name: water-tank-display
-  friendly_name: Water Tank Display Controller
 
-project_version: "1.0.0"
+# The 2.54mm 8 pin header connectors on the back of the display include:
+# GPIO18    GPIO17    GPIO16    RXD     TXD     3v3     GND   EN      GPIO39    VBUS
+
+# MX1.25 BAT - expects voltage input from a battery, 3.7V lithium
+
+
+sensor:
+  - platform: adc
+    pin: GPIO4
+    id: water_tank_adc_v
+    attenuation: 11db
+    update_interval: 500ms
+
+  # It’s a software helper in ESPHome that calculates resistance (in ohms) from an ADC voltage reading using a known reference resistor in a voltage divider.
+  # https://esphome.io/components/sensor/resistance/
+  - platform: resistance
+    id: sender_ohms
+    name: "Fresh Water Sender Resistance (ohms)"
+    sensor: water_tank_adc_v  # This is your ADC voltage sensor
+    configuration: DOWNSTREAM # Position of unknown resistor in divider
+    resistor: 220.0 Ohm # (Required, float): The value of the resistor with a constant value.
+    # reference_voltage: 3.3 V # (Optional, float): The reference voltage. Defaults to 3.3V.
+
+    filters:
+      # Multi-point calibration for percentage. Add a point for each gallon mark (measured while filling).
+      - calibrate_linear:
+          - 33.0 -> 0.0    # 33? = 0%
+          - 33.0 -> 6.25
+          - 33.0 -> 12.5
+          - 36.0 -> 18.75
+          - 39.0 -> 25.0
+          - 43.0 -> 31.25
+          - 48.0 -> 37.5
+          - 54.0 -> 43.75
+          - 61.0 -> 50.0
+          - 69.0 -> 56.25
+          - 78.0 -> 62.5
+          - 89.0 -> 68.75
+          - 102.0 -> 75.0
+          - 118.0 -> 81.25
+          - 137.0 -> 87.5
+          - 160.0 -> 93.75
+          - 240.0 -> 100.0 # 240? = 100%
+      - median:
+          window_size: 15
+          send_every: 5s
+      - exponential_moving_average:
+          alpha: 0.1
+      - clamp:
+          min_value: 33.0
+          max_value: 240.0
+
+
+  - platform: template
+    id: tank_percent
+    name: "Fresh Water Tank Level (%)"
+    unit_of_measurement: "%"
+    accuracy_decimals: 0
+    filters:
+      - clamp:
+          min_value: 0.0
+          max_value: 100.0
+    lambda: |-
+      // Map your measured ohms to % (example: 33?=100% full, 240?=0% empty)
+      if (isnan(id(sender_ohms).state)) return NAN;
+      const float ohms = id(sender_ohms).state;
+      const float full_ohms  = 33.0f;
+      const float empty_ohms = 240.0f;
+      float pct = (empty_ohms - ohms) * 100.0f / (empty_ohms - full_ohms);
+      if (pct < 0)   pct = 0;
+      if (pct > 100) pct = 100;
+      return roundf(pct);
+
+
+  - platform: template
+    id: tank_gallons
+    name: "Tank Gallons Remaining"
+    unit_of_measurement: "gal"
+    accuracy_decimals: 1
+    update_interval: 1s
+    lambda: |-
+      // Replace with your true tank capacity in gallons
+      const float CAPACITY_GAL = 120.0f;
+      if (isnan(id(tank_percent).state)) return NAN;
+      return CAPACITY_GAL * (id(tank_percent).state / 100.0f);
+
+  - platform: template
+    id: water_tank_full
+    name: "Water Tank Full"
+    lambda: |-
+      if (isnan(id(tank_percent).state)) return false;
+      return id(tank_percent).state >= 95.0f;
+
+
+script:
+  - id: fill_fresh
+    then:
+      - if:
+          condition:
+            binary_sensor.is_off: near_full
+          then:
+            - cover.open: valve_A
+            - delay: 200ms
+            - cover.open: valve_B
+            - switch.turn_on: valve_C
+          else:
 
 packages:
   remote_packages:
@@ -27,8 +143,8 @@ packages:
           wifi_ssid: !secret wifi_ssid
           wifi_password: !secret wifi_password
       - path: packages/time/homeassistant.yaml
-  - !include packages/display/sleep.yaml
-  - !include devices/esp32-s3-touch-amoled-1.75.yaml
+      - path: packages/display/sleep.yaml
+      - path: devices/esp32-s3-touch-amoled-1.75.yaml
 
 esphome:
   name: ${device_name}
@@ -42,43 +158,63 @@ esphome:
     board_build.f_flash: 80000000L
     board_build.f_cpu: 240000000L
 
-number:
+# https://pictogrammers.com/library/mdi/
+
+# Requires Home Assistant 2024.5 or later to use valves.
+valve:
+  # The valve which controls the external hydrant being used for input vs output.
   - platform: template
-    name: "Water Tank Level"
-    id: water_tank_level
-    unit_of_measurement: "%"
-    icon: "mdi:water-percent"
-    min_value: 0
-    max_value: 100
-    step: 1
-    optimistic: true
-    initial_value: 0
-    restore_value: true
-    on_value:
-      then:
-        - lambda: |-
-            // Update overall gauge when number changes
-            const int pct = (int)x;
-            id(update_gauge).execute(pct);
+    id: valve_input_output_hydrant
+    name: "Input Hydrant Selection Valve"
+    comment: "Selects the hydrant between either water input or output."
+    device_class: "water"
+    icon: "mdi:valve"
+
+  # The valve which controls the input to the water pump from the tank or fill port.
+  - platform: template
+    id: valve_water_pump_source
+    name: "Water Pump Source Selector Valve"
+    comment: "Selects the water pump source between tank or fill port."
+    device_class: "water"
+    icon: "mdi:valve"
+
 
   - platform: template
-    name: "Water Capacity"
-    id: water_capacity_gallons
-    unit_of_measurement: "gal"
-    icon: "mdi:water"
-    accuracy_decimals: 1
-    update_interval: 1s
-    lambda: "return id(tank_percent).state;"   # input is percent
+    id: valve_fill
+    name: "Tank Fill Valve"
+    comment: "Opens the valve to fill the water tank from the water pump."
+    device_class: "water"
+    icon: "mdi:valve"
 
-    filters:
-      - calibrate_linear:
-          # percent -> gallons (measure at several levels while filling)
-          - 0    -> 0
-          - 10   -> 3.0
-          - 25   -> 10.0
-          - 50   -> 26.0
-          - 75   -> 40.0
-          - 90   -> 46.0
+    open_action:
+      - switch.turn_on: relay_fill_open
+    close_action:
+      - switch.turn_off: relay_fill_open
+
+
+
+switch:
+  - platform: gpio
+    id: valve_open
+    name: "Valve OPEN relay"
+    pin: GPIO10
+    interlock: [valve_open, valve_close]
+    interlock_wait_time: 100ms
+
+  - platform: gpio
+    id: valve_close
+    name: "Valve CLOSE relay"
+    pin: GPIO11
+    interlock: [valve_open, valve_close]
+    interlock_wait_time: 100ms
+
+
+  - platform: gpio
+    id: water_pump_relay
+    name: "Water Pump"
+    comment: "Controls power to the water pump"
+    pin: GPIO12
+
 
 
 # --- Resistive sender ? ADC (example wiring) ---
@@ -97,52 +233,6 @@ sensor:
           send_first_at: 1
     accuracy_decimals: 3
 
-
-  # Convert ADC voltage -> sensor resistance (Ohm).
-  # Assumptions: adc_water returns volts (ESPHome does). If you configured it to return ratio,
-  # multiply by 3.3 first.
-  - platform: template
-    id: water_sensor_ohms
-    name: "Water Sensor ?"
-    unit_of_measurement: "?"
-    update_interval: 1s
-    accuracy_decimals: 1
-    lambda: |-
-      const float Vref   = 3.30f;     // ESP32 ADC reference
-      const float R_fixed = 1000.0f;  // <-- your known series resistor (Ohm)
-      const float v = id(adc_water).state;  // volts
-      // Avoid divide-by-zero near full-scale
-      if (v <= 0.01f || v >= (Vref - 0.01f)) return NAN;
-      float R = R_fixed * (v / (Vref - v));
-      return R;
-
-
-  - platform: template
-    id: tank_percent
-    name: "Water Level %"
-    unit_of_measurement: "%"
-    update_interval: 1s
-    accuracy_decimals: 0
-    lambda: "return id(water_sensor_ohms).state;"
-    filters:
-      # Replace the pairs below with your sender's actual calibration points.
-      # Format: measured_ohms -> percent
-      - calibrate_linear:
-          - 33.0  -> 100.0   # full
-          - 240.0 -> 0.0     # empty
-      - clamp:
-          min_value: 0.0
-          max_value: 100.0
-    on_value:
-      then:
-        # Keep the UI in sync from the physical sensor, too.
-        - script.execute:
-            id: ui_update_from_percent
-            pct: !lambda "return (int)x;"
-        # Optionally mirror it into the number template so HA shows the same value:
-        - number.set:
-            id: gauge_percent
-            value: !lambda "return x;"
 
   # Gallons remaining (linear tank). If your tank isn’t linear, see Section C.2 below.
   - platform: template

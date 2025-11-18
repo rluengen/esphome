@@ -50,6 +50,14 @@ number:
 
 # But according to https://esphome.io/components/sensor/adc/#adc-esp32_pins on an ESP32-C6 GPIO0-GPIO6 are valid pins
 
+switch:
+  - id: ${relay_1_id}
+    interlock: [${relay_2_id}]
+    interlock_wait_time: 100ms
+
+  - id: ${relay_2_id}
+    interlock: [${relay_1_id}]
+
 # Analog to digital sensor to measure the motor current.
 sensor:
   - platform: adc
@@ -72,8 +80,8 @@ cover:
     device_class: awning
 
     open_action:
-      - switch.turn_on: ${relay_1_id}
       - switch.turn_off: ${relay_2_id}
+      - switch.turn_on: ${relay_1_id}
 
     open_duration: 15s
 
