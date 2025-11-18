@@ -33,17 +33,81 @@ packages:
         vars:
           backlight_light_id: display_backlight_id
           inactivity_timeout: 300s
-      - path: packages/home_assistant_light.yaml
-        vars:
-          light_id: rear_can_lights
-          entity_id: light.rear_can_lights
       - path: devices/viewe-esp32c3-rotary-knob.yaml
+
+#      - path: packages/home_assistant_light.yaml
+#        vars:
+#          light_id: rear_can_lights
+#          entity_id: light.rear_can_lights
+
+select:
+  - platform: template
+    name: "Dial Selected Light"
+    id: dial_selected_light
+    optimistic: true
+    initial_option: "All Lights"
+    options:
+      - "All Lights"
+      - "Living Room"
+      - "Desk"
+      - "Bedside"
+    on_value:
+      then:
+        - lambda: |-
+            // Map friendly option to actual entity_id
+            std::string v = id(dial_selected_light).state;
+            if (v == "Living Room") {
+              id(selected_entity) = "light.living_room";
+            } else if (v == "Desk") {
+              id(selected_entity) = "light.desk";
+            } else if (v == "Bedside") {
+              id(selected_entity) = "light.bedside_lamp";
+            } else {
+              id(selected_entity) = "light.living_room";
+            }
+
+globals:
+  - id: current_brightness
+    type: int
+    initial_value: "0"
+
+  - id: selected_light_index
+    type: int
+    initial_value: "0"
+    restore_value: yes
+
+script:
+  - id: publish_brightness_throttled
+    mode: restart
+    then:
+      - delay: 300ms
+      - if:
+          condition:
+            lambda: 'return id(current_brightness) == 0;'
+          then:
+            - homeassistant.service:
+                service: light.turn_off
+                data:
+                  entity_id: !lambda 'return id(selected_entity);'
+          else:
+            - homeassistant.service:
+                service: light.turn_on
+                data:
+                  entity_id: !lambda 'return id(selected_entity);'
+                  brightness: !lambda |-
+                    // convert 0..100 -> 0..255 and clamp
+                    int val = id(current_brightness);
+                    int b = (int)(val * 255.0 / 100.0 + 0.5);
+                    if (b < 1) b = 1;   // avoid sending 0
+                    if (b > 255) b = 255;
+                    return b;
 
 sensor:
   - id: !extend rotary_encoder_id
     name: "Rotary Encoder"
     on_clockwise:
       then:
+        - script.execute: screen_bump_activity
         - lambda: |-
             int step = 2;
             id(current_brightness) = std::min(100, id(current_brightness) + step);
@@ -51,6 +115,7 @@ sensor:
 
     on_anticlockwise:
       then:
+        - script.execute: screen_bump_activity
         - lambda: |-
             int step = 2;
             id(current_brightness) = std::max(0, id(current_brightness) - step);
@@ -64,6 +129,7 @@ binary_sensor:
           - ON for at most 500ms
           - OFF for at least 100ms
         then:
+          - script.execute: screen_bump_activity
           - homeassistant.service:
               service: light.toggle
               data:
@@ -82,9 +148,11 @@ binary_sensor:
           - OFF for at least 100ms
         then:
           - logger.log: "Double click detected - no action assigned"
+          - script.execute: screen_bump_activity
 
       # Long press
       - timing:
           - ON for at least 1000ms
         then:
           - logger.log: "Long press detected - no action assigned"
+          - script.execute: screen_bump_activity

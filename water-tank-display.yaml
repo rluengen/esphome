@@ -35,7 +35,7 @@ sensor:
     attenuation: 11db
     update_interval: 500ms
 
-  # It’s a software helper in ESPHome that calculates resistance (in ohms) from an ADC voltage reading using a known reference resistor in a voltage divider.
+  # Itï¿½s a software helper in ESPHome that calculates resistance (in ohms) from an ADC voltage reading using a known reference resistor in a voltage divider.
   # https://esphome.io/components/sensor/resistance/
   - platform: resistance
     id: sender_ohms
@@ -158,6 +158,11 @@ esphome:
     board_build.f_flash: 80000000L
     board_build.f_cpu: 240000000L
 
+touchscreen:
+  - id: !extend ${touchscreen}
+    on_touch:
+      - script.execute: screen_bump_activity
+
 # https://pictogrammers.com/library/mdi/
 
 # Requires Home Assistant 2024.5 or later to use valves.
@@ -234,7 +239,7 @@ sensor:
     accuracy_decimals: 3
 
 
-  # Gallons remaining (linear tank). If your tank isn’t linear, see Section C.2 below.
+  # Gallons remaining (linear tank). If your tank isnï¿½t linear, see Section C.2 below.
   - platform: template
     id: tank_gallons
     name: "Water Remaining"
@@ -309,7 +314,7 @@ lvgl:
           range_from: 0
           range_to: 100
           value: 0
-          bg_angles: { start: 135, end: 405 } # 270° arc
+          bg_angles: { start: 135, end: 405 } # 270ï¿½ arc
 
       - lvgl.widget.create:
           type: label
@@ -363,7 +368,7 @@ script:
       pct: int
     then:
       - lambda: |-
-          // Grab screen children: we’ll search by type; or cache pointers in statics.
+          // Grab screen children: weï¿½ll search by type; or cache pointers in statics.
           // (We cached arc/label in the on_ready block as statics; retrieve them here.)
           extern "C" {
             // Access the statics by re-declaring them (file-scope in generated C++).
@@ -371,7 +376,7 @@ script:
           }
           // As a practical approach in ESPHome, re-find by order:
           //   The 2nd arc is our value arc; the centered big label is our value text.
-          // For robustness, we’ll remember across calls with static pointers:
+          // For robustness, weï¿½ll remember across calls with static pointers:
           static lv_obj_t* arc_val = nullptr;
           static lv_obj_t* lbl_val = nullptr;
 
@@ -391,7 +396,7 @@ script:
                 if (!lbl_val) lbl_val = child;
               }
               child = lv_obj_get_child(scr, 0); // NOTE: LVGL v9 uses different iterator; ESPHome wraps; this is illustrative
-              // In ESPHome it’s often easier to create via `lvgl.widget.create` and refer by IDs.
+              // In ESPHome itï¿½s often easier to create via `lvgl.widget.create` and refer by IDs.
             }
           }
 
