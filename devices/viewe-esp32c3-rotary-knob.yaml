@@ -4,8 +4,11 @@
 esphome:
   name: ${device_name}
   friendly_name: ${friendly_name}
-  platform: ESP32
-  board: esp32c3_devkitm_1
+
+esp32:
+  board: esp32-c3-devkitm-1
+  framework:
+    type: arduino
 
 lvgl:
 
@@ -37,12 +40,13 @@ output:
 light:
   - platform: monochromatic
     name: "Display Backlight"
+    id: display_backlight_id
     output: backlight_output
     restore_mode: RESTORE_DEFAULT_ON
 
 sensor:
   - platform: rotary_encoder
-    id: my_rotary_encoder
+    id: rotary_encoder_id
     name: "Rotary Encoder"
     pin_a: 6
     pin_b: 7
@@ -52,7 +56,7 @@ sensor:
 
 binary_sensor:
   - platform: gpio
-    id: encoder_button
+    id: encoder_button_id
     pin: 
       number: 9
       inverted: true
@@ -60,14 +64,3 @@ binary_sensor:
     filters:
       - delayed_on: 50ms
       - delayed_off: 50ms
-    on_click:
-      - min_length: 50ms
-        max_length: 500ms
-        then:
-          - logger.log: "Rotary encoder button clicked"
-      - min_length: 500ms
-        then:
-          - logger.log: "Rotary encoder button long pressed"
-    on_double_click:
-      then:
-        - logger.log: "Rotary encoder button double clicked"

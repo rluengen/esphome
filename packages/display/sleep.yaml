@@ -1,7 +1,7 @@
 touchscreen:
-# - id: !extend touchscreen
-  on_touch:
-    - script.execute: bump_activity
+  - id: !extend touchscreen
+    on_touch:
+      - script.execute: bump_activity
 
 globals:
   - id: last_input_ms
@@ -46,13 +46,13 @@ script:
       # Option A: cut panel EN
       - if:
           condition:
-            lambda: 'return true;'  # set false if you don’t use EN
+            lambda: 'return true;'  # set false if you don't use EN
           then:
             - switch.turn_off: panel_power
       # Option B: panel sleep via display action
       - if:
           condition:
-            lambda: 'return true;'  # set false if you don’t use display actions
+            lambda: 'return true;'  # set false if you don't use display actions
           then:
             - display.turn_off: disp
       - lambda: |-

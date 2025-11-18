@@ -20,7 +20,8 @@ sensor:
               int pct = (int) roundf((raw / 255.0f) * 100.0f);
               id(current_brightness) = pct;
             }
-  # Exposed % (optional—for debugging/visibility in HA)
+
+  # Exposed Brightness Percent
   - platform: template
     id: ha_light_${light_id}_brightness_pct
     unit_of_measurement: "%"
