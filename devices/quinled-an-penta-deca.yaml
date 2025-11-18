@@ -92,19 +92,25 @@ output:
 
 binary_sensor:
   - platform: gpio
+    id: button_1
     pin: 36
-    name: button_1
     filters:
       - invert:
 
   - platform: gpio
+    id: button_2
     pin: 39
-    name: button_2
     filters:
       - invert:
 
   - platform: gpio
+    id: button_3
     pin: 34
-    name: button_3
+    filters:
+      - invert:
+
+  - platform: gpio
+    id: button_4
+    pin: 33
     filters:
       - invert:

@@ -50,6 +50,7 @@ packages:
       - path: packages/common.yaml
         vars:
           api_encryption_key: !secret encryption_key
+          log_level: VERY_VERBOSE
       - path: packages/network/wifi.yaml
         vars:
           wifi_ssid: !secret wifi_ssid
@@ -83,6 +84,7 @@ light:
   - platform: monochromatic
     id: door_light
     name: "Door Light"
+    icon: "mdi:door_light"
     default_transition_length: 500ms
     output: led_channel_3
 
@@ -129,14 +131,14 @@ light:
   - platform: monochromatic
     id: light_exterior_passenger_capsule
     name: "Exterior Capsule Passenger Flood Light"
-    icon: "mdi:light-flood-down"
+    icon: "mdi:wall-sconce-flat"
     default_transition_length: 500ms
     output: led_channel_11
 
   - platform: monochromatic
     id: light_exterior_driver_capsule
     name: "Exterior Capsule Driver Flood Light"
-    icon: "mdi:light-flood-down"
+    icon: "mdi:wall-sconce-flat"
     default_transition_length: 500ms
     output: led_channel_12
 
@@ -175,9 +177,14 @@ light:
 # This allows us to connect multiple buttons to the QuinLED An-Penta-Deca.
 
 binary_sensor:
-  # Button 1 on P0
+  - id: !extend button_1
+    on_press:
+      - logger.log: "hello world"
+      - light.turn_on:
+          id: light_exterior_roof_rear
+  
   - platform: gpio
-    name: "${friendly_name} Extended Button 0"
+    name: "Extended Button 0"
     id: pcf8574_button_0
     pin:
       pcf8574: pcf8574_hub
@@ -197,9 +204,8 @@ binary_sensor:
           id: light_exterior_roof_rear
 
 
-# a button which turns on a light while pressed. This works for the upper/lower passenger/driver roof lights
   - platform: gpio
-    name: "${friendly_name} Extended Button 1"
+    name: "Extended Button 1"
     id: pcf8574_button_1
     pin:
       pcf8574: pcf8574_hub
@@ -215,11 +221,13 @@ binary_sensor:
           condition:
             light.is_on: light_exterior_roof_rear
           then:
+            - logger.log: "turn roof light off"
             - light.turn_off: light_exterior_roof_rear
           else:
+            - logger.log: "turn roof light on"
             - light.turn_on:
                 id: light_exterior_roof_rear
                 brightness: 100%
-    on_release:
-      - light.turn_off:
-          id: light_exterior_roof_rear
+#    on_release:
+#      - light.turn_off:
+#          id: light_exterior_roof_rear
