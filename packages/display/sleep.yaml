@@ -91,7 +91,10 @@ switch:
     name: "Display Keep Awake"
     id: display_keep_awake_switch
     optimistic: true
-    restore_state: yes
+    # Replaced `restore_state: yes` (deprecated) with `restore_mode`.
+    # Use one of: RESTORE_DEFAULT_OFF, RESTORE_DEFAULT_ON, ALWAYS_OFF, ALWAYS_ON
+    # RESTORE_DEFAULT_OFF: restore previous state if present, otherwise default to OFF
+    restore_mode: RESTORE_DEFAULT_OFF
     turn_on_action:
       - lambda: |-
           id(keep_display_awake) = true;
