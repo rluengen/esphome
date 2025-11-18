@@ -1,3 +1,6 @@
+substitutions:
+  sleep_idle_time_milliseconds: 5000
+
 touchscreen:
   - id: !extend touchscreen
     on_touch:
@@ -13,6 +16,11 @@ globals:
     type: bool
     restore_value: no
 
+  - id: keep_display_awake
+    type: bool
+    restore_value: yes
+    initial_value: "false"
+
 interval:
   - interval: 1s
     then:
@@ -22,7 +30,8 @@ interval:
           if (id(last_input_ms) == 0) id(last_input_ms) = now;
 
           const uint32_t idle_ms = now - id(last_input_ms);
-          if (!id(screen_is_off) && idle_ms > (uint32_t) atoi("${SCREEN_IDLE_MS}")) {
+          // Don't turn off if user explicitly wants to keep the display awake
+          if (!id(screen_is_off) && !id(keep_display_awake) && idle_ms > (uint32_t) atoi("${sleep_idle_time_milliseconds}")) {
             id(enter_screen_off).execute();
           }
 
@@ -81,3 +90,16 @@ script:
       - lambda: |-
           id(screen_is_off) = false;
           id(last_input_ms) = millis();   // restart the idle timer
+
+switch:
+  - platform: template
+    name: "Display Keep Awake"
+    id: display_keep_awake_switch
+    optimistic: true
+    restore_state: yes
+    turn_on_action:
+      - lambda: |-
+          id(keep_display_awake) = true;
+    turn_off_action:
+      - lambda: |-
+          id(keep_display_awake) = false;
