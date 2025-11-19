@@ -32,7 +32,7 @@ switch:
 # Uptime sensor
 sensor:
   - platform: uptime
-    id: uptime
+    id: uptime_id
     name: "${friendly_name} Uptime"
     update_interval: 60s
 
