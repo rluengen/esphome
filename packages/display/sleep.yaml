@@ -46,14 +46,14 @@ script:
   # Turn off: pick A or B or both
   - id: enter_screen_off
     then:
-      - switch.turn_off: ${display_panel_power_switch_id}
+      - light.turn_off: ${display_panel_power_switch_id}
       - lambda: |-
           id(screen_is_off) = true;
 
   # Turn on again (first tap wakes; second tap interacts)
   - id: exit_screen_off
     then:
-      - switch.turn_on: ${display_panel_power_switch_id}
+      - light.turn_on: ${display_panel_power_switch_id}
       - delay: 60ms   # give panel rails time to rise
       # Force a redraw so the first frame is crisp
       - lambda: |-
