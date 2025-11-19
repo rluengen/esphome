@@ -77,9 +77,9 @@ script:
       #       lambda: 'return true;'
       #     then:
       #       - display.turn_on: disp
-      # Removed invalid actions; panel_power switch + redraw handle wake.
-      # Force a redraw so the first frame is crisp
-      - lvgl.redraw
+      # Removed invalid actions (display.turn_on, lvgl.redraw not available).
+      # Panel power switch handles wake; display will refresh on next update cycle.
+      # - lvgl.redraw
       - lambda: |-
           id(screen_is_off) = false;
           id(last_input_ms) = millis();   // restart the idle timer
