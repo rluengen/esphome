@@ -56,7 +56,6 @@ script:
       - switch.turn_on: ${display_panel_power_switch_id}
       - delay: 60ms   # give panel rails time to rise
       # Force a redraw so the first frame is crisp
-      - lvgl.redraw
       - lambda: |-
           id(screen_is_off) = false;
           id(last_input_ms) = millis();   // restart the idle timer

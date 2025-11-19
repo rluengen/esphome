@@ -1,0 +1,121 @@
+# https://github.com/vodidan/UEDX46460015-MD50E-ESPHome-config/blob/main/UEDX46460015-MD50E.yaml
+esp32:
+  board: esp32-s3-devkitc-1
+  flash_size: 16MB
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      CONFIG_ESP32S3_DEFAULT_CPU_FREQ_240: "y"
+      CONFIG_ESP32S3_DATA_CACHE_64KB: "y"
+      CONFIG_ESP32S3_DATA_CACHE_LINE_64B: "y"
+      CONFIG_SPIRAM_FETCH_INSTRUCTIONS: y
+      CONFIG_SPIRAM_RODATA: y
+
+psram:
+  mode: octal
+  speed: 120MHz
+
+  spi:
+  - id: display_qspi
+    type: quad
+    clk_pin: 10
+    data_pins: [13, 11, 14, 9]
+
+i2c:
+  sda: 1
+  scl: 3
+
+sensor:
+  - platform: rotary_encoder
+    name: "Rotary Encoder"
+    pin_a: 5
+    pin_b: 6
+    on_clockwise:
+      - logger.log: "Turned Clockwise"
+    on_anticlockwise:
+      - logger.log: "Turned Anticlockwise"
+
+binary_sensor:
+  - platform: gpio
+    pin: 0
+    id: rotary_button
+
+display:
+  - platform: qspi_dbi
+    model: CUSTOM
+    data_rate: 40MHz
+    spi_mode: mode0
+    id: main_display
+    spi_id: display_qspi
+    color_order: rgb
+    dimensions:
+      height: 466
+      width: 472
+      offset_width: 6
+      offset_height: 0
+    cs_pin: 12
+    reset_pin: 8
+    enable_pin: 17
+    brightness: 200
+    auto_clear_enabled: false
+    init_sequence:
+      - [ 0xFE, 0x00 ]
+      - [ 0xC4, 0x80 ]
+      - [ 0x3A, 0x55 ]
+      - [ 0x35, 0x00 ]
+      - delay 10ms
+      - [ 0x53, 0x20 ]
+      - delay 10ms
+      - [ 0x51, 0xFF ]
+      - delay 10ms
+      - [ 0x63, 0xFF ]
+      - delay 10ms
+      - [ 0x2A, 0x00, 0x06, 0x01, 0xDD ]
+      - [ 0x2B, 0x00, 0x00, 0x01, 0xD1 ]
+      - [ 0x11, 0x00 ]
+      - delay 60ms
+
+touchscreen:
+  platform: cst816
+  id: my_touchscreen
+  interrupt_pin: 4
+  reset_pin: 2
+  on_release:
+    then:
+      - logger.log: "touchscreen pressed"
+      - if:
+          condition: lvgl.is_paused
+          then:
+            - logger.log: "LVGL resuming"
+            - lvgl.resume:
+            - lvgl.widget.redraw:
+            - delay: 100ms
+            - number.set:
+                id: display_brightness
+                value: 80
+
+number:
+  - platform: template
+    name: LVGL Screen timeout(knob)
+    optimistic: true
+    id: display_timeout
+    unit_of_measurement: "s"
+    initial_value: 30
+    restore_value: true
+    min_value: 10
+    max_value: 180
+    step: 5
+    mode: box
+  - platform: template
+    name: "Display Brightness"
+    id: display_brightness
+    optimistic: true
+    min_value: 0
+    max_value: 100
+    step: 1
+    restore_value: true
+    on_value:
+      then:
+        - lambda: |-
+            uint8_t brightness = static_cast<uint8_t>((x / 100.0f) * 255.0f);
+            id(main_display).set_brightness(brightness);
