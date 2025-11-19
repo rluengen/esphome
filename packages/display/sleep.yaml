@@ -1,5 +1,6 @@
 substitutions:
   sleep_idle_time_milliseconds: 5000
+  display_panel_power_switch_id: panel_power
 
 globals:
   - id: last_input_ms
@@ -51,13 +52,7 @@ script:
           condition:
             lambda: 'return true;'  # set false if you don't use EN
           then:
-            - switch.turn_off: panel_power
-      # Option B: panel sleep via display action (commented out - action not available)
-      # - if:
-      #     condition:
-      #       lambda: 'return true;'
-      #     then:
-      #       - display.turn_off: disp
+            - switch.turn_off: ${display_panel_power_switch_id}
       - lambda: |-
           id(screen_is_off) = true;
 
@@ -69,17 +64,18 @@ script:
           condition:
             lambda: 'return true;'  # set false if no EN
           then:
-            - switch.turn_on: panel_power
+            - switch.turn_on: ${display_panel_power_switch_id}
             - delay: 60ms   # give panel rails time to rise
-      # Wake panel (commented out - action not available)
-      # - if:
-      #     condition:
-      #       lambda: 'return true;'
-      #     then:
-      #       - display.turn_on: disp
-      # Removed invalid actions (display.turn_on, lvgl.redraw not available).
-      # Panel power switch handles wake; display will refresh on next update cycle.
-      # - lvgl.redraw
+      # Wake panel
+      - if:
+          condition:
+            lambda: 'return true;'  # set false if not using display actions
+          then:
+            - display.turn_on: disp
+      # Re-enable LVGL rendering
+      - lvgl.sleep.disable
+      # Force a redraw so the first frame is crisp
+      - lvgl.redraw
       - lambda: |-
           id(screen_is_off) = false;
           id(last_input_ms) = millis();   // restart the idle timer
