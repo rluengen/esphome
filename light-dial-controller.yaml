@@ -29,6 +29,10 @@ packages:
           display_id: round_display
           display_panel_power_switch_id: display_backlight_id
       - path: devices/viewe-esp32c3-rotary-knob.yaml
+      - path: packages/icons/network_icons.yaml
+      - path: packages/icons/weather_icons.yaml
+      - path: packages/icons/battery_icons.yaml
+      - path: packages/icons/homeassistant_icons.yaml
 
 #      - path: packages/home_assistant_light.yaml
 #        vars:
@@ -69,18 +73,56 @@ number:
 
 lvgl:
 # https://esphome.io/cookbook/lvgl/#turn-off-screen-when-idle
-  on_idl:
+  on_idle:
     timeout: !lambda "return (id(display_timeout).state * 1000);"
     then:
       - logger.log: "LVGL is idle"
   # todo: deep sleep now, wake up time should be to the next minute? or 10 minutes?
-      - light.turn_off: display_backlight
+      - light.turn_off: display_backlight_id
       - lvgl.pause:
 
   disp_bg_color: 0x000000
 
+#  top_layer:
+#    wigets:
+
   top_layer:
-    wigets:
+    widgets:
+      # WiFi signal strength indicator (top-left)
+      - label:
+          id: wifi_icon
+          align: TOP_LEFT
+          x: 5
+          y: 5
+          text: "\U000F05A9"  # mdi:wifi
+          text_font: battery_icons
+          text_color: 0xFFFFFF
+      - label:
+          id: wifi_signal_label
+          align: TOP_LEFT
+          x: 25
+          y: 5
+          text: "-"
+          text_font: roboto_16
+          text_color: 0x00FF00
+      
+      # Home Assistant connection status (top-right)
+      - label:
+          id: ha_status_icon
+          align: TOP_RIGHT
+          x: -25
+          y: 5
+          text: "\U000F02DC"  # mdi:home
+          text_font: battery_icons
+          text_color: 0xFFFFFF
+      - label:
+          id: ha_connection_label
+          align: TOP_RIGHT
+          x: -5
+          y: 5
+          text: "?"
+          text_font: roboto_16
+          text_color: 0xFFFF00
 
   pages:
     - id: main_page
@@ -175,6 +217,26 @@ globals:
     type: std::string
     initial_value: "light.living_room"
     restore_value: yes
+
+font:
+  - file: "fonts/materialdesignicons-webfont.ttf"
+    id: battery_icons
+    size: 20
+    bpp: 4
+    glyphs: [
+      "\U000F007A", # mdi-battery-10
+      "\U000F007B", # mdi-battery-20
+      "\U000F007C", # mdi-battery-30
+      "\U000F007D", # mdi-battery-40
+      "\U000F007E", # mdi-battery-50
+      "\U000F007F", # mdi-battery-60
+      "\U000F0080", # mdi-battery-70
+      "\U000F0081", # mdi-battery-80
+      "\U000F0082", # mdi-battery-90
+      "\U000F0079", # mdi-battery (full)
+      "\U000F008E", # mdi-battery-outline
+      "\U000F0091", # mdi-battery-unknown
+      ]
 
 script:
   - id: update_light_display
