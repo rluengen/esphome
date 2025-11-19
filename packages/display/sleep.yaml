@@ -52,12 +52,12 @@ script:
             lambda: 'return true;'  # set false if you don't use EN
           then:
             - switch.turn_off: panel_power
-      # Option B: panel sleep via display action
-      - if:
-          condition:
-            lambda: 'return true;'  # set false if you don't use display actions
-          then:
-            - display.turn_off: disp
+      # Option B: panel sleep via display action (commented out - action not available)
+      # - if:
+      #     condition:
+      #       lambda: 'return true;'
+      #     then:
+      #       - display.turn_off: disp
       - lambda: |-
           id(screen_is_off) = true;
 
@@ -71,13 +71,13 @@ script:
           then:
             - switch.turn_on: panel_power
             - delay: 60ms   # give panel rails time to rise
-      # Wake panel
-      - if:
-          condition:
-            lambda: 'return true;'  # set false if not using display actions
-          then:
-            - display.turn_on: disp
-      # Removed invalid action `lvgl.sleep.disable`; turning display on resumes rendering.
+      # Wake panel (commented out - action not available)
+      # - if:
+      #     condition:
+      #       lambda: 'return true;'
+      #     then:
+      #       - display.turn_on: disp
+      # Removed invalid actions; panel_power switch + redraw handle wake.
       # Force a redraw so the first frame is crisp
       - lvgl.redraw
       - lambda: |-

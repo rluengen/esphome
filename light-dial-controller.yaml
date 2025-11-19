@@ -33,8 +33,7 @@ packages:
       - path: packages/time/homeassistant.yaml
       - path: packages/display/sleep.yaml
         vars:
-          backlight_light_id: display_backlight_id
-          inactivity_timeout: 300s
+          display_id: round_display
       - path: devices/viewe-esp32c3-rotary-knob.yaml
 
 #      - path: packages/home_assistant_light.yaml
