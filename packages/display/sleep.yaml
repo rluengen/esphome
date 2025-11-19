@@ -45,8 +45,7 @@ script:
   # Turn off: pick A or B or both
   - id: enter_screen_off
     then:
-      # Optionally tell LVGL to go to sleep (reduces CPU draw)
-      - lvgl.sleep.enable
+      # Removed invalid action `lvgl.sleep.enable` (not supported). Display off + optional power cut handles sleep.
       # Option A: cut panel EN
       - if:
           condition:
@@ -78,8 +77,7 @@ script:
             lambda: 'return true;'  # set false if not using display actions
           then:
             - display.turn_on: disp
-      # Re-enable LVGL rendering
-      - lvgl.sleep.disable
+      # Removed invalid action `lvgl.sleep.disable`; turning display on resumes rendering.
       # Force a redraw so the first frame is crisp
       - lvgl.redraw
       - lambda: |-

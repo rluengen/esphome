@@ -11,9 +11,11 @@
 # to be able to rotate through the different devices. 
 
 substitutions:
-  device_name: light-dial-controller
+  device_name: light_dial_controller
   friendly_name: Light Dial Controller
   project_version: "1.0.0"
+
+lvgl:
 
 packages:
   remote_packages:
