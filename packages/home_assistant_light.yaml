@@ -15,11 +15,12 @@ sensor:
       then:
         - lambda: |-
             // Convert 0..255 -> %
-            float raw = id(ha_light_brightness_raw).state;
+            float raw = id(ha_light_${light_id}_brightness_raw).state;
             if (!isnan(raw)) {
               int pct = (int) roundf((raw / 255.0f) * 100.0f);
-              id(current_brightness) = pct;
+              id(current_brightness_${light_id}) = pct;
             }
+        - script.execute: update_light_display
 
   # Exposed Brightness Percent
   - platform: template

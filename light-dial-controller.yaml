@@ -3,19 +3,12 @@
 # pushing the button will toggle the current device on/off.
 # rotating the dial will adjust a value (e.g., brightness).
 # pressing and holding the button for 2 seconds will turn the device off.
-# swiping left and right will switch between the lights
 # automatically turn off the display after a period of inactivity.
-
-# I can do this either in esphome manually or via home assistant by creating a target knob.
-# the question is if home assistant should have the concept - I think that we want it on the knob
-# to be able to rotate through the different devices. 
 
 substitutions:
   device_name: light_dial_controller
   friendly_name: Light Dial Controller
   project_version: "1.0.0"
-
-lvgl:
 
 packages:
   remote_packages:
@@ -42,31 +35,104 @@ packages:
 #          light_id: rear_can_lights
 #          entity_id: light.rear_can_lights
 
+sun:
+  id: sun_id
+  latitude: !secret latitude
+  longitude: !secret longitude
+
+font:
+  - file: "gfonts://Roboto"
+    id: roboto_16
+    size: 16
+    glyphs: "!%()+=,-_.:°0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz"
+  - file: "gfonts://Roboto"
+    id: roboto_24
+    size: 24
+    glyphs: "!%()+=,-_.:°0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz"
+#  - file: "gfonts://Roboto"
+#    id: roboto_48
+#    size: 48
+#    glyphs: "💡🔆" # bulb and brightness emoji
+
+lvgl:
+  pages:
+    - id: main_page
+      widgets:
+        # Circular arc showing brightness level (0-100%)
+        - arc:
+            id: brightness_arc
+            align: CENTER
+            x: 0
+            y: 0
+            width: 180
+            height: 180
+            arc_color: 0x444444
+            arc_width: 12
+            min_value: 0
+            max_value: 100
+            value: 0
+            adjustable: false
+            bg_color: 0x222222
+            bg_opa: COVER
+            radius: 90
+            indicator:
+              arc_color: 0xFFDD44
+              arc_width: 14
+
+        # Light icon (centered, above name)
+        - label:
+            id: light_icon_label
+            align: CENTER
+            x: 0
+            y: -35
+            text: "💡"
+            text_font: roboto_24
+            text_color: 0xFFFFFF
+
+        # Light name (centered)
+        - label:
+            id: light_name_label
+            align: CENTER
+            x: 0
+            y: 10
+            text: "Living Room"
+            text_font: roboto_16
+            text_color: 0xFFFFFF
+
+        # Brightness percentage (centered, below name)
+        - label:
+            id: brightness_pct_label
+            align: CENTER
+            x: 0
+            y: 40
+            text: "0%"
+            text_font: roboto_24
+            text_color: 0xFFDD44
+
 select:
   - platform: template
     name: "Dial Selected Light"
     id: dial_selected_light
-    optimistic: true
-    initial_option: "All Lights"
+    initial_option: light.bed_interior_lights
     options:
-      - "All Lights"
-      - "Living Room"
-      - "Desk"
-      - "Bedside"
+      - light.bed_interior_lights
+      - light.main_can_lights
+      - light.bed_can_lights
+      - light.cwww_led_capsule_lights
+      - light.exterior_lights
+      - light.door_light
+      - light.cwww_led_dog_crate_lights
+
+    set_action: # The action that should be performed when the remote (like Home Assistant’s frontend) requests to set the Select option
+      - logger.log:
+          format: "Selected light option (remote): %s (index %d)"
+          args: ["x.c_str()", "i"]
+
     on_value:
       then:
-        - lambda: |-
-            // Map friendly option to actual entity_id
-            std::string v = id(dial_selected_light).state;
-            if (v == "Living Room") {
-              id(selected_entity) = "light.living_room";
-            } else if (v == "Desk") {
-              id(selected_entity) = "light.desk";
-            } else if (v == "Bedside") {
-              id(selected_entity) = "light.bedside_lamp";
-            } else {
-              id(selected_entity) = "light.living_room";
-            }
+        - logger.log:
+            format: "Selected light option: %s (index %d)"
+            args: ["x.c_str()", "i"]
 
 globals:
   - id: current_brightness
@@ -84,6 +150,58 @@ globals:
     restore_value: yes
 
 script:
+  - id: update_light_display
+    then:
+      - lambda: |-
+          // before we update the lvgl widget, we need to ensure that current_brightness
+          // we need to read the brightness of the currently selected light.
+          auto index = id(dial_selected_light).active_index();
+          if (index.has_value()) {
+
+            auto selected_option = id(dial_selected_light).at(index.value());
+
+            int brightness = 0;
+            if (strcmp(selected_option.c_str(), "light.bed_interior_lights") == 0) {
+                brightness = (int)roundf((id(light_bed_interior_lights_brightness).state / 255.0f) * 100.0f);
+            } else if (strcmp(selected_option.c_str(), "light.main_can_lights") == 0) {
+                brightness = (int)roundf((id(light_main_can_lights_brightness).state / 255.0f) * 100.0f);
+            } else if (strcmp(selected_option.c_str(), "light.bed_can_lights") == 0) {
+                brightness = (int)roundf((id(light_bed_can_lights_brightness).state / 255.0f) * 100.0f);
+            } else if (strcmp(selected_option.c_str(), "light.cwww_led_capsule_lights") == 0) {
+                brightness = (int)roundf((id(light_cwww_led_capsule_lights_brightness).state / 255.0f) * 100.0f);
+            } else if (strcmp(selected_option.c_str(), "light.exterior_lights") == 0) {
+                brightness = (int)roundf((id(light_exterior_lights_brightness).state / 255.0f) * 100.0f);
+            } else if (strcmp(selected_option.c_str(), "light.door_light") == 0) {
+                brightness = (int)roundf((id(light_door_light_brightness).state / 255.0f) * 100.0f);
+            } else if (strcmp(selected_option.c_str(), "light.cwww_led_dog_crate_lights") == 0) {
+                brightness = (int)roundf((id(light_cwww_led_dog_crate_lights_brightness).state / 255.0f) * 100.0f);
+            } else {
+                brightness = 0;
+            }
+
+            id(current_brightness) = brightness;
+          }
+
+          // Update LVGL widgets
+          id(brightness_arc).set_value(id(current_brightness));
+          char buf[8];
+          snprintf(buf, sizeof(buf), "%d%%", id(current_brightness));
+          id(brightness_pct_label).set_text(buf);
+
+  - id: increase_light_brightness
+    then:
+      - lambda: |-
+          int step = 2;
+          id(current_brightness) = std::min(100, id(current_brightness) + step);
+          id(publish_brightness_throttled).execute();
+
+  - id: decrease_light_brightness
+    then:
+      - lambda: |-
+          int step = 2;
+          id(current_brightness) = std::max(0, id(current_brightness) - step);
+          id(publish_brightness_throttled).execute();
+
   - id: publish_brightness_throttled
     mode: restart
     then:
@@ -115,18 +233,87 @@ sensor:
     on_clockwise:
       then:
         - script.execute: screen_bump_activity
-        - lambda: |-
-            int step = 2;
-            id(current_brightness) = std::min(100, id(current_brightness) + step);
-        - script.execute: publish_brightness_throttled
+        - if:
+            condition:
+              lambda: 'return id(encoder_button_id).state;'
+            then:
+              - select.next: dial_selected_light
+            else:
+              - script.execute: increase_light_brightness
 
     on_anticlockwise:
       then:
         - script.execute: screen_bump_activity
-        - lambda: |-
-            int step = 2;
-            id(current_brightness) = std::max(0, id(current_brightness) - step);
-        - script.execute: publish_brightness_throttled
+        - if:
+            condition:
+              lambda: 'return id(encoder_button_id).state;'
+            then:
+              - select.previous: dial_selected_light
+            else:
+              - script.execute: decrease_light_brightness
+
+  - platform: sun
+    id: sun_elevation
+    name: Sun Elevation
+    type: elevation
+    internal: true
+
+  # Home Assistant brightness attribute sensors for each selectable light.
+  - platform: homeassistant
+    id: light_bed_interior_lights_brightness
+    entity_id: light.bed_interior_lights
+    attribute: brightness
+    internal: true
+    on_value:
+      - script.execute: update_light_display
+
+  - platform: homeassistant
+    id: light_main_can_lights_brightness
+    entity_id: light.main_can_lights
+    attribute: brightness
+    internal: true
+    on_value:
+      - script.execute: update_light_display
+
+  - platform: homeassistant
+    id: light_bed_can_lights_brightness
+    entity_id: light.bed_can_lights
+    attribute: brightness
+    internal: true
+    on_value:
+      - script.execute: update_light_display
+
+  - platform: homeassistant
+    id: light_cwww_led_capsule_lights_brightness
+    entity_id: light.cwww_led_capsule_lights
+    attribute: brightness
+    internal: true
+    on_value:
+      - script.execute: update_light_display
+
+  - platform: homeassistant
+    id: light_exterior_lights_brightness
+    entity_id: light.exterior_lights
+    attribute: brightness
+    internal: true
+    on_value:
+      - script.execute: update_light_display
+
+  - platform: homeassistant
+    id: light_door_light_brightness
+    entity_id: light.door_light
+    attribute: brightness
+    internal: true
+    on_value:
+      - script.execute: update_light_display
+
+  - platform: homeassistant
+    id: light_cwww_led_dog_crate_lights_brightness
+    entity_id: light.cwww_led_dog_crate_lights
+    attribute: brightness
+    internal: true
+    on_value:
+      - script.execute: update_light_display
 
 binary_sensor:
   - id: !extend encoder_button_id
