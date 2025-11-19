@@ -1,0 +1,29 @@
+# https://pictogrammers.com/library/mdi/
+
+font:
+  - file: "fonts/materialdesignicons-webfont.ttf"
+    id: wifi_icons
+    size: 20
+    bpp: 4
+    glyphs: [
+      "\U000F05A9", # mdi-wifi
+      "\U000F16BF", # wifi-lock
+      "\U000F16C0", # wifi-lock-open
+
+      "\U000F05AA", # wifi-off
+      "\U000F091F", # wifi-strength-1
+      "\U000F0921", # wifi-strength-1-lock
+      "\U000F16CB", # wifi-strength-1-lock-open
+      "\U000F0922", # wifi-strength-2
+      "\U000F0924", # wifi-strength-2-lock
+      "\U000F16CC", # wifi-strength-2-lock-open
+      "\U000F0925", # wifi-strength-3
+      "\U000F0927", # wifi-strength-3-lock
+      "\U000F16CD", # wifi-strength-3-lock-open
+      "\U000F0928", # wifi-strength-4
+      "\U000F092A", # wifi-strength-4-lock
+      "\U000F16CE", # wifi-strength-4-lock-open
+      "\U000F092F", # wifi-strength-outline
+      "\U000F16CF", # wifi-strength-lock-open-outline
+      "\U000F092C", # wifi-strength-lock-outline
+      ]
