@@ -54,7 +54,34 @@ font:
 #    size: 48
 #    glyphs: "💡🔆" # bulb and brightness emoji
 
+number:
+  - platform: template
+    name: LVGL Screen timeout
+    optimistic: true
+    id: display_timeout
+    unit_of_measurement: "s"
+    initial_value: 60
+    restore_value: true
+    min_value: 10
+    max_value: 180
+    step: 5
+    mode: box
+
 lvgl:
+# https://esphome.io/cookbook/lvgl/#turn-off-screen-when-idle
+  on_idl:
+    timeout: !lambda "return (id(display_timeout).state * 1000);"
+    then:
+      - logger.log: "LVGL is idle"
+  # todo: deep sleep now, wake up time should be to the next minute? or 10 minutes?
+      - light.turn_off: display_backlight
+      - lvgl.pause:
+
+  disp_bg_color: 0x000000
+
+  top_layer:
+    wigets:
+
   pages:
     - id: main_page
       widgets:

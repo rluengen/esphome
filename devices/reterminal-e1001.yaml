@@ -1,0 +1,117 @@
+# https://wiki.seeedstudio.com/reterminal_e10xx_with_esphome_advanced/
+
+esp32:
+  board: esp32-s3-devkitc-1
+  framework:
+    type: arduino
+
+spi:
+  clk_pin: GPIO7
+  mosi_pin: GPIO9
+
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: GPIO3         # Green button
+      mode: INPUT_PULLUP
+      inverted: true
+    id: button_green
+    name: "Green Button"
+
+  - platform: gpio
+    pin:
+      number: GPIO4          # Right white button
+      mode: INPUT_PULLUP
+      inverted: true
+
+    id: button_right
+    name: "Right Button"
+
+  - platform: gpio
+    pin:
+      number: GPIO5           # Left white button
+      mode: INPUT_PULLUP
+      inverted: true
+    id: button_left
+    name: "Left Button"
+
+output:
+  - platform: gpio
+    pin: GPIO6
+    id: led_output
+    inverted: true
+
+  - platform: ledc
+    pin: GPIO45
+    id: buzzer_pwm
+    # The frequency determines the pitch of the buzzer's sound. 1000Hz is a mid-range tone.
+    frequency: 1000Hz
+
+  - platform: gpio
+    pin: GPIO21
+    id: bsp_battery_enable
+
+sensor:
+  - platform: adc
+    pin: GPIO1
+    name: "Battery Voltage"
+    id: battery_voltage
+    update_interval: 60s
+    attenuation: 12db
+    filters:
+      - multiply: 2.0  # Voltage divider compensation
+
+  - platform: template
+    name: "Battery Level"
+    id: battery_level
+    unit_of_measurement: "%"
+    icon: "mdi:battery"
+    device_class: battery
+    state_class: measurement
+    lambda: 'return id(battery_voltage).state;'
+    update_interval: 10s
+    filters:
+      - calibrate_linear:
+          - 4.15 -> 100.0
+          - 3.96 -> 90.0
+          - 3.91 -> 80.0
+          - 3.85 -> 70.0
+          - 3.80 -> 60.0
+          - 3.75 -> 50.0
+          - 3.68 -> 40.0
+          - 3.58 -> 30.0
+          - 3.49 -> 20.0
+          - 3.41 -> 10.0
+          - 3.30 -> 5.0
+          - 3.27 -> 0.0
+      - clamp:
+          min_value: 0
+          max_value: 100
+
+light:
+  - platform: binary
+    name: "Onboard LED"
+    output: led_output
+    id: onboard_led
+
+switch:
+  - platform: template
+    name: "switch_buzzer_virtual"
+    turn_on_action:
+      - output.turn_on: buzzer_pwm
+    turn_off_action:
+      - output.turn_off: buzzer_pwm
+
+display:
+  - platform: waveshare_epaper
+    id: epaper_display
+    model: 7.50inv2
+    cs_pin: GPIO10
+    dc_pin: GPIO11
+    reset_pin:
+      number: GPIO12
+      inverted: false
+    busy_pin:
+      number: GPIO13
+      inverted: true
+
