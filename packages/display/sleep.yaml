@@ -46,34 +46,15 @@ script:
   # Turn off: pick A or B or both
   - id: enter_screen_off
     then:
-      # Removed invalid action `lvgl.sleep.enable` (not supported). Display off + optional power cut handles sleep.
-      # Option A: cut panel EN
-      - if:
-          condition:
-            lambda: 'return true;'  # set false if you don't use EN
-          then:
-            - switch.turn_off: ${display_panel_power_switch_id}
+      - switch.turn_off: ${display_panel_power_switch_id}
       - lambda: |-
           id(screen_is_off) = true;
 
   # Turn on again (first tap wakes; second tap interacts)
   - id: exit_screen_off
     then:
-      # Power first (if using EN)
-      - if:
-          condition:
-            lambda: 'return true;'  # set false if no EN
-          then:
-            - switch.turn_on: ${display_panel_power_switch_id}
-            - delay: 60ms   # give panel rails time to rise
-      # Wake panel
-      - if:
-          condition:
-            lambda: 'return true;'  # set false if not using display actions
-          then:
-            - display.turn_on: disp
-      # Re-enable LVGL rendering
-      - lvgl.sleep.disable
+      - switch.turn_on: ${display_panel_power_switch_id}
+      - delay: 60ms   # give panel rails time to rise
       # Force a redraw so the first frame is crisp
       - lvgl.redraw
       - lambda: |-
