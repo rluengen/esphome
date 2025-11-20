@@ -114,4 +114,7 @@ display:
     busy_pin:
       number: GPIO13
       inverted: true
+    dimensions:
+      width: 880
+      height: 528
 
