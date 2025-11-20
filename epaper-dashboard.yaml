@@ -8,6 +8,7 @@ substitutions:
   device_name: terminal
   friendly_name: "Terminal Display"
   project_version: "1.0.0"
+  log_level: INFO
 
   run_duration: 30s
   sleep_duration: 60s
@@ -172,7 +173,7 @@ interval:
             - logger.log: "Regular display update (powered mode)"
             - script.execute: redraw_display
 
-script.execute:
+script:
   - id: update_battery_icon
     then:
       - lvgl.label.update:
