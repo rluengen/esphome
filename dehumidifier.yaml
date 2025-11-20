@@ -208,3 +208,24 @@ automation:
           else:
             - switch.turn_off: compressor_relay_switch
             - switch.turn_off: fan_relay_switch
+
+# https://esphome.io/components/climate/index.html
+# https://github.com/rikksullenberger/thermostat/blob/main/hvac-dev.yaml
+climate:
+  - platform:
+    id: dehumidifier_climate_control
+    icon: dehumidifier
+    target_humidity: 60
+    mode: DRY # or OFF
+    
+    # supports fan mode of AUTO only?
+    on_control:
+      - logger.log: "Control input received; configuration updated!"
+      - lambda: |-
+          if (x.get_mode() != CLIMATE_MODE_OFF) {
+              id(turnoff_script).stop();
+              x.set_target_temperature(25.0f);
+          }
+    visual:
+      min_humidity: 30%
+      max_humidity: 90%
