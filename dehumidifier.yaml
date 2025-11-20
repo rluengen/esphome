@@ -5,8 +5,11 @@
 substitutions:
   device_name: dehumidifier
   friendly_name: Dehumidifier
-  
-project_version: "1.0.0"
+  project_version: "1.0.0"
+
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
 
 packages:
   remote_packages:
@@ -22,6 +25,10 @@ packages:
           wifi_ssid: !secret wifi_ssid
           wifi_password: !secret wifi_password
       - path: packages/time/homeassistant.yaml
+      - path: devices/kincony-kc868-a2v3-sp32-s3.yaml
+        vars:
+          relay_1_id: compressor_relay_switch
+          relay_2_id: fan_relay_switch
 
 api:
   services:
@@ -36,18 +43,16 @@ api:
 # https://esphome.io/components/sensor/ntc/
 sensor:
   - platform: ntc
-    sensor: temperature_resistance_sensor
+    sensor: resistance_sensor
     calibration:
       b_constant: 3950
-      reference_temperature: 25캜
+      reference_temperature: 25째C
       reference_resistance: 10kOhm
-      nominal_resistance: 10kOhm
     name: "Defrost Temperature"
     id: defrost_temp_c
-    unit_of_measurement: "캜"
-    update_interval: never
+    unit_of_measurement: "째C"
 
- - platform: resistance
+  - platform: resistance
     id: resistance_sensor
     sensor: source_sensor
     configuration: DOWNSTREAM
@@ -56,14 +61,14 @@ sensor:
 
   - platform: adc
     id: source_sensor
-    pin: A0
+    pin: GPIO1
 
     # https://esphome.io/components/sensor/ntc/#self-heating
 
 
 
   - platform: dht
-    pin: GPIO21
+    pin: GPIO2
     temperature:
       name: "Ambient Temperature"
       id: ambient_temp
@@ -81,17 +86,55 @@ sensor:
     model: DHT22
     update_interval: 10s
 
-switch:
-  - platform: gpio
-    pin: D0
-    id: ntc_vcc
-
 interval:
   - interval: 60s
     then:
       - switch.turn_on: ntc_vcc
       - component.update: source_sensor
       - switch.turn_off: ntc_vcc
+  
+  - interval: 30s  # Check humidity every 30 seconds
+    then:
+      - if:
+          condition:
+            and:
+              - switch.is_on: dehumidifier_power  # Only when enabled
+              - binary_sensor.is_off: defrost_mode  # Not in defrost
+          then:
+            - if:
+                condition:
+                  lambda: 'return id(ambient_humidity).state > (id(humidity_target).state + 2.0);'
+                then:
+                  - if:
+                      condition:
+                        switch.is_off: compressor_relay_switch
+                      then:
+                        - logger.log: "Starting dehumidifier - humidity too high"
+                        - switch.turn_on: fan_relay_switch
+                        - delay: 2s  # Start fan first
+                        - switch.turn_on: compressor_relay_switch
+                else:
+                  - if:
+                      condition:
+                        lambda: 'return id(ambient_humidity).state < (id(humidity_target).state - 2.0);'
+                      then:
+                        - if:
+                            condition:
+                              switch.is_on: compressor_relay_switch
+                            then:
+                              - logger.log: "Stopping dehumidifier - target humidity reached"
+                              - switch.turn_off: compressor_relay_switch
+                              - delay: 30s  # Let fan run for 30s after compressor stops
+                              - switch.turn_off: fan_relay_switch
+          else:
+            - if:
+                condition:
+                  or:
+                    - switch.is_off: dehumidifier_power
+                    - binary_sensor.is_on: defrost_mode
+                then:
+                  - switch.turn_off: compressor_relay_switch
+                  - switch.turn_off: fan_relay_switch
 
 number:
   - platform: template
@@ -104,20 +147,15 @@ number:
     initial_value: 60
     optimistic: true
 
-#output:
-#  - platform: ledc
-#    pin: GPIO18
-#   frequency: 25000 Hz
-#    id: fan_pwm
-#
-#fan:
-#  - platform: speed
-#    output: fan_pwm
-#    name: "Dehumidifier Fan"
-#    id: dehumidifier_fan
-#    speed_count: 3
-
-
+  - platform: template
+    name: "Defrost Exit Temperature"
+    id: defrost_exit_temp
+    min_value: 3
+    max_value: 10
+    step: 0.5
+    unit_of_measurement: "째C"
+    initial_value: 5.0
+    optimistic: true
 
 # automatically go into defrost mode if the temperature is < 2C
 binary_sensor:
@@ -126,6 +164,10 @@ binary_sensor:
     id: defrost_mode
     lambda: |-
       return id(defrost_temp_c).state < 2.0;
+    on_press:
+      - script.execute: defrost_cycle
+    on_release:
+      - logger.log: "Defrost mode ended"
 
   - platform: template
     name: "Compressor"
@@ -142,20 +184,16 @@ binary_sensor:
     entity_category: diagnostic
 
 switch:
-  - platform: gpio
-    pin: GPIO22
+  - id: !extend compressor_relay_switch
     name: "Compressor Relay"
-    id: compressor_relay_switch
     internal: true
 
-  - platform: gpio
-    pin: GPIO23
+  - id: !extend fan_relay_switch
     name: "Fan Relay"
-    id: fan_relay_switch
     internal: true
 
   - platform: gpio
-    pin: D0
+    pin: GPIO21
     id: ntc_vcc
     internal: true
 
@@ -163,69 +201,52 @@ switch:
     name: "Dehumidifier"
     id: dehumidifier_power
     icon: "mdi:air-humidifier"
+    optimistic: true
     lambda: |-
       // Report ON if either relay is energized.
       return id(compressor_relay_switch).state || id(fan_relay_switch).state;
-    on_turn_on:
+    turn_on_action:
       - if:
           condition:
-            binary_sensor.is_off: defrost_mode
-            lambda: 'return id(ambient_humidity).state > id(humidity_target).state;'
+            and:
+              - binary_sensor.is_off: defrost_mode
+              - lambda: 'return id(ambient_humidity).state > id(humidity_target).state;'
           then:
             - switch.turn_on: fan_relay_switch
             - switch.turn_on: compressor_relay_switch
           else:
-            - logger.log: "Dehumidifier blocked (defrost mode active)"
-    on_turn_off:
+            - logger.log: "Dehumidifier blocked (defrost mode active or target humidity reached)"
+    turn_off_action:
       - switch.turn_off: compressor_relay_switch
       - switch.turn_off: fan_relay_switch
     restore_mode: RESTORE_DEFAULT_OFF
 
-# https://esphome.io/components/sensor/ntc/#self-heating
-interval:
-  - interval: 60s
+script:
+  # Safety script to prevent compressor short cycling
+  - id: compressor_delay
+    mode: single
     then:
-      - switch.turn_on: ntc_vcc
-      - component.update: source_sensor
-      - switch.turn_off: ntc_vcc
-
-automation:
-  - alias: "Dehumidifier Control"
-    trigger:
-      - platform: time
-        seconds: /10
-    condition:
-      - condition: not
-        binary_sensor.is_on: defrost_mode
-      - switch.is_on: dehumidifier_power 
-    action:
+      - delay: 90s  # Minimum delay between compressor cycles
+      
+  # Script to handle defrost cycle
+  - id: defrost_cycle
+    mode: restart
+    then:
+      - logger.log: "Starting defrost cycle"
+      - switch.turn_off: compressor_relay_switch  # Turn off compressor during defrost
+      - switch.turn_on: fan_relay_switch  # Keep fan running to circulate air
+      - logger.log: 
+          format: "Waiting for defrost temperature to reach %.1f째C"
+          args: ['id(defrost_exit_temp).state']
+      # Wait until temperature rises above the defrost exit threshold
+      - wait_until:
+          condition:
+            lambda: 'return id(defrost_temp_c).state > id(defrost_exit_temp).state;'
+          timeout: 30min  # Safety timeout in case sensor fails
       - if:
           condition:
-            lambda: 'return id(ambient_humidity).state > id(humidity_target).state;'
+            lambda: 'return id(defrost_temp_c).state > id(defrost_exit_temp).state;'
           then:
-            - switch.turn_on: compressor_relay_switch
-            - switch.turn_on: fan_relay_switch
+            - logger.log: "Defrost cycle complete - temperature threshold reached"
           else:
-            - switch.turn_off: compressor_relay_switch
-            - switch.turn_off: fan_relay_switch
-
-# https://esphome.io/components/climate/index.html
-# https://github.com/rikksullenberger/thermostat/blob/main/hvac-dev.yaml
-climate:
-  - platform:
-    id: dehumidifier_climate_control
-    icon: dehumidifier
-    target_humidity: 60
-    mode: DRY # or OFF
-    
-    # supports fan mode of AUTO only?
-    on_control:
-      - logger.log: "Control input received; configuration updated!"
-      - lambda: |-
-          if (x.get_mode() != CLIMATE_MODE_OFF) {
-              id(turnoff_script).stop();
-              x.set_target_temperature(25.0f);
-          }
-    visual:
-      min_humidity: 30%
-      max_humidity: 90%
+            - logger.log: "Defrost cycle timed out after 30 minutes"

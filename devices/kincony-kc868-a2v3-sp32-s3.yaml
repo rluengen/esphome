@@ -1,4 +1,9 @@
 # https://devices.esphome.io/devices/kincony-kc868-a2v3/
+substitutions:
+  relay_1_id: relay_1
+  relay_2_id: relay_2
+  input_1_id: input_1
+  input_2_id: input_2
 
 esp32:
   board: esp32-s3-devkitc-1
@@ -15,27 +20,27 @@ i2c:
 switch:
   - platform: gpio
     pin: 40
-    id: relay1
+    id: ${relay_1_id}
     name: "Relay 1"
     disabled_by_default: true
 
   - platform: gpio
     pin: 39
-    id: relay2
+    id: ${relay_2_id}
     name: "Relay 2"
     disabled_by_default: true
 
 binary_sensor:
   - platform: gpio
     name: "Input 1"
-    id: input_1
+    id: ${input_1_id}
     pin:
       number: 16
       inverted: true
 
   - platform: gpio
     name: "Input 2"
-    id: input_2
+    id: ${input_2_id}
     pin:
       number: 17
       inverted: true
