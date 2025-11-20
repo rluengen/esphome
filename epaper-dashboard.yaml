@@ -172,6 +172,7 @@ display:
   - id: !extend epaper_display
     auto_clear_enabled: false
     update_interval: never
+    dimensions: !remove
 
 # Regular display updates when not in deep sleep
 interval:
