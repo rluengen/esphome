@@ -29,10 +29,10 @@ packages:
           wifi_ssid: !secret wifi_ssid
           wifi_password: !secret wifi_password
       - path: packages/time/homeassistant.yaml
-#      - path: packages/icons/network_icons.yaml
+      - path: packages/icons/network_icons.yaml
 #      - path: packages/icons/weather_icons.yaml
       - path: packages/icons/battery_icons.yaml
-#      - path: packages/icons/homeassistant_icons.yaml
+      - path: packages/icons/homeassistant_icons.yaml
       - path: devices/reterminal-e1001.yaml
 
 esphome:
@@ -202,8 +202,21 @@ script:
     then:
       - lvgl.label.update:
           id: lbl_wifi_status
-          text: "📶" # Connected WiFi
-          
+          text: !lambda |-
+            std::string icon;
+            if (!isnan(id(wifi_rssi).state))
+            {
+              float r = id(wifi_rssi).state;
+              if      (r > -55) icon = "\U000F0928"; // wifi-strength-4
+              else if (r > -65) icon = "\U000F0925"; // wifi-strength-3
+              else if (r > -72) icon = "\U000F0922"; // wifi-strength-2
+              else if (r > -80) icon = "\U000F091F"; // wifi-strength-1
+              else              icon = "\U000F091F"; // wifi-strength-0
+            }
+ 
+            snprintf(buf, sizeof(buf), "%s", icon.c_str());
+            return buf;
+
   - id: set_wifi_disconnected
     then:
       - lvgl.label.update:
@@ -303,7 +316,7 @@ lvgl:
 
   widgets:
     # Header container spanning the top of the display
-    - container:
+    - obj:
         id: header_container
         width: 100%
         height: 40
@@ -314,48 +327,43 @@ lvgl:
         border_width: 0
         pad_all: 5
         widgets:
-          # Status indicators grouped on the right side
-          - container:
-              id: status_container
-              width: SIZE_CONTENT
-              height: SIZE_CONTENT
+          # WiFi status (right side, leftmost)
+          - label:
+              id: lbl_wifi_status
+              align: TOP_RIGHT
+              x: -120
+              y: 5
+              text: "\U000F092F"
+              text_font: wifi_icons
+              text_color: 0xFFFFFF
+              
+          # Home Assistant status (right side, second from left)
+          - label:
+              id: lbl_ha_status
+              align: TOP_RIGHT
+              x: -90
+              y: 5
+              text: "🏠"
+              text_font: battery_icons
+              text_color: 0xFFFFFF
+              
+          # Battery power cord (right side, second from right)
+          - label:
+              id: lbl_battery_power_cord
+              align: TOP_RIGHT
+              x: -40
+              y: 5
+              text: "⚡"
+              text_font: battery_icons
+              text_color: 0xFFFFFF
+              hidden: true  # Initially hidden
+              
+          # Battery status (rightmost)
+          - label:
+              id: lbl_battery_status
               align: TOP_RIGHT
               x: -10
               y: 5
-              bg_color: 0x000000
-              border_width: 0
-              layout: LV_LAYOUT_FLEX
-              flex_flow: LV_FLEX_FLOW_ROW
-              flex_align_main: LV_FLEX_ALIGN_END
-              flex_align_cross: LV_FLEX_ALIGN_CENTER
-              flex_align_track: LV_FLEX_ALIGN_CENTER
-              pad_column: 8
-              widgets:
-                # WiFi status
-                - label:
-                    id: lbl_wifi_status
-                    text: "📶"
-                    text_font: battery_icons
-                    text_color: 0xFFFFFF
-                    
-                # Home Assistant status  
-                - label:
-                    id: lbl_ha_status
-                    text: "🏠"
-                    text_font: battery_icons
-                    text_color: 0xFFFFFF
-                    
-                # Battery power cord (when powered)
-                - label:
-                    id: lbl_battery_power_cord
-                    text: "⚡"
-                    text_font: battery_icons
-                    text_color: 0xFFFFFF
-                    hidden: true  # Initially hidden
-                    
-                # Battery status
-                - label:
-                    id: lbl_battery_status
-                    text: "\U000F0091"
-                    text_font: battery_icons
-                    text_color: 0xFFFFFF      
+              text: "\U000F0091"
+              text_font: battery_icons
+              text_color: 0xFFFFFF      
