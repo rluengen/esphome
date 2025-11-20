@@ -215,6 +215,7 @@ script:
               else              icon = "\U000F091F"; // wifi-strength-0
             }
  
+            char buf[8];
             snprintf(buf, sizeof(buf), "%s", icon.c_str());
             return buf;
 
@@ -243,6 +244,7 @@ script:
           text: !lambda |-
             static char buf[10];
             std::string icon;
+            int x = id(battery_level).state;
             if (x == 100.0) {
               icon = "\U000F0079"; // mdi-battery (full)
             } else if (x > 90) {
