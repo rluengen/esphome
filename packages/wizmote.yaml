@@ -11,20 +11,8 @@ esp_now:
 
 wizmote:
   mac_address: ${wizmote_mac_address}
+  on_button:
+    - logger.log: "Wizmote button pushed! data.button "
 
-binary_sensor:
-  - platform: wizmote
-    button: 1
-    name: "WizMote Button 1"
-
-  - platform: wizmote
-    button: 2
-    name: "WizMote Button 2"
-
-  - platform: wizmote
-    button: 3
-    name: "WizMote Button 3"
-
-  - platform: wizmote
-    button: 4
-    name: "WizMote Button 4"
+wifi:
+  power_save_mode: none
