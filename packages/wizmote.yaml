@@ -52,39 +52,47 @@ wifi:
   power_save_mode: none
 
 binary_sensor:
+    # Wizmote Pin 1
   - platform: template
     id: wizmote_on
     name: "Wizmote On"
-    comment: "Wizmote Pin 1"
+
+    # Wizmote Pin 2
   - platform: template
     id: wizmote_off
     name: "Wizmote Off"
-    comment: "Wizmote Pin 2"
+
+    # Wizmote Pin 3
   - platform: template
     id: wizmote_sleep
     name: "Wizmote Sleep"
-    comment: "Wizmote Pin 3"
+
+    # Wizmote Pin 16
   - platform: template
     id: wizmote_1
     name: "Wizmote 1"
-    comment: "Wizmote Pin 16"
+
+    # Wizmote Pin 17
   - platform: template
     id: wizmote_2
     name: "Wizmote 2"
-    comment: "Wizmote Pin 17"
+
+    # Wizmote Pin 18
   - platform: template
     id: wizmote_3
     name: "Wizmote 3"
-    comment: "Wizmote Pin 18"
+
+    # Wizmote Pin 19
   - platform: template
     id: wizmote_4
     name: "Wizmote 4"
-    comment: "Wizmote Pin 19"
+
+    # Wizmote Pin 8
   - platform: template
     id: wizmote_down
     name: "Wizmote -"
-    comment: "Wizmote Pin 8"
+
+    # Wizmote Pin 9
   - platform: template
     id: wizmote_up
     name: "Wizmote +"
-    comment: "Wizmote Pin 9"
