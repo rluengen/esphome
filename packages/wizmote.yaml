@@ -14,5 +14,77 @@ wizmote:
   on_button:
     - lambda: |-
         ESP_LOGI("button", "Button pressed! Pin=%d", data.button);
+        if (data.button == 1) {
+          id(wizmote_on).publish_state(true);
+        } else if (data.button == 2) {
+          id(wizmote_off).publish_state(true);
+        } else if (data.button == 3) {
+          id(wizmote_sleep).publish_state(true);
+        } else if (data.button == 16) {
+          id(wizmote_1).publish_state(true);
+        } else if (data.button == 17) {
+          id(wizmote_2).publish_state(true);
+        } else if (data.button == 18) {
+          id(wizmote_3).publish_state(true);
+        } else if (data.button == 19) {
+          id(wizmote_4).publish_state(true);
+        } else if (data.button == 8) {
+          id(wizmote_down).publish_state(true);
+        } else if (data.button == 9) {
+          id(wizmote_up).publish_state(true);
+        }
+
+        // Reset them back to false so they act like momentary presses
+        id(wizmote_on).publish_state(false);
+        id(wizmote_off).publish_state(false);
+
+        id(wizmote_sleep).publish_state(false);
+
+        id(wizmote_1).publish_state(false);
+        id(wizmote_2).publish_state(false);
+        id(wizmote_3).publish_state(false);
+        id(wizmote_4).publish_state(false);
+
+        id(wizmote_up).publish_state(false);
+        id(wizmote_down).publish_state(false);
+
 wifi:
   power_save_mode: none
+
+binary_sensor:
+  - platform: template
+    id: wizmote_on
+    name: "Wizmote On"
+    comment: "Wizmote Pin 1"
+  - platform: template
+    id: wizmote_off
+    name: "Wizmote Off"
+    comment: "Wizmote Pin 2"
+  - platform: template
+    id: wizmote_sleep
+    name: "Wizmote Sleep"
+    comment: "Wizmote Pin 3"
+  - platform: template
+    id: wizmote_1
+    name: "Wizmote 1"
+    comment: "Wizmote Pin 16"
+  - platform: template
+    id: wizmote_2
+    name: "Wizmote 2"
+    comment: "Wizmote Pin 17"
+  - platform: template
+    id: wizmote_3
+    name: "Wizmote 3"
+    comment: "Wizmote Pin 18"
+  - platform: template
+    id: wizmote_4
+    name: "Wizmote 4"
+    comment: "Wizmote Pin 19"
+  - platform: template
+    id: wizmote_down
+    name: "Wizmote -"
+    comment: "Wizmote Pin 8"
+  - platform: template
+    id: wizmote_up
+    name: "Wizmote +"
+    comment: "Wizmote Pin 9"
