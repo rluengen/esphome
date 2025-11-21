@@ -10,7 +10,7 @@ external_components:
 esp_now:
 
 wizmote:
-  mac_address: ${wizmote_mac_address}
+#  mac_address: ${wizmote_mac_address}
   on_button:
     - logger.log: "Wizmote button pushed! data.button "
 
