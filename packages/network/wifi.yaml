@@ -11,3 +11,22 @@ wifi:
   on_disconnect:
     then:
     - logger.log: "Disconnected from WiFi"
+
+# Text sensor for device information
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: "${friendly_name} WiFi IP Address"
+      filters:
+        - lambda: |-
+            static std::string last;
+            if (last != x) {
+              last = x;
+              return x;
+            } else {
+              return {};
+            }
+    ssid:
+      name: "${friendly_name} SSID"
+    bssid:
+      name: "${friendly_name} BSSID"
