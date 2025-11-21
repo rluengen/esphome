@@ -12,7 +12,7 @@ esp_now:
 wizmote:
 #  mac_address: ${wizmote_mac_address}
   on_button:
-    - logger.log: "Wizmote button pushed! data.button "
-
+    - lambda: |-
+        ESP_LOGI("button", "Button pressed! Pin=%d", data.button);
 wifi:
   power_save_mode: none
