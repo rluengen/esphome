@@ -17,7 +17,9 @@ text_sensor:
   - platform: wifi_info
     ip_address:
       name: "${friendly_name} WiFi IP Address"
+      entity_category: diagnostic
       filters:
+        - unique:
         - lambda: |-
             static std::string last;
             if (last != x) {
@@ -28,5 +30,11 @@ text_sensor:
             }
     ssid:
       name: "${friendly_name} SSID"
+      entity_category: diagnostic
+      filters:
+        - unique:
     bssid:
       name: "${friendly_name} BSSID"
+      entity_category: diagnostic
+      filters:
+        - unique:
