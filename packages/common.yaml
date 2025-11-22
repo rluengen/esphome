@@ -12,6 +12,17 @@ logger:
 api:
   encryption:
     key: ${api_encryption_key}
+  on_client_connected:
+    - logger.log: "Connected!"
+    - lambda: |-
+        ESP_LOGI("api", "HA client connected");
+        id(ha_connected).publish_state(true);
+
+  on_client_disconnected:
+    - logger.log: "Disconnected!"
+    - lambda: |-
+        ESP_LOGW("api", "HA client disconnected");
+        id(ha_connected).publish_state(false);
 
 # Enable Over-The-Air updates
 ota:
@@ -22,6 +33,10 @@ ota:
 binary_sensor:
   - platform: status
     name: "${friendly_name} Status"
+
+  - platform: template
+    id: ha_connected
+    name: "Home Assistant Connected"
 
 # Restart switch
 switch:
