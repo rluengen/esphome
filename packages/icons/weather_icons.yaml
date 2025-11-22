@@ -1,6 +1,8 @@
 # https://pictogrammers.com/library/mdi/
 # https://esphome.io/cookbook/lvgl/#weather-forecast-panel
 # https://pictogrammers.com/library/mdi/category/weather/
+
+font:
   - file: "fonts/materialdesignicons-webfont.ttf"
     id: weather_icons
     size: 100
