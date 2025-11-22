@@ -7,4 +7,5 @@ font:
     bpp: 4
     glyphs: [
       "\U000F07D0", # mdi-homeassistant
+      "\U000F0028", # alert-circle
       ]
