@@ -50,7 +50,7 @@ packages:
       - path: packages/common.yaml
         vars:
           api_encryption_key: !secret encryption_key
-          log_level: INFO
+          log_level: DEBUG
       - path: packages/network/wifi.yaml
         vars:
           wifi_ssid: !secret wifi_ssid
@@ -58,6 +58,7 @@ packages:
       - path: packages/time/homeassistant.yaml
       - path: devices/quinled-an-penta-deca.yaml
       - path: i2c/pcf8574.yaml
+      - path: packages/wizmote.yaml
 
 esphome:
   name: led-van-controller
@@ -207,6 +208,19 @@ script:
             - script.execute: turn_on_exterior_flood_lights
           else:
             - script.execute: turn_off_exterior_flood_lights
+  
+  - id: turn_on_lights
+    then:
+      - script.execute: turn_on_interior_lights
+      # TODO: if the awning cover is open, then turn on the awning lights
+
+  - id: turn_off_lights
+    then:
+      - script.execute: turn_off_exterior_flood_lights
+      - script.execute: turn_off_interior_lights
+      - light.turn_off: garage_led_lights
+      - light.turn_off: light_awning_outside_light
+      - light.turn_off: light_awning_inside_light
 
   - id: turn_on_interior_lights
     then:
@@ -371,3 +385,11 @@ binary_sensor:
 
   - id: !extend pcf8574_button_7
     internal: true
+
+  - id: !extend wizmote_on
+    on_press:
+      - script.execute: turn_on_lights
+  
+  - id: !extend wizmote_off
+    on_press:
+      - script.execute: turn_off_lights

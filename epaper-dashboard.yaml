@@ -10,7 +10,7 @@ substitutions:
   device_name: terminal
   friendly_name: "Terminal Display"
   project_version: "1.0.0"
-  log_level: INFO
+  log_level: VERBOSE
 
   run_duration: 30s
   sleep_duration: 60s
@@ -48,131 +48,19 @@ esphome:
       - lvgl.resume:  # Resume LVGL in case it was paused during deep sleep
 
       # Disable deep sleep when powered, allow it when on battery
-      - if:
-          condition:
-            binary_sensor.is_on: is_powered
-          then:
-            - deep_sleep.prevent: deep_sleep_1
-          else:
-            - deep_sleep.allow: deep_sleep_1
-
-sensor:
-  - id: !extend battery_voltage
-    on_value:
-      then:
-        - lambda: |-
-            const bool powered = !isnan(id(battery_voltage).state) && id(battery_voltage).state > 4.5; // threshold
-            id(is_powered).publish_state(powered);
-
-  - id: !extend battery_level
-    on_value:
-      - lvgl.label.update:
-          id: lbl_battery_status
-          text: !lambda |-
-            static char buf[10];
-            std::string icon;
-            if (x == 100.0) {
-                icon = "\U000F0079"; // mdi-battery (full)
-            } else if (x > 90) {
-                icon = "\U000F0082"; // mdi-battery-90
-            } else if (x > 80) {
-                icon = "\U000F0081"; // mdi-battery-80
-            } else if (x > 70) {
-                icon = "\U000F0080"; // mdi-battery-70
-            } else if (x > 60) {
-                icon = "\U000F007F"; // mdi-battery-60
-            } else if (x > 50) {
-                icon = "\U000F007E"; // mdi-battery-50
-            } else if (x > 40) {
-                icon = "\U000F007D"; // mdi-battery-40
-            } else if (x > 30) {
-                icon = "\U000F007C"; // mdi-battery-30
-            } else if (x > 20) {
-                icon = "\U000F007B"; // mdi-battery-20
-            } else if (x > 10) {
-                icon = "\U000F007A"; // mdi-battery-10
-            } else if (x > 0) {
-                icon = "\U000F008E"; // mdi-battery-outline
-            } else {
-                icon = "\U000F0091"; // mdi-battery-unknown
-            }
-            snprintf(buf, sizeof(buf), "%s", icon.c_str());
-            return buf;
-
-binary_sensor:
-  # Powered (USB/charger) vs battery
-  - platform: template
-    id: is_powered
-    internal: true
-    on_state:
-      then:
-        - if:
-            condition:
-              binary_sensor.is_on: is_powered
-            then:
-              - deep_sleep.prevent: deep_sleep_1
-              - lvgl.widget.show: lbl_battery_power_cord
-            else:
-              - deep_sleep.allow: deep_sleep_1
-              - lvgl.widget.hide: lbl_battery_power_cord
-
-  - id: !extend button_left
-    on_press:
-      then:
-        - lvgl.page.previous:
-            time: 0ms
-
-  - id: !extend button_right
-    on_press:
-      then:
-        - lvgl.page.next:
-            time: 0ms
-
-  - id: !extend button_green
-    on_press:
-      then:
-        - light.turn_on: onboard_led
-        - delay: 500ms
-        - light.turn_off: onboard_led
+#      - if:
+#          condition:
+#            binary_sensor.is_on: is_powered
+#          then:
+#            - deep_sleep.prevent: deep_sleep_1
+#          else:
+#            - deep_sleep.allow: deep_sleep_1
 
 # Deep sleep configuration - https://esphome.io/components/deep_sleep/
-deep_sleep:
-  id: deep_sleep_1
-  run_duration: ${run_duration}
-  sleep_duration: ${sleep_duration}
-
-  # Use the green button (GPIO3) to wake from sleep - no separate wakeup_pin needed
-  # since the button is already defined in the device package
-
-api:
-  on_client_connected:
-    - if:
-        condition:
-          lambda: 'return (0 == client_info.find("Home Assistant "));'
-        then:
-          - logger.log: "Home Assistant connected"
-          - script.execute: set_ha_connected
-  on_client_disconnected:
-    - if:
-        condition:
-          lambda: 'return (0 == client_info.find("Home Assistant "));'
-        then:
-          - logger.log: "Home Assistant disconnected"
-          - script.execute: set_ha_disconnected
-
-# WiFi status monitoring  
-wifi:
-  on_connect:
-    - script.execute: set_wifi_connected
-  on_disconnect:
-    - script.execute: set_wifi_disconnected
-
-# Display configuration
-display:
-  - id: !extend epaper_display
-    auto_clear_enabled: false
-    update_interval: never
-    dimensions: !remove
+#deep_sleep:
+#  id: deep_sleep_1
+#  run_duration: ${run_duration}
+#  sleep_duration: ${sleep_duration}
 
 # Regular display updates when not in deep sleep
 interval:
@@ -297,16 +185,15 @@ lvgl:
       - logger.log: "LVGL ready - updating display"
       - component.update: epaper_display
 
-  on_pause:
-    then:
-      - if:
-          condition:
-            lambda: 'return !id(is_powered).state;'  # only sleep on battery
-          then:
-            - logger.log: "Entering deep sleep due to idle on battery"
-            - deep_sleep.enter:
-                id: deep_sleep_1
-                sleep_duration: 60s
+#  on_pause:
+#    then:
+#      - if:
+#          condition:
+#            lambda: 'return !id(is_powered).state;'  # only sleep on battery
+#          then:
+#            - deep_sleep.enter:
+#                id: deep_sleep_1
+#                sleep_duration: 60s
 
   on_resume:
     then:
@@ -323,7 +210,7 @@ lvgl:
         id: header_container
         width: 100%
         height: 40
-        align: TOP_MID
+        align: TOP_LEFT
         x: 0
         y: 0
         bg_color: 0x000000
@@ -333,8 +220,8 @@ lvgl:
           # WiFi status (right side, leftmost)
           - label:
               id: lbl_wifi_status
-              align: TOP_RIGHT
-              x: -120
+              align: TOP_LEFT
+              x: 120
               y: 5
               text: "\U000F092F"
               text_font: wifi_icons
@@ -343,8 +230,8 @@ lvgl:
           # Home Assistant status (right side, second from left)
           - label:
               id: lbl_ha_status
-              align: TOP_RIGHT
-              x: -90
+              align: TOP_LEFT
+              x: 90
               y: 5
               text: "🏠"
               text_font: battery_icons
@@ -353,8 +240,8 @@ lvgl:
           # Battery power cord (right side, second from right)
           - label:
               id: lbl_battery_power_cord
-              align: TOP_RIGHT
-              x: -40
+              align: TOP_LEFT
+              x: 40
               y: 5
               text: "⚡"
               text_font: battery_icons
@@ -364,8 +251,8 @@ lvgl:
           # Battery status (rightmost)
           - label:
               id: lbl_battery_status
-              align: TOP_RIGHT
-              x: -10
+              align: TOP_LEFT
+              x: 10
               y: 5
               text: "\U000F0091"
               text_font: battery_icons

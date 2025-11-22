@@ -1,0 +1,21 @@
+# For the GPS component to work a UART bus needs to be set in the configuration. Only the RX pin should be necessary.
+uart:
+  tx_pin: GPIOXX
+  rx_pin: GPIOXX
+  baud_rate: 9600
+
+gps:
+  latitude:
+    name: "Latitude"
+  longitude:
+    name: "Longitude"
+  altitude:
+    name: "Altitude"
+  satellites:
+    name: "Satellites"
+  hdop:
+    name: "Horizontal Dilution of Precision"
+  update_interval: 5s
+
+time:
+  - platform: gps    
