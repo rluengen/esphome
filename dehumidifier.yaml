@@ -252,7 +252,7 @@ script:
           else:
             - logger.log: "Defrost cycle timed out after 30 minutes"
 
-
+# https://github.com/esphome/esphome-docs/pull/2110/files#diff-3c675dcb29f3fd96aad388c1be4d93423f29af77d446fa1c152fd2c066addab7
 humidifier:
       - platform: hygrostat
         name: "Hygrostat Humidifier Controller"
