@@ -1,16 +1,17 @@
 # The Van Awning and Solar cover controller uses a BEVRLink 4 Relay + 4 Button
 # controller to control the cover states for two awnings.
-esphome:
-  name: van-cover-relay-controller
-  friendly_name: "Van Cover Controller"
-  on_boot:
-    then:
-       # Indicate that the covers are both closed by default?
+substitutions:
+  device_name: van_cover_relay_controller
+  friendly_name: Van Cover Controller
+  project_name: Van Cover Controller
+  project_version: "1.0.0"
 
-esp32:
-  board: esp32-c6-devkitc-1
-  framework:
-    type: esp-idf
+esphome:
+  name: led-van-controller
+  friendly_name: ${friendly_name}
+  project:
+    name: smartvan.${project_name}
+    version: ${project_version}
 
 packages:
   remote_packages:
@@ -43,6 +44,17 @@ packages:
           ina260_current_sensor_id: solar_panel_motor_current_sensor
           ina260_current_sensor_name: "Solar Panel Motor Current Sensor"
 
+      - path: devices/bevrlink-4ch-esp32-relay.yaml
+        vars:
+          button_1_name: "Open Nomadic Awning"
+          button_1_press_action: open_nomadic_awning_script
+          button_2_name: "Close Nomadic Awning Button"
+          button_2_press_action: close_nomadic_awning_script
+          button_3_name: "Open Solar Panel"
+          button_3_press_action: open_solar_awning_script
+          button_4_name: "Close Solar Panel Button"
+          button_4_press_action: close_solar_awning_script
+
       - path: packages/relay-current-cover-controller.yaml
         vars:
           cover_name: Nomadic Awning
@@ -58,17 +70,6 @@ packages:
           current_sensor_id: solar_panel_motor_current_sensor
           relay_1_id: relay3
           relay_2_id: relay4
-
-      - path: devices/bevrlink-4ch-esp32-relay.yaml
-        vars:
-          button_1_name: "Open Nomadic Awning"
-          button_1_press_action: open_nomadic_awning_script
-          button_2_name: "Close Nomadic Awning Button"
-          button_2_press_action: close_nomadic_awning_script
-          button_3_name: "Open Solar Panel"
-          button_3_press_action: open_solar_awning_script
-          button_4_name: "Close Solar Panel Button"
-          button_4_press_action: close_solar_awning_script
 
 script:
   - id: update_nomadic_motor_current_while_moving

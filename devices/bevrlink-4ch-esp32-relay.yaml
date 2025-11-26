@@ -12,6 +12,11 @@ substitutions:
   button_4_press_action: noop_script
   button_4_release_action: noop_script
 
+esp32:
+  board: esp32-c6-devkitc-1
+  framework:
+    type: esp-idf
+
 script:
   - id: noop_script
     then:
