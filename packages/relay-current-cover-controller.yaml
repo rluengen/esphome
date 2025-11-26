@@ -41,22 +41,14 @@ number:
     initial_value: 30
     restore_value: true
 
-# current sensor is a 20A ACS712
-# VCC -> Power (5v)
-# Out -> ADC Capable GPIO, IE GPIO34
-# GND -> GND
-
-# GPIO 34 and 35 are good pins for measuring motor current
-
-# But according to https://esphome.io/components/sensor/adc/#adc-esp32_pins on an ESP32-C6 GPIO0-GPIO6 are valid pins
-
-switch:
-  - id: ${relay_1_id}
-    interlock: &interlock_group [${relay_1_id}, ${relay_2_id}]
-    interlock_wait_time: 100ms
-
-  - id: ${relay_2_id}
-    interlock: *interlock_group
+#switch:
+#  - id: ${relay_1_id}
+#    interlock: &interlock_group [${relay_1_id}, ${relay_2_id}]
+#    interlock_wait_time: 100ms
+#
+#  - id: ${relay_2_id}
+#    interlock: *interlock_group
+#    interlock_wait_time: 100ms
 
 cover:
   - platform: current_based
