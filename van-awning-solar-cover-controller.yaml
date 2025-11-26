@@ -79,7 +79,7 @@ script:
             - lambda: 'return id(nomadic_awning_cover).state == COVER_OPENING || id(nomadic_awning_cover).state == COVER_CLOSING;'
           then:
             - sensor.update: nomadic_awning_cover_motor_current
-            - delay: 1s
+            - delay: 250ms
       - logger.log: "Nomadic awning stopped moving; update loop finished"
 
   - id: update_solar_motor_current_while_moving
@@ -90,7 +90,7 @@ script:
             - lambda: 'return id(solar_panel_cover).state == COVER_OPENING || id(solar_panel_cover).state == COVER_CLOSING;'
           then:
             - sensor.update: solar_panel_cover_motor_current
-            - delay: 1s
+            - delay: 250s
       - logger.log: "Solar panel stopped moving; update loop finished"
 
   - id: open_nomadic_awning_script

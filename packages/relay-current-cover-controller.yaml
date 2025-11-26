@@ -52,11 +52,11 @@ number:
 
 switch:
   - id: ${relay_1_id}
-    interlock: [${relay_2_id}]
+    interlock: &interlock_group [${relay_1_id}, ${relay_2_id}]
     interlock_wait_time: 100ms
 
   - id: ${relay_2_id}
-    interlock: [${relay_1_id}]
+    interlock: *interlock_group
 
 cover:
   - platform: current_based
