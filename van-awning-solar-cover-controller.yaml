@@ -7,7 +7,7 @@ substitutions:
   project_version: "1.0.0"
 
 esphome:
-  name: led-van-controller
+  name: van_cover_relay_controller
   friendly_name: ${friendly_name}
   project:
     name: smartvan.${project_name}
@@ -27,6 +27,11 @@ packages:
           wifi_ssid: !secret wifi_ssid
           wifi_password: !secret wifi_password
       - path: packages/time/homeassistant.yaml
+
+      - path: packages/gps-receiver.yaml
+        vars:
+          tx_pin: GPIO16
+          rx_pin: GPIO17
 
       - path: i2c/ina260.yaml
         vars:
@@ -88,11 +93,11 @@ script:
       - logger.log: "Starting current updates while nomadic awning moving"
       - while:
           condition:
-            - lambda: 'return id(nomadic_awning_cover).state == COVER_OPENING || id(nomadic_awning_cover).state == COVER_CLOSING;'
+            - lambda: 'return id(nomadic_awning_cover).current_operation == COVER_OPERATION_OPENING || id(nomadic_awning_cover).current_operation == COVER_OPERATION_CLOSING;'
           then:
             - sensor.template.publish:
                 id: awning_motor_current_template
-                state: !lambda 'return id(nomadic_awning_cover_motor_current).state;'
+                state: !lambda 'return id(nomadic_motor_current_sensor).state;'
             - delay: 250ms
       - logger.log: "Nomadic awning stopped moving; update loop finished"
 
@@ -101,11 +106,11 @@ script:
       - logger.log: "Starting current updates while solar panel moving"
       - while:
           condition:
-            - lambda: 'return id(solar_panel_cover).state == COVER_OPENING || id(solar_panel_cover).state == COVER_CLOSING;'
+            - lambda: 'return id(solar_panel_cover).current_operation == COVER_OPERATION_OPENING || id(solar_panel_cover).current_operation == COVER_OPERATION_CLOSING;'
           then:
             - sensor.template.publish:
                 id: solar_current_template
-                state: !lambda 'return id(solar_panel_cover_motor_current).state;'
+                state: !lambda 'return id(solar_panel_motor_current_sensor).state;'
             - delay: 250s
       - logger.log: "Solar panel stopped moving; update loop finished"
 

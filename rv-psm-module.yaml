@@ -6,10 +6,10 @@
 # https://www.mbvans.com/content/dam/mb-vans/us/upfitter/psm-programs/MY25_RV_Software_Specification_V4.pdf
 
 substitutions:
-  device_name: rv-psm-module
-  friendly_name: RV PSM Module
-
-project_version: "1.0.0"
+  device_name: van_psm_module_controller
+  friendly_name: Mercedes Sprinter Parametric Special Module
+  project_name:  Mercedes Sprinter Parametric Special Module
+  project_version: "1.0.0"
 
 packages:
   remote_packages:
@@ -45,7 +45,6 @@ binary_sensor:
     id: awning_open_trigger
 
 # If the signal is active-low (e.g., pulled to GND when triggered):
-binary_sensor:
   - platform: gpio
     pin:
       number: GPIO18
@@ -54,8 +53,6 @@ binary_sensor:
     name: "Awning Open Trigger"
     id: awning_open_trigger
 
-
-binary_sensor:
   - platform: template
     id: any-door-open
     name: "Any Door Open"
