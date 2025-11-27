@@ -1,7 +1,11 @@
 # For the GPS component to work a UART bus needs to be set in the configuration. Only the RX pin should be necessary.
+substitutions:
+  tx_pin: 
+  rx_pin: 
+
 uart:
-  tx_pin: GPIOXX
-  rx_pin: GPIOXX
+  tx_pin: ${tx_pin}
+  rx_pin: ${rx_pin}
   baud_rate: 9600
 
 gps:
