@@ -59,7 +59,7 @@ packages:
         vars:
           cover_name: Nomadic Awning
           cover_id: nomadic_awning_cover
-          current_sensor_id: nomadic_motor_current_sensor
+          current_sensor_id: awning_motor_current_template
           relay_1_id: relay1
           relay_2_id: relay2
 
@@ -67,9 +67,20 @@ packages:
         vars:
           cover_name: Solar Panel
           cover_id: solar_panel_cover
-          current_sensor_id: solar_panel_motor_current_sensor
+          current_sensor_id: solar_current_template
           relay_1_id: relay3
           relay_2_id: relay4
+
+sensor:
+  - platform: template
+    name: "Awning Motor Current"
+    id: awning_motor_current_template
+    unit_of_measurement: "A"
+
+  - platform: template
+    name: "Solar Motor Current"
+    id: solar_current_template
+    unit_of_measurement: "A"
 
 script:
   - id: update_nomadic_motor_current_while_moving
@@ -79,7 +90,9 @@ script:
           condition:
             - lambda: 'return id(nomadic_awning_cover).state == COVER_OPENING || id(nomadic_awning_cover).state == COVER_CLOSING;'
           then:
-            - sensor.update: nomadic_awning_cover_motor_current
+            - sensor.template.publish:
+                id: awning_motor_current_template
+                state: !lambda 'return id(nomadic_awning_cover_motor_current).state;'
             - delay: 250ms
       - logger.log: "Nomadic awning stopped moving; update loop finished"
 
@@ -90,7 +103,9 @@ script:
           condition:
             - lambda: 'return id(solar_panel_cover).state == COVER_OPENING || id(solar_panel_cover).state == COVER_CLOSING;'
           then:
-            - sensor.update: solar_panel_cover_motor_current
+            - sensor.template.publish:
+                id: solar_current_template
+                state: !lambda 'return id(solar_panel_cover_motor_current).state;'
             - delay: 250s
       - logger.log: "Solar panel stopped moving; update loop finished"
 
