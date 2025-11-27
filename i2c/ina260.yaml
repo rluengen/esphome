@@ -16,4 +16,3 @@ sensor:
     current:
       id: ${ina260_current_sensor_id}
       name: ${ina260_current_sensor_name}
-    update_interval: never
