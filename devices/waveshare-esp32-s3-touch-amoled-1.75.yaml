@@ -15,7 +15,7 @@
 # MX1.25 BAT - expects voltage input from a battery, 3.7V lithium
 
 substitutions:
-  touchscreen_id: screen_id
+  touchscreen_id: touch_id
   # I2S Audio Config
   i2s_bps_spk: 16bit
   i2s_bps_mic: 16bit
