@@ -1,6 +1,7 @@
 substitutions:
   sleep_idle_time_milliseconds: 5000
   display_panel_power_switch_id: panel_power
+  touchscreen_id: touchscreen
 
 globals:
   - id: last_input_ms
@@ -16,6 +17,11 @@ globals:
     type: bool
     restore_value: yes
     initial_value: "false"
+
+touchscreen:
+  - id: !extend ${touchscreen}
+    on_touch:
+      - script.execute: screen_bump_activity
 
 interval:
   - interval: 1s

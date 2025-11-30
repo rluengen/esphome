@@ -1,36 +1,50 @@
-# ESPHome configuration for the Waveshare ESP32-S3-Touch-AMOLED-1.75 board
+# ESP32-S3 1.75inch AMOLED Round Touch Display Development Board, 32-bit LX7 Dual-core Processor, 466×466 Pixels, 
+# QSPI Interface, Onboard Dual Microphone Array, ESP32 With Display
+# https://www.waveshare.com/esp32-s3-touch-amoled-1.75.htm
 # https://www.waveshare.com/wiki/ESP32-S3-Touch-AMOLED-1.75
-# https://devices.esphome.io/devices/Waveshare-ESP32-S3-Touch-AMOLED-1.75/
+# https://devices.esphome.io/devices/waveshare-esp32-s3-touch-amoled-1.75/
+
+# PCF85063 RTC Chip
+# QMI8658 IMU Chip
+# CO5300 1.75" 466x466 AMOLED Display with CST9217 Touch Controller
+# AXP2101 Power Management IC
+
+# The 2.54mm 8 pin header connectors on the back of the display include:
+# GPIO18    GPIO17    GPIO16    RXD     TXD     3v3     GND   EN      GPIO39    VBUS
+
+# MX1.25 BAT - expects voltage input from a battery, 3.7V lithium
+
+substitutions:
+  # I2S Audio Config
+  i2s_bps_spk: 16bit
+  i2s_bps_mic: 16bit
+  i2s_sample_rate_spk: 44100
+  i2s_sample_rate_mic: 44100
+  i2s_use_apll: true
 
 esphome:
-  name: "${name}"
-  friendly_name: "${friendly_name}"
   platformio_options:
     board_build.flash_mode: dio
     board_build.f_flash: 80000000L
     board_build.f_cpu: 240000000L
 
 esp32:
-  board: esp32-s3-devkitc-1
+  variant: esp32s3
   flash_size: 16MB
   framework:
     type: esp-idf
-
-# ---------- External component for CST9217 touch ----------
-external_components:
-  - source:
-      type: git
-      url: https://github.com/shelson/esphome-cst9217
-    refresh: always
-  - source: github://dala318/esphome-qmi8658
 
 psram:
   mode: octal
   speed: 80MHz
 
-# ---------- I2C (CST9217 touch, codecs, etc.) ----------
+external_components:
+  - source: 
+      type: git
+      url: https://github.com/shelson/esphome-cst9217
+
 i2c:
-  - id: i2c_bus
+  - id: bus_a
     sda: GPIO15
     scl: GPIO14
     scan: true
@@ -109,7 +123,7 @@ switch:
 # Display Configuration
 display:
   - platform: mipi_spi
-    id: display
+    id: disp1
     model: CO5300
     bus_mode: quad
     reset_pin: GPIO39
@@ -117,7 +131,6 @@ display:
     dimensions:
       height: 466
       width: 466
-    update_interval: never
 
 light:
   - platform: monochromatic
@@ -127,7 +140,7 @@ light:
     default_transition_length:
       milliseconds: 0
     initial_state:
-      brightness: 81%
+      brightness: 80%
     restore_mode:
       ALWAYS_ON
 
