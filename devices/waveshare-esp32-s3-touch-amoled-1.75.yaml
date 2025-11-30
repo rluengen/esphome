@@ -15,6 +15,7 @@
 # MX1.25 BAT - expects voltage input from a battery, 3.7V lithium
 
 substitutions:
+  touchscreen_id: touchscreen
   # I2S Audio Config
   i2s_bps_spk: 16bit
   i2s_bps_mic: 16bit
@@ -157,7 +158,7 @@ output:
 touchscreen:
   - platform: cst9217
     display: disp1
-    id: ts_disp1
+    id: ${touchscreen_id}
     interrupt_pin: GPIO11
     reset_pin: GPIO40
     transform:
