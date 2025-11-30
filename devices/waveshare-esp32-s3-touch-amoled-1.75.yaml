@@ -16,6 +16,8 @@
 
 substitutions:
   touchscreen_id: touch_id
+  display_id: amoled_display_id
+
   # I2S Audio Config
   i2s_bps_spk: 16bit
   i2s_bps_mic: 16bit
@@ -124,7 +126,7 @@ switch:
 # Display Configuration
 display:
   - platform: mipi_spi
-    id: disp1
+    id: ${display_id}
     model: CO5300
     bus_mode: quad
     reset_pin: GPIO39
