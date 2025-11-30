@@ -77,7 +77,7 @@ display:
 
 touchscreen:
   platform: cst816
-  id: my_touchscreen
+  id: screen_id
   interrupt_pin: 4
   reset_pin: 2
   on_release:

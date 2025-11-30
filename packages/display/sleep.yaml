@@ -1,7 +1,7 @@
 substitutions:
   sleep_idle_time_milliseconds: 5000
   display_panel_power_switch_id: panel_power
-  touchscreen_id: touchscreen
+  touchscreen_id: screen_id
 
 globals:
   - id: last_input_ms
