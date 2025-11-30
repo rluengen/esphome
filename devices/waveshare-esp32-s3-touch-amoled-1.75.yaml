@@ -17,6 +17,7 @@
 substitutions:
   touchscreen_id: touch_id
   display_id: amoled_display_id
+  display_backlight_id: display_backlight_id
 
   # I2S Audio Config
   i2s_bps_spk: 16bit
@@ -137,7 +138,7 @@ display:
 
 light:
   - platform: monochromatic
-    id: display_backlight
+    id: ${display_backlight_id}
     name: "Backlight"
     output: backlight_brightness
     default_transition_length:
@@ -154,12 +155,12 @@ output:
     write_action:
       then:
         - lambda: |-
-            id(disp1).set_brightness(state*255);
+            id(${display_backlight_id}).set_brightness(state*255);
 
 # Touchscreen Configuration
 touchscreen:
   - platform: cst9217
-    display: disp1
+    display: ${display_backlight_id}
     id: ${touchscreen_id}
     interrupt_pin: GPIO11
     reset_pin: GPIO40
