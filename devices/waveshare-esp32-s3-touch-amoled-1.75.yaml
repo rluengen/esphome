@@ -155,7 +155,7 @@ output:
     write_action:
       then:
         - lambda: |-
-            id(${display_backlight_id}).set_brightness(state*255);
+            id(${display_id}).set_brightness(state*255);
 
 # Touchscreen Configuration
 touchscreen:
