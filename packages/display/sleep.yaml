@@ -19,7 +19,7 @@ globals:
     initial_value: "false"
 
 touchscreen:
-  - id: !extend ${touchscreen}
+  - id: !extend ${touchscreen_id}
     on_touch:
       - script.execute: screen_bump_activity
 
