@@ -5,6 +5,7 @@
 substitutions:
   device_name: dehumidifier
   friendly_name: Dehumidifier
+  project_name: Van Dehumidifier
   project_version: "1.0.0"
 
 esphome:

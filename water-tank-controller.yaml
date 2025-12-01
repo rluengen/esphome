@@ -1,0 +1,68 @@
+substitutions:
+  device_name: water_tank_controller
+  friendly_name: Water Tank Controller
+  project_name:  Mercedes Sprinter Control Modules
+  project_version: "1.0.0"
+  log_level: VERBOSE
+
+# relay 1: water pump power
+# relay 2: Pump Water Source Selector Valve
+# relay 3: Valve Selector Switch
+# relay 4: water vent fill from pump
+
+# still need an adc sensor circuit to detect 
+
+packages:
+  remote_packages:
+    url: https://github.com/rluengen/esphome
+    ref: main
+    refresh: always
+    files:
+      - path: packages/common.yaml
+        vars:
+          api_encryption_key: !secret encryption_key
+      - path: packages/network/wifi.yaml
+        vars:
+          wifi_ssid: !secret wifi_ssid
+          wifi_password: !secret wifi_password
+      - path: packages/time/homeassistant.yaml
+      - path: devices/bevrlink-4ch-esp32-relay.yaml
+        vars:
+          button_1_name: "Water Pump"
+          button_1_press_action: start_water_pump_script
+          button_4_press_action: toggle_relay_4_script
+
+external_components:
+  - source: 
+      type: git
+      url: https://github.com/avishorp/esphome-oneshot-timer
+
+oneshot_timer:
+  - interval: 20min
+    id: water_pump_run_timer
+    auto_start: false
+    on_timeout:
+      then:
+        - switch.turn_off: relay1
+
+script:
+  # this should cancel any restart?
+  - id: start_water_pump_script
+    mode: restart
+    then:
+      - oneshot_timer.start:
+          id: water_pump_run_timer
+      - switch.turn_on: relay1
+
+  - id: fresh_water_fill_script
+    then:
+      - switch.turn_off: relay1
+      - switch.turn_off: relay2
+      - switch.turn_off: relay3
+  # wait for the valves to close all the way?
+
+  - id: dirty_water_fill_script
+  
+  - id: toggle_relay_4_script
+    then:
+      - switch.toggle: relay4
