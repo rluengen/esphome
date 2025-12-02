@@ -132,9 +132,9 @@ display:
     bus_mode: quad
     reset_pin: GPIO39
     cs_pin: GPIO12
-    dimensions:
-      height: 466
-      width: 466
+#    dimensions:
+#      height: 466
+#      width: 466
 
 light:
   - platform: monochromatic

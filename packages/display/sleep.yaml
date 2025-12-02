@@ -1,5 +1,5 @@
 substitutions:
-  sleep_idle_time_milliseconds: 5000
+  sleep_idle_time_milliseconds: 30000
   display_panel_power_switch_id: panel_power
 
 globals:
