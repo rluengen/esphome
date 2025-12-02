@@ -77,7 +77,30 @@ packages:
 #          relay_1_id: relay3
 #          relay_2_id: relay4
 
+sensor:
+  - platform: homeassistant
+    name: "Sun Elevation"
+    id: sun_elevation
+    entity_id: sun.sun
+    attribute: elevation
+    unit_of_measurement: "°"
+    accuracy_decimals: 2
+    internal: true
+    on_value:
+      then:
+        - script.execute: adjust_solar_awning_based_on_sun
+
 script:
+  # Automatically close the solar awning when the sun sets.
+  - id: adjust_solar_awning_based_on_sun
+    then:
+      - if:
+          condition:
+            lambda: 'return id(sun_elevation).state < 0.0;'
+          then:
+            - logger.log: "Sun is low - retracting solar awning"
+#            - cover.close: solar_panel_cover
+
   - id: open_nomadic_awning_script
     then:
       - cover.open: nomadic_awning_cover

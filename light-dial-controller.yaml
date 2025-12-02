@@ -39,11 +39,6 @@ packages:
 #          light_id: rear_can_lights
 #          entity_id: light.rear_can_lights
 
-sun:
-  id: sun_id
-  latitude: !secret latitude
-  longitude: !secret longitude
-
 font:
   - file: "gfonts://Roboto"
     id: roboto_16
@@ -53,10 +48,6 @@ font:
     id: roboto_24
     size: 24
     glyphs: "!%()+=,-_.:°0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz"
-#  - file: "gfonts://Roboto"
-#    id: roboto_48
-#    size: 48
-#    glyphs: "💡🔆" # bulb and brightness emoji
 
 number:
   - platform: template
@@ -77,14 +68,10 @@ lvgl:
     timeout: !lambda "return (id(display_timeout).state * 1000);"
     then:
       - logger.log: "LVGL is idle"
-  # todo: deep sleep now, wake up time should be to the next minute? or 10 minutes?
       - light.turn_off: display_backlight_id
       - lvgl.pause:
 
   disp_bg_color: 0x000000
-
-#  top_layer:
-#    wigets:
 
   top_layer:
     widgets:
@@ -217,6 +204,7 @@ globals:
     type: std::string
     initial_value: "light.living_room"
     restore_value: yes
+
 script:
   - id: update_light_display
     then:
@@ -319,12 +307,6 @@ sensor:
               - select.previous: dial_selected_light
             else:
               - script.execute: decrease_light_brightness
-
-  - platform: sun
-    id: sun_elevation
-    name: Sun Elevation
-    type: elevation
-    internal: true
 
   # Home Assistant brightness attribute sensors for each selectable light.
   - platform: homeassistant
