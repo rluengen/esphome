@@ -13,13 +13,15 @@ api:
   encryption:
     key: ${api_encryption_key}
   on_client_connected:
-    - logger.log: "Connected!"
+    - logger.log:
+        format: "Client %s connected to API with IP %s"
+        args: ["client_info.c_str()", "client_address.c_str()"]
     - lambda: |-
         ESP_LOGI("api", "HA client connected");
         id(ha_connected).publish_state(true);
 
   on_client_disconnected:
-    - logger.log: "Disconnected!"
+    - logger.log: "API client disconnected!"
     - lambda: |-
         ESP_LOGW("api", "HA client disconnected");
         id(ha_connected).publish_state(false);
