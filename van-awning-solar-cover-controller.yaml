@@ -86,10 +86,10 @@ script:
     then:
       - cover.close: nomadic_awning_cover
 
-#  - id: open_solar_awning_script
-#    then:
-#      - cover.open: solar_panel_cover
+  - id: open_solar_awning_script
+    then:
+      - logger.log: "Solar panel open - not yet implemented"
 
-#  - id: close_solar_awning_script
-#    then:
-#      - cover.close: solar_panel_cover
+  - id: close_solar_awning_script
+    then:
+      - logger.log: "Solar panel close - not yet implemented"

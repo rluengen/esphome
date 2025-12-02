@@ -33,6 +33,11 @@ packages:
           display_id: round_display_id
           display_panel_power_switch_id: display_backlight_id
 
+touchscreen:
+  - id: !extend ${touchscreen_id}
+    on_touch:
+      - script.execute: screen_bump_activity
+
 esphome:
   name: ${device_name}
   friendly_name: ${friendly_name}
