@@ -48,19 +48,19 @@ esphome:
       - lvgl.resume:  # Resume LVGL in case it was paused during deep sleep
 
       # Disable deep sleep when powered, allow it when on battery
-#      - if:
-#          condition:
-#            binary_sensor.is_on: is_powered
-#          then:
-#            - deep_sleep.prevent: deep_sleep_1
-#          else:
-#            - deep_sleep.allow: deep_sleep_1
+      - if:
+          condition:
+            binary_sensor.is_on: is_powered
+          then:
+            - deep_sleep.prevent: deep_sleep_1
+          else:
+            - deep_sleep.allow: deep_sleep_1
 
 # Deep sleep configuration - https://esphome.io/components/deep_sleep/
-#deep_sleep:
-#  id: deep_sleep_1
-#  run_duration: ${run_duration}
-#  sleep_duration: ${sleep_duration}
+deep_sleep:
+  id: deep_sleep_1
+  run_duration: ${run_duration}
+  sleep_duration: ${sleep_duration}
 
 # Regular display updates when not in deep sleep
 interval:
@@ -185,15 +185,16 @@ lvgl:
       - logger.log: "LVGL ready - updating display"
       - component.update: epaper_display
 
-#  on_pause:
-#    then:
-#      - if:
-#          condition:
-#            lambda: 'return !id(is_powered).state;'  # only sleep on battery
-#          then:
-#            - deep_sleep.enter:
-#                id: deep_sleep_1
-#                sleep_duration: 60s
+  on_pause:
+    then:
+      - if:
+          condition:
+            lambda: 'return !id(is_powered).state;'  # only sleep on battery
+          then:
+            - logger.log: "Entering deep sleep due to idle on battery"
+            - deep_sleep.enter:
+                id: deep_sleep_1
+                sleep_duration: 60s
 
   on_resume:
     then:

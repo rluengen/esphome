@@ -128,6 +128,36 @@ sensor:
       if (pct < 0)   pct = 0;
       if (pct > 100) pct = 100;
       return roundf(pct);
+    on_value:
+      then:
+        - lvgl.arc.update:
+            id: tank_arc
+            value: !lambda 'return x;'
+        - lvgl.label.update:
+            id: lbl_tank_percent
+            text: !lambda |-
+              static char buf[16];
+              snprintf(buf, sizeof(buf), "%.0f %%", x);
+              return buf;
+        - lvgl.label.update:
+            id: lbl_tank_status
+            text: !lambda |-
+              if (x >= 95.0) return "Tank Full";
+              else if (x >= 75.0) return "Tank High";
+              else if (x >= 50.0) return "Tank Medium";
+              else if (x >= 25.0) return "Tank Low";
+              else if (x >= 10.0) return "Tank Very Low";
+              else return "Tank Empty";
+
+        # Update arc color based on level
+        - lvgl.arc.update:
+            id: tank_arc
+            arc_color: !lambda |-
+              if (x >= 95.0) return lv_color_hex(0x00FF00);           // Green - Full
+              else if (x >= 75.0) return lv_color_hex(0x00FF00);      // Green - High
+              else if (x >= 50.0) return lv_color_hex(0x0080FF);      // Blue - Medium
+              else if (x >= 25.0) return lv_color_hex(0xFFAA00);      // Orange - Low
+              else return lv_color_hex(0xFF0000);                     // Red - Very Low
 
   - platform: template
     id: tank_gallons
@@ -140,6 +170,14 @@ sensor:
       const float CAPACITY_GAL = 120.0f;
       if (isnan(id(tank_percent).state)) return NAN;
       return CAPACITY_GAL * (id(tank_percent).state / 100.0f);
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: lbl_tank_gallons
+            text: !lambda |-
+              static char buf[16];
+              snprintf(buf, sizeof(buf), "%.1f gal", x);
+              return buf;
 
 
 # https://pictogrammers.com/library/mdi/
@@ -177,8 +215,6 @@ valve:
     open_action:
       - logger.log: "Input Selection Valve Opened"
       - valve.close: valve_fill
-#      - wait_until:
-#          valve.is_cosed: valve_fill
     close_action:
       - logger.log: "Input Selection Valve Closed"
     assumed_state: false
@@ -196,10 +232,6 @@ valve:
       return VALVE_CLOSED;
     open_action:
       - logger.log: "Input Selection Valve Opened"
-      - if:
-          condition:
-            
-          
     close_action:
       - logger.log: "Input Selection Valve Closed"
     assumed_state: false
@@ -208,6 +240,18 @@ switch:
   - platform: template
     id: water_pump_switch
     name: "Water Pump"
+    turn_on_action:
+      - script.execute: turn_on_water_pump
+    turn_off_action:
+      - valve.close: valve_water_pump_source
+      - valve.close: valve_input_output_hydrant
+      - wait_until:
+          condition:
+            and:
+              - valve.is_closed: valve_water_pump_source
+              - valve.is_closed: valve_input_output_hydrant
+          timeout: 5s
+#      - switch.turn_off: relay1
 
 #    open_action:
 #      - switch.turn_on: relay_fill_open
@@ -247,37 +291,113 @@ font:
 color:
   - id: background
     hex: '000000'
+  - id: text_foreground
+    hex: 'FFFFFF'
 
 # https://docs.lvgl.io/master/details/widgets/base_widget.html
 lvgl:
+  on_idle:
+    timeout: 30s
+    then:
+      - logger.log: "LVGL is idle"
+  
   pages:
     - id: main_page
       bg_color: background
       scrollbar_mode: "OFF"
       widgets:
-        - meter:
+        # Round arc meter for tank level
+        - arc:
+            id: tank_arc
+            height: 400
+            width: 400
             align: CENTER
-
-        - label:
-            text: "--.- %"
+            y: -20
+            arc_width: 35
+            arc_color: 0x0080FF
+            arc_rounded: true
+            value: 0
+            min_value: 0
+            max_value: 100
+            start_angle: 135
+            end_angle: 45  # 270 degree arc
+            bg_opa: TRANSP
+            adjustable: false
+            arc_opa: COVER
+        
+        # Background arc (empty portion)
+        - arc:
+            id: tank_arc_bg
+            height: 400
+            width: 400
             align: CENTER
-
+            y: -20
+            arc_width: 35
+            arc_color: 0x333333
+            arc_rounded: true
+            value: 100
+            min_value: 0
+            max_value: 100
+            start_angle: 135
+            end_angle: 45
+            adjustable: false
+            mode: NORMAL
+        
+        # Center percentage display
         - label:
+            id: lbl_tank_percent
+            text: "-- %"
+            align: CENTER
+            y: -30
+            text_font: f_value_64
+            text_color: 0xFFFFFF
+            text_align: CENTER
+        
+        # Gallons display below percentage
+        - label:
+            id: lbl_tank_gallons
             text: "-- gal"
             align: CENTER
+            y: 40
+            text_font: f_text_28
+            text_color: 0xAAAAAA
+            text_align: CENTER
+        
+        # Tank status label at bottom
+        - label:
+            id: lbl_tank_status
+            text: "Water Tank"
+            align: BOTTOM_MID
+            y: -10
+            text_font: f_text_28
+            text_color: 0x888888
+            text_align: CENTER
 
 script:
   - id: turn_on_water_pump
     then:
       - valve.open: valve_water_pump_source
       - valve.open: valve_input_output_hydrant
+      - wait_until:
+          condition:
+            and:
+              - valve.is_open: valve_water_pump_source
+              - valve.is_open: valve_input_output_hydrant
+          timeout: 5s
       - switch.turn_on: water_pump_switch
 
   - id: turn_off_water_pump
     then:
+      - switch.turn_off: water_pump_switch
+      - delay: 500ms  # Wait for pump to stop before closing valves
       - valve.close: valve_water_pump_source
       - valve.close: valve_input_output_hydrant
-      - switch.turn_off: water_pump_switch
+      - wait_until:
+          condition:
+            and:
+              - valve.is_closed: valve_water_pump_source
+              - valve.is_closed: valve_input_output_hydrant
+          timeout: 5s
 
   - id: fresh_water_fill
     then:
