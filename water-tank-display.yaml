@@ -317,8 +317,8 @@ font:
     size: 32
     bpp: 4
   - file: "gfonts://Montserrat"
-    id: f_value_72
-    size: 72
+    id: f_value_90
+    size: 90
     bpp: 4
 
 color:
@@ -386,8 +386,7 @@ lvgl:
             id: lbl_tank_percent
             text: "-- %"
             align: CENTER
-            y: -30
-            text_font: f_value_72
+            text_font: f_value_90
             text_color: 0xFFFFFF
             text_align: CENTER
         
@@ -396,7 +395,7 @@ lvgl:
             id: lbl_tank_gallons
             text: "-- gal"
             align: CENTER
-            y: 40
+            y: 80
             text_font: f_text_32
             text_color: 0xAAAAAA
             text_align: CENTER
@@ -406,7 +405,7 @@ lvgl:
             id: lbl_tank_status
             text: "Water Tank"
             align: BOTTOM_MID
-            y: -10
+            y: -15
             text_font: f_text_32
             text_color: 0x888888
             text_align: CENTER
