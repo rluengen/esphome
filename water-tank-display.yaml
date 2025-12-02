@@ -32,6 +32,13 @@ packages:
         vars:
           display_id: round_display_id
           display_panel_power_switch_id: display_backlight_id
+          sleep_idle_time_milliseconds: 90000
+
+display:
+  - id: !extend round_display_id
+    dimensions:
+      height: 466
+      width: 472
 
 touchscreen:
   - id: !extend ${touchscreen_id}
@@ -135,34 +142,48 @@ sensor:
       return roundf(pct);
     on_value:
       then:
-        - lvgl.arc.update:
-            id: tank_arc
-            value: !lambda 'return x;'
+#        - lvgl.arc.update:
+#            id: tank_arc
+#            value: !lambda |-
+#              if (isnan(x))
+#              {
+#                return 0.0;
+#              }
+#              return x;
         - lvgl.label.update:
             id: lbl_tank_percent
             text: !lambda |-
               static char buf[16];
-              snprintf(buf, sizeof(buf), "%.0f %%", x);
+              if (isnan(x))
+              {
+              snprintf(buf, sizeof(buf), "-.- %%");
+              }
+              else
+              {
+                snprintf(buf, sizeof(buf), "%.0f %%", x);
+              }
               return buf;
         - lvgl.label.update:
             id: lbl_tank_status
             text: !lambda |-
-              if (x >= 95.0) return "Tank Full";
-              else if (x >= 75.0) return "Tank High";
-              else if (x >= 50.0) return "Tank Medium";
-              else if (x >= 25.0) return "Tank Low";
-              else if (x >= 10.0) return "Tank Very Low";
+              if (isnan(x)) return "Unknown";
+              else if (x >= 95.0) return "Full";
+              else if (x >= 75.0) return "High";
+              else if (x >= 50.0) return "Medium";
+              else if (x >= 25.0) return "Low";
+              else if (x >= 10.0) return "Very Low";
               else return "Tank Empty";
 
         # Update arc color based on level
-        - lvgl.arc.update:
-            id: tank_arc
-            arc_color: !lambda |-
-              if (x >= 95.0) return lv_color_hex(0x00FF00);           // Green - Full
-              else if (x >= 75.0) return lv_color_hex(0x00FF00);      // Green - High
-              else if (x >= 50.0) return lv_color_hex(0x0080FF);      // Blue - Medium
-              else if (x >= 25.0) return lv_color_hex(0xFFAA00);      // Orange - Low
-              else return lv_color_hex(0xFF0000);                     // Red - Very Low
+#        - lvgl.arc.update:
+#            id: tank_arc
+#            arc_color: !lambda |-
+#              if (isnan(x)) return lv_color_hex(0x7F7F7F);            // Gray - Unknown
+#              else if (x >= 95.0) return lv_color_hex(0x00FF00);      // Green - Full
+#              else if (x >= 75.0) return lv_color_hex(0x00FF00);      // Green - High
+#              else if (x >= 50.0) return lv_color_hex(0x0080FF);      // Blue - Medium
+#              else if (x >= 25.0) return lv_color_hex(0xFFAA00);      // Orange - Low
+#              else return lv_color_hex(0xFF0000);                     // Red - Very Low
 
   - platform: template
     id: tank_gallons
@@ -181,7 +202,14 @@ sensor:
             id: lbl_tank_gallons
             text: !lambda |-
               static char buf[16];
-              snprintf(buf, sizeof(buf), "%.1f gal", x);
+              if (isnan(id(tank_percent).state))
+              {
+                snprintf(buf, sizeof(buf), "-.- gal", x);
+              }
+              else
+              {
+                snprintf(buf, sizeof(buf), "%.1f gal", x);
+              }
               return buf;
 
 
@@ -250,12 +278,12 @@ switch:
     turn_off_action:
       - valve.close: valve_water_pump_source
       - valve.close: valve_input_output_hydrant
-      - wait_until:
-          condition:
-            and:
-              - valve.is_closed: valve_water_pump_source
-              - valve.is_closed: valve_input_output_hydrant
-          timeout: 5s
+#      - wait_until:
+#          condition:
+#            and:
+#              - valve.is_closed: valve_water_pump_source
+#              - valve.is_closed: valve_input_output_hydrant
+#          timeout: 5s
 #      - switch.turn_off: relay1
 
 #    open_action:
@@ -285,12 +313,12 @@ switch:
 
 font:
   - file: "gfonts://Montserrat"
-    id: f_text_28
-    size: 28
+    id: f_text_32
+    size: 32
     bpp: 4
   - file: "gfonts://Montserrat"
-    id: f_value_64
-    size: 64
+    id: f_value_72
+    size: 72
     bpp: 4
 
 color:
@@ -302,10 +330,16 @@ color:
 # https://docs.lvgl.io/master/details/widgets/base_widget.html
 lvgl:
   on_idle:
-    timeout: 30s
+    timeout: 90s
     then:
       - logger.log: "LVGL is idle"
-  
+
+  on_boot:
+    then:
+      - logger.log: "LVGL boot"
+#      - lvgl.execute: |-
+#          lv_obj_clean(lv_scr_act());
+
   pages:
     - id: main_page
       bg_color: background
@@ -314,10 +348,9 @@ lvgl:
         # Round arc meter for tank level
         - arc:
             id: tank_arc
-            height: 400
-            width: 400
+            height: 460
+            width: 460
             align: CENTER
-            y: -20
             arc_width: 35
             arc_color: 0x0080FF
             arc_rounded: true
@@ -331,22 +364,22 @@ lvgl:
             arc_opa: COVER
         
         # Background arc (empty portion)
-        - arc:
-            id: tank_arc_bg
-            height: 400
-            width: 400
-            align: CENTER
-            y: -20
-            arc_width: 35
-            arc_color: 0x333333
-            arc_rounded: true
-            value: 100
-            min_value: 0
-            max_value: 100
-            start_angle: 135
-            end_angle: 45
-            adjustable: false
-            mode: NORMAL
+#        - arc:
+#            id: tank_arc_bg
+#            height: 400
+#            width: 400
+#            align: CENTER
+#            y: -20
+#            arc_width: 35
+#            arc_color: 0x333333
+#            arc_rounded: true
+#            value: 100
+#            min_value: 0
+#            max_value: 100
+#            start_angle: 135
+#            end_angle: 45
+#            adjustable: false
+#            mode: NORMAL
         
         # Center percentage display
         - label:
@@ -354,7 +387,7 @@ lvgl:
             text: "-- %"
             align: CENTER
             y: -30
-            text_font: f_value_64
+            text_font: f_value_72
             text_color: 0xFFFFFF
             text_align: CENTER
         
@@ -364,7 +397,7 @@ lvgl:
             text: "-- gal"
             align: CENTER
             y: 40
-            text_font: f_text_28
+            text_font: f_text_32
             text_color: 0xAAAAAA
             text_align: CENTER
         
@@ -374,7 +407,7 @@ lvgl:
             text: "Water Tank"
             align: BOTTOM_MID
             y: -10
-            text_font: f_text_28
+            text_font: f_text_32
             text_color: 0x888888
             text_align: CENTER
 
@@ -383,12 +416,12 @@ script:
     then:
       - valve.open: valve_water_pump_source
       - valve.open: valve_input_output_hydrant
-      - wait_until:
-          condition:
-            and:
-              - valve.is_open: valve_water_pump_source
-              - valve.is_open: valve_input_output_hydrant
-          timeout: 5s
+#      - wait_until:
+#          condition:
+#            and:
+#              - valve.is_open: valve_water_pump_source
+#              - valve.is_open: valve_input_output_hydrant
+#          timeout: 5s
       - switch.turn_on: water_pump_switch
 
   - id: turn_off_water_pump
@@ -397,12 +430,12 @@ script:
       - delay: 500ms  # Wait for pump to stop before closing valves
       - valve.close: valve_water_pump_source
       - valve.close: valve_input_output_hydrant
-      - wait_until:
-          condition:
-            and:
-              - valve.is_closed: valve_water_pump_source
-              - valve.is_closed: valve_input_output_hydrant
-          timeout: 5s
+#      - wait_until:
+#          condition:
+#            and:
+#              - valve.is_closed: valve_water_pump_source
+#              - valve.is_closed: valve_input_output_hydrant
+#          timeout: 5s
 
   - id: fresh_water_fill
     then:
