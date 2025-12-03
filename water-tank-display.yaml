@@ -150,6 +150,7 @@ sensor:
 #                return 0.0;
 #              }
 #              return x;
+
         - lvgl.label.update:
             id: lbl_tank_percent
             text: !lambda |-
@@ -163,6 +164,7 @@ sensor:
                 snprintf(buf, sizeof(buf), "%.0f %%", x);
               }
               return buf;
+
         - lvgl.label.update:
             id: lbl_tank_status
             text: !lambda |-
@@ -175,15 +177,19 @@ sensor:
               else return "Tank Empty";
 
         # Update arc color based on level
-#        - lvgl.arc.update:
-#            id: tank_arc
-#            arc_color: !lambda |-
-#              if (isnan(x)) return lv_color_hex(0x7F7F7F);            // Gray - Unknown
-#              else if (x >= 95.0) return lv_color_hex(0x00FF00);      // Green - Full
-#              else if (x >= 75.0) return lv_color_hex(0x00FF00);      // Green - High
-#              else if (x >= 50.0) return lv_color_hex(0x0080FF);      // Blue - Medium
-#              else if (x >= 25.0) return lv_color_hex(0xFFAA00);      // Orange - Low
-#              else return lv_color_hex(0xFF0000);                     // Red - Very Low
+        - lvgl.arc.update:
+            id: tank_arc
+            arc_color: !lambda |-
+              lv_obj_t* arc = id(tank_arc);
+              lv_obj_set_style_arc_width(arc, 35, LV_PART_INDICATOR);   // foreground
+              lv_obj_set_style_arc_width(arc, 35, LV_PART_MAIN);        // background
+
+              if (isnan(x)) return lv_color_hex(0x7F7F7F);            // Gray - Unknown
+              else if (x >= 95.0) return lv_color_hex(0x00FF00);      // Green - Full
+              else if (x >= 75.0) return lv_color_hex(0x00FF00);      // Green - High
+              else if (x >= 50.0) return lv_color_hex(0x0080FF);      // Blue - Medium
+              else if (x >= 25.0) return lv_color_hex(0xFFAA00);      // Orange - Low
+              else return lv_color_hex(0xFF0000);                     // Red - Very Low
 
   - platform: template
     id: tank_gallons
@@ -360,31 +366,14 @@ lvgl:
             start_angle: 135
             end_angle: 45  # 270 degree arc
             bg_opa: TRANSP
+            bg_color: 0x0FF000
             adjustable: false
             arc_opa: COVER
         
-        # Background arc (empty portion)
-#        - arc:
-#            id: tank_arc_bg
-#            height: 400
-#            width: 400
-#            align: CENTER
-#            y: -20
-#            arc_width: 35
-#            arc_color: 0x333333
-#            arc_rounded: true
-#            value: 100
-#            min_value: 0
-#            max_value: 100
-#            start_angle: 135
-#            end_angle: 45
-#            adjustable: false
-#            mode: NORMAL
-        
         # Center percentage display
         - label:
-            id: lbl_tank_percent
-            text: "-- %"
+            id: lbl_tank_gallons
+            text: "-.- gal"
             align: CENTER
             text_font: f_value_90
             text_color: 0xFFFFFF
@@ -392,8 +381,8 @@ lvgl:
         
         # Gallons display below percentage
         - label:
-            id: lbl_tank_gallons
-            text: "-- gal"
+            id: lbl_tank_percent
+            text: "- %"
             align: CENTER
             y: 80
             text_font: f_text_32
