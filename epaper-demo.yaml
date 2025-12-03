@@ -81,7 +81,8 @@ interval:
 
 lvgl:
   color_depth: 16
-  bg_color: 0
+  bg_color: 0xFFFFFF
+  text_color: 0x000000
   border_width: 0
   outline_width: 0
   shadow_width: 0
@@ -125,115 +126,110 @@ lvgl:
   on_boot:
     - logger.log: "LVGL on_boot"
 
-  widgets:
-    # Header container spanning the top of the display
-    - obj:
-        id: header_container
-        width: 100%
-        height: 40
-        align: TOP_LEFT
-        x: 0
-        y: 0
-        bg_color: 0x000000
-        border_width: 0
-        pad_all: 5
-        widgets:
-          # WiFi status (right side, leftmost)
-          - label:
-              id: lbl_wifi_status
-              align: TOP_LEFT
-              x: 120
-              y: 5
-              text_font: wifi_icons
-              text: !lambda |-
-                std::string icon;
+  top_layer:
+    widgets:
+      - obj:
+          id: main_container
+          width: 100%
+          align: TOP
+          border_width: 0
+          pad_all: 0
+          widgets:
+              # WiFi status (right side, leftmost)
+              - label:
+                  id: lbl_wifi_status
+                  align: TOP_LEFT
+                  x: 120
+                  y: 5
+                  text_font: wifi_icons
+                  text: !lambda |-
+                    std::string icon;
 
-                if (WiFi.isConnected())
-                {
-                  if (!isnan(id(wifi_rssi).state))
-                  {
-                    float r = id(wifi_rssi).state;
-                    if      (r > -55) icon = "\U000F0928"; // wifi-strength-4
-                    else if (r > -65) icon = "\U000F0925"; // wifi-strength-3
-                    else if (r > -72) icon = "\U000F0922"; // wifi-strength-2
-                    else if (r > -80) icon = "\U000F091F"; // wifi-strength-1
-                    else              icon = "\U000F091F"; // wifi-strength-0
-                  }
-                }
-                else
-                {
-                  icon = "";
-                }
- 
-                char buf[8];
-                snprintf(buf, sizeof(buf), "%s", icon.c_str());
-                return buf;
+                    if (WiFi.isConnected())
+                    {
+                      if (!isnan(id(wifi_rssi).state))
+                      {
+                        float r = id(wifi_rssi).state;
+                        if      (r > -55) icon = "\U000F0928"; // wifi-strength-4
+                        else if (r > -65) icon = "\U000F0925"; // wifi-strength-3
+                        else if (r > -72) icon = "\U000F0922"; // wifi-strength-2
+                        else if (r > -80) icon = "\U000F091F"; // wifi-strength-1
+                        else              icon = "\U000F091F"; // wifi-strength-0
+                      }
+                    }
+                    else
+                    {
+                      icon = "";
+                    }
+    
+                    char buf[8];
+                    snprintf(buf, sizeof(buf), "%s", icon.c_str());
+                    return buf;
 
-          # Home Assistant status (right side, second from left)
-          - label:
-              id: lbl_ha_status
-              align: TOP_LEFT
-              x: 90
-              y: 5
-              text_font: homeassistant_icons
-              text: !lambda |-
-                if (id(ha_connected).state) {
-                  ESP_LOGI("ha", "Connected to Home Assistant");
-                  return "\U000F07D0";
-                } else {
-                  ESP_LOGW("ha", "NOT connected to Home Assistant");
-                  return "\U000F0028";
-                }
+              # Home Assistant status (right side, second from left)
+              - label:
+                  id: lbl_ha_status
+                  align: TOP_LEFT
+                  x: 90
+                  y: 5
+                  text_font: homeassistant_icons
+                  text: !lambda |-
+                    if (id(ha_connected).state) {
+                      ESP_LOGI("ha", "Connected to Home Assistant");
+                      return "\U000F07D0";
+                    } else {
+                      ESP_LOGW("ha", "NOT connected to Home Assistant");
+                      return "\U000F0028";
+                    }
 
-          # Battery power cord (right side, second from right)
-          - label:
-              id: lbl_battery_power_cord
-              align: TOP_LEFT
-              x: 40
-              y: 5
-              text: "⚡"
-              text_font: battery_icons
-              hidden: true  # Initially hidden
-              
-          # Battery status (rightmost)
-          - label:
-              id: lbl_battery_status
-              align: TOP_LEFT
-              x: 10
-              y: 5
-              text_font: battery_icons
-              text: !lambda |-
-                static char buf[10];
-                std::string icon;
-                int x = id(battery_level).state;
-                if (x == 100.0) {
-                  icon = "\U000F0079"; // mdi-battery (full)
-                } else if (x > 90) {
-                  icon = "\U000F0082"; // mdi-battery-90
-                } else if (x > 80) {
-                  icon = "\U000F0081"; // mdi-battery-80
-                } else if (x > 70) {
-                  icon = "\U000F0080"; // mdi-battery-70
-                } else if (x > 60) {
-                  icon = "\U000F007F"; // mdi-battery-60
-                } else if (x > 50) {
-                  icon = "\U000F007E"; // mdi-battery-50
-                } else if (x > 40) {
-                  icon = "\U000F007D"; // mdi-battery-40
-                } else if (x > 30) {
-                  icon = "\U000F007C"; // mdi-battery-30
-                } else if (x > 20) {
-                  icon = "\U000F007B"; // mdi-battery-20
-                } else if (x > 10) {
-                  icon = "\U000F007A"; // mdi-battery-10
-                } else if (x > 0) {
-                  icon = "\U000F008E"; // mdi-battery-outline
-                } else {
-                  icon = "\U000F0091"; // mdi-battery-unknown
-                }
-                snprintf(buf, sizeof(buf), "%s", icon.c_str());
-                return buf;
-
+              # Battery power cord (right side, second from right)
+              - label:
+                  id: lbl_battery_power_cord
+                  align: TOP_LEFT
+                  x: 40
+                  y: 5
+                  text: "⚡"
+                  text_font: battery_icons
+                  hidden: true  # Initially hidden
+                  
+              # Battery status (rightmost)
+              - label:
+                  id: lbl_battery_status
+                  align: TOP_LEFT
+                  x: 10
+                  y: 5
+                  text_font: battery_icons
+                  text: !lambda |-
+                    static char buf[10];
+                    std::string icon;
+                    int x = id(battery_level).state;
+                    if (x == 100.0) {
+                      icon = "\U000F0079"; // mdi-battery (full)
+                    } else if (x > 90) {
+                      icon = "\U000F0082"; // mdi-battery-90
+                    } else if (x > 80) {
+                      icon = "\U000F0081"; // mdi-battery-80
+                    } else if (x > 70) {
+                      icon = "\U000F0080"; // mdi-battery-70
+                    } else if (x > 60) {
+                      icon = "\U000F007F"; // mdi-battery-60
+                    } else if (x > 50) {
+                      icon = "\U000F007E"; // mdi-battery-50
+                    } else if (x > 40) {
+                      icon = "\U000F007D"; // mdi-battery-40
+                    } else if (x > 30) {
+                      icon = "\U000F007C"; // mdi-battery-30
+                    } else if (x > 20) {
+                      icon = "\U000F007B"; // mdi-battery-20
+                    } else if (x > 10) {
+                      icon = "\U000F007A"; // mdi-battery-10
+                    } else if (x > 0) {
+                      icon = "\U000F008E"; // mdi-battery-outline
+                    } else {
+                      icon = "\U000F0091"; // mdi-battery-unknown
+                    }
+                    snprintf(buf, sizeof(buf), "%s", icon.c_str());
+                    return buf;
 #          - label:
 #              id: lbl_battery_level
 #              align: TOP_LEFT
@@ -244,6 +240,233 @@ lvgl:
 #                static char buf[10];
 #                snprintf(buf, sizeof(buf), "%d%%", level);
 #                return buf;
+
+  pages:
+    - id: main_page
+      widgets:
+        # Header container spanning the top of the display
+        - obj:
+            id: header_container
+            width: 100%
+            height: 40
+            align: TOP_LEFT
+            x: 0
+            y: 0
+            bg_color: 0x000000
+            border_width: 0
+            pad_all: 5
+
+        # Weather Section (top center)
+        - obj:
+            id: weather_container
+            width: 320
+            height: 200
+            align: TOP_MID
+            x: 0
+            y: 50
+            bg_color: 0xFFFFFF
+            border_width: 3
+            border_color: 0x000000
+            pad_all: 10
+            widgets:
+              - label:
+                  id: lbl_weather_icon
+                  align: TOP_MID
+                  x: 0
+                  y: 10
+                  text_font: weather_icons
+                  text_color: 0x000000
+                  text: "\U000F0599"  # Default sunny icon
+              
+              - label:
+                  id: lbl_weather_temp
+                  align: TOP_MID
+                  x: 0
+                  y: 120
+                  text_font: unscii_16
+                  text_color: 0x000000
+                  text: !lambda |-
+                    if (!id(weather_temp).state.empty()) {
+                      return id(weather_temp).state.c_str();
+                    }
+                    return "N/A";
+              
+              - label:
+                  id: lbl_weather_condition
+                  align: BOTTOM_MID
+                  x: 0
+                  y: -5
+                  text_color: 0x000000
+                  text: !lambda |-
+                    if (!id(weather_condition).state.empty()) {
+                      return id(weather_condition).state.c_str();
+                    }
+                    return "Unknown";
+
+        # Location Section (below weather)
+        - obj:
+            id: location_container
+            width: 320
+            height: 130
+            align: TOP_MID
+            x: 0
+            y: 260
+            bg_color: 0xFFFFFF
+            border_width: 3
+            border_color: 0x000000
+            pad_all: 10
+            widgets:
+              - label:
+                  id: lbl_location_city
+                  align: TOP_LEFT
+                  x: 5
+                  y: 5
+                  text_color: 0x000000
+                  text: !lambda |-
+                    if (!id(location_city).state.empty() && !id(location_state).state.empty()) {
+                      static char buf[64];
+                      snprintf(buf, sizeof(buf), "%s, %s", 
+                        id(location_city).state.c_str(), 
+                        id(location_state).state.c_str());
+                      return buf;
+                    }
+                    return "Location Unknown";
+              
+              - label:
+                  id: lbl_latitude
+                  align: TOP_LEFT
+                  x: 5
+                  y: 40
+                  text_color: 0x000000
+                  text: !lambda |-
+                    if (!isnan(id(location_latitude).state)) {
+                      static char buf[48];
+                      float lat = id(location_latitude).state;
+                      char dir = lat >= 0 ? 'N' : 'S';
+                      lat = abs(lat);
+                      int deg = (int)lat;
+                      float min_float = (lat - deg) * 60;
+                      int min = (int)min_float;
+                      int sec = (int)((min_float - min) * 60);
+                      snprintf(buf, sizeof(buf), "%d°%d'%d\"%c", deg, min, sec, dir);
+                      return buf;
+                    }
+                    return "Lat: N/A";
+              
+              - label:
+                  id: lbl_longitude
+                  align: TOP_LEFT
+                  x: 5
+                  y: 70
+                  text_color: 0x000000
+                  text: !lambda |-
+                    if (!isnan(id(location_longitude).state)) {
+                      static char buf[48];
+                      float lon = id(location_longitude).state;
+                      char dir = lon >= 0 ? 'E' : 'W';
+                      lon = abs(lon);
+                      int deg = (int)lon;
+                      float min_float = (lon - deg) * 60;
+                      int min = (int)min_float;
+                      int sec = (int)((min_float - min) * 60);
+                      snprintf(buf, sizeof(buf), "%d°%d'%d\"%c", deg, min, sec, dir);
+                      return buf;
+                    }
+                    return "Lon: N/A";
+
+        # Arc meters section (bottom row)
+        # Fuel Level Arc
+        - arc:
+            id: arc_fuel
+            x: 30
+            y: 410
+            width: 150
+            height: 150
+            start_angle: 135
+            end_angle: 45
+            rotation: 0
+            min_value: 0
+            max_value: 100
+            value: 75
+            arc_width: 18
+            arc_color: 0x000000
+            arc_rounded: false
+            indicator:
+              arc_color: 0xFFFFFF
+              arc_width: 18
+            widgets:
+              - label:
+                  align: CENTER
+                  text: !lambda |-
+                    static char buf[16];
+                    snprintf(buf, sizeof(buf), "%.0f%%", id(fuel_level).state);
+                    return buf;
+              - label:
+                  align: BOTTOM_MID
+                  y: 25
+                  text: "Fuel"
+
+        # DEF Level Arc
+        - arc:
+            id: arc_def
+            x: 210
+            y: 410
+            width: 150
+            height: 150
+            start_angle: 135
+            end_angle: 45
+            rotation: 0
+            min_value: 0
+            max_value: 100
+            value: 50
+            arc_width: 18
+            arc_color: 0x000000
+            arc_rounded: false
+            indicator:
+              arc_color: 0xFFFFFF
+              arc_width: 18
+            widgets:
+              - label:
+                  align: CENTER
+                  text: !lambda |-
+                    static char buf[16];
+                    snprintf(buf, sizeof(buf), "%.0f%%", id(def_level).state);
+                    return buf;
+              - label:
+                  align: BOTTOM_MID
+                  y: 25
+                  text: "DEF"
+
+        # Battery Level Arc
+        - arc:
+            id: arc_battery
+            x: 390
+            y: 410
+            width: 150
+            height: 150
+            start_angle: 135
+            end_angle: 45
+            rotation: 0
+            min_value: 0
+            max_value: 100
+            value: 90
+            arc_width: 18
+            arc_color: 0x000000
+            arc_rounded: false
+            indicator:
+              arc_color: 0xFFFFFF
+              arc_width: 18
+            widgets:
+              - label:
+                  align: CENTER
+                  text: !lambda |-
+                    static char buf[16];
+                    snprintf(buf, sizeof(buf), "%.0f%%", id(vehicle_battery).state);
+                    return buf;
+              - label:
+                  align: BOTTOM_MID
+                  y: 25
+                  text: "Battery"
 
 # Deep sleep configuration - https://esphome.io/components/deep_sleep/
 deep_sleep:
@@ -257,7 +480,86 @@ sensor:
     accuracy_decimals: 0
     lambda: return esp_sleep_get_wakeup_cause();
 
+  - platform: homeassistant
+    id: location_latitude
+    entity_id: sensor.location_latitude
+
+  - platform: homeassistant
+    id: location_longitude
+    entity_id: sensor.location_longitude
+
+  - platform: homeassistant
+    id: fuel_level
+    entity_id: sensor.fuel_level
+    on_value:
+      then:
+        - lvgl.arc.update:
+            id: arc_fuel
+            value: !lambda return x;
+
+  - platform: homeassistant
+    id: def_level
+    entity_id: sensor.def_level
+    on_value:
+      then:
+        - lvgl.arc.update:
+            id: arc_def
+            value: !lambda return x;
+
+  - platform: homeassistant
+    id: vehicle_battery
+    entity_id: sensor.vehicle_battery
+    on_value:
+      then:
+        - lvgl.arc.update:
+            id: arc_battery
+            value: !lambda return x;
+
 display:
   - id: !extend epaper_display
     auto_clear_enabled: false
     update_interval: never
+
+# Home Assistant sensors for dashboard
+text_sensor:
+  - platform: homeassistant
+    id: weather_condition
+    entity_id: weather.forecast_home
+    attribute: condition
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: lbl_weather_icon
+            text: !lambda |-
+              std::map<std::string, std::string> weather_icons = {
+                {"clear-night", "\U000F0594"},
+                {"cloudy", "\U000F0590"},
+                {"exceptional", "\U000F0F2F"},
+                {"fog", "\U000F0591"},
+                {"hail", "\U000F0592"},
+                {"lightning", "\U000F0593"},
+                {"lightning-rainy", "\U000F067E"},
+                {"partlycloudy", "\U000F0595"},
+                {"pouring", "\U000F0596"},
+                {"rainy", "\U000F0597"},
+                {"snowy", "\U000F0598"},
+                {"snowy-rainy", "\U000F067F"},
+                {"sunny", "\U000F0599"},
+                {"windy", "\U000F059D"},
+                {"windy-variant", "\U000F059E"}
+              };
+              std::string condition = x;
+              return weather_icons.count(condition) ? weather_icons[condition].c_str() : "\U000F14E4";
+
+  - platform: homeassistant
+    id: weather_temp
+    entity_id: weather.forecast_home
+    attribute: temperature
+
+  - platform: homeassistant
+    id: location_city
+    entity_id: sensor.location_city
+
+  - platform: homeassistant
+    id: location_state
+    entity_id: sensor.location_state
