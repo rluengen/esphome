@@ -130,6 +130,7 @@ sensor:
       - clamp:
           min_value: 0.0
           max_value: 100.0
+
     lambda: |-
       // Map your measured ohms to % (example: 33?=100% full, 240?=0% empty)
       if (isnan(id(sender_ohms).state)) return NAN;
@@ -140,8 +141,18 @@ sensor:
       if (pct < 0)   pct = 0;
       if (pct > 100) pct = 100;
       return roundf(pct);
+
     on_value:
       then:
+        - lambda: |-
+            const float CAPACITY_GAL = 16.0f;
+            float gallons = NAN;
+            if (!isnan(id(tank_percent).state))
+            {
+              gallons = CAPACITY_GAL * (id(tank_percent).state / 100.0f);
+            }
+            id(tank_gallons).publish_state(gallons);
+
 #        - lvgl.arc.update:
 #            id: tank_arc
 #            value: !lambda |-
@@ -196,12 +207,6 @@ sensor:
     name: "Tank Gallons Remaining"
     unit_of_measurement: "gal"
     accuracy_decimals: 1
-    update_interval: 1s
-    lambda: |-
-      // Replace with your true tank capacity in gallons
-      const float CAPACITY_GAL = 120.0f;
-      if (isnan(id(tank_percent).state)) return NAN;
-      return CAPACITY_GAL * (id(tank_percent).state / 100.0f);
     on_value:
       then:
         - lvgl.label.update:
