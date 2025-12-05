@@ -53,6 +53,11 @@ globals:
     restore_value: false
     initial_value: '16.0'  # 16 gallon tank
 
+  - id: pump_timer_countdown_global
+    type: int
+    restore_value: false
+    initial_value: '1200'
+
 number:
   - platform: template
     id: tank_capacity_setting
@@ -150,6 +155,7 @@ binary_sensor:
       then:
         - logger.log: "Water leak detected - emergency shutdown"
         - switch.turn_off: water_pump_switch
+        - delay: 500ms  # Let pump stop first
         - valve.close: valve_water_pump_source
         - valve.close: valve_input_output_hydrant
         - valve.close: valve_fill
@@ -243,14 +249,14 @@ sensor:
             }
             id(tank_gallons).publish_state(gallons);
 
-#        - lvgl.arc.update:
-#            id: tank_arc
-#            value: !lambda |-
-#              if (isnan(x))
-#              {
-#                return 0.0;
-#              }
-#              return x;
+        - lvgl.arc.update:
+            id: tank_arc
+            value: !lambda |-
+              if (isnan(x))
+              {
+                return 0.0;
+              }
+              return x;
 
         - lvgl.label.update:
             id: lbl_tank_percent
@@ -284,6 +290,7 @@ sensor:
               lv_obj_t* arc = id(tank_arc);
               lv_obj_set_style_arc_width(arc, 35, LV_PART_INDICATOR);   // foreground
               lv_obj_set_style_arc_width(arc, 35, LV_PART_MAIN);        // background
+              lv_obj_set_style_arc_color(arc, lv_color_hex(0xFFAA00), LV_PART_MAIN); // background
 
               if (isnan(x)) return lv_color_hex(0x7F7F7F);            // Gray - Unknown
               else if (x >= 95.0) return lv_color_hex(0x00FF00);      // Green - Full
@@ -339,19 +346,38 @@ valve:
     name: "Input Hydrant Selection Valve"
     icon: "mdi:valve"
     lambda: |-
-      return VALVE_CLOSED;
+      return {};
     open_action:
+      - logger.log: "Input Selection Valve Opening"
+      - valve.template.publish:
+          id: valve_input_output_hydrant
+          current_operation: OPENING
+      - delay: 3s  # Valve actuation time
+      - valve.template.publish:
+          id: valve_input_output_hydrant
+          current_operation: IDLE
+          position: !lambda "return VALVE_OPEN;"
+      - lvgl.label.update:
+          id: lbl_valve_hydrant
+          text: "󰨽"
       - logger.log: "Input Selection Valve Opened"
-      - lvgl.label.update:
-          id: lbl_valve_hydrant
-          text: "●"
     close_action:
-      - logger.log: "Input Selection Valve Closed"
+      - logger.log: "Input Selection Valve Closing"
+      - valve.template.publish:
+          id: valve_input_output_hydrant
+          current_operation: CLOSING
+      - delay: 3s  # Valve actuation time
+      - valve.template.publish:
+          id: valve_input_output_hydrant
+          current_operation: IDLE
+          position: !lambda "return VALVE_CLOSED;"
       - lvgl.label.update:
           id: lbl_valve_hydrant
-          text: "○"
+          text: "󰨾"
+      - logger.log: "Input Selection Valve Closed"
     assumed_state: false
-    optimistic: true
+    optimistic: false
+    has_position: true
 
   # The valve which controls the input to the water pump. This is either
   # the water tank or the external (dirty) fill port.
@@ -363,20 +389,39 @@ valve:
     name: "Water Pump Source Selector Valve"
     icon: "mdi:valve"
     lambda: |-
-      return VALVE_CLOSED;
+      return {};
     open_action:
-      - logger.log: "Input Selection Valve Opened"
+      - logger.log: "Water Pump Source Valve Opening"
+      - valve.template.publish:
+          id: valve_water_pump_source
+          current_operation: OPENING
       - valve.close: valve_fill
+      - delay: 3s  # Valve actuation time
+      - valve.template.publish:
+          id: valve_water_pump_source
+          current_operation: IDLE
+          position: !lambda "return VALVE_OPEN;"
       - lvgl.label.update:
           id: lbl_valve_source
-          text: "●"
+          text: "󰨽"
+      - logger.log: "Water Pump Source Valve Opened"
     close_action:
-      - logger.log: "Input Selection Valve Closed"
+      - logger.log: "Water Pump Source Valve Closing"
+      - valve.template.publish:
+          id: valve_water_pump_source
+          current_operation: CLOSING
+      - delay: 3s  # Valve actuation time
+      - valve.template.publish:
+          id: valve_water_pump_source
+          current_operation: IDLE
+          position: !lambda "return VALVE_CLOSED;"
       - lvgl.label.update:
           id: lbl_valve_source
-          text: "○"
+          text: "󰨾"
+      - logger.log: "Water Pump Source Valve Closed"
     assumed_state: false
-    optimistic: true
+    optimistic: false
+    has_position: true
 
 # The water fill valve controls if water is pumped into the water tank.
 # This should not be an option if the water source is the water tank.
@@ -388,19 +433,38 @@ valve:
     name: "Tank Fill Valve"
     icon: "mdi:valve"
     lambda: |-
-      return VALVE_CLOSED;
+      return {};
     open_action:
-      - logger.log: "Input Selection Valve Opened"
+      - logger.log: "Tank Fill Valve Opening"
+      - valve.template.publish:
+          id: valve_fill
+          current_operation: OPENING
+      - delay: 3s  # Valve actuation time
+      - valve.template.publish:
+          id: valve_fill
+          current_operation: IDLE
+          position: !lambda "return VALVE_OPEN;"
       - lvgl.label.update:
           id: lbl_valve_fill
-          text: "●"
+          text: "󰨽"
+      - logger.log: "Tank Fill Valve Opened"
     close_action:
-      - logger.log: "Input Selection Valve Closed"
+      - logger.log: "Tank Fill Valve Closing"
+      - valve.template.publish:
+          id: valve_fill
+          current_operation: CLOSING
+      - delay: 3s  # Valve actuation time
+      - valve.template.publish:
+          id: valve_fill
+          current_operation: IDLE
+          position: !lambda "return VALVE_CLOSED;"
       - lvgl.label.update:
           id: lbl_valve_fill
-          text: "○"
+          text: "󰨾"
+      - logger.log: "Tank Fill Valve Closed"
     assumed_state: false
-    optimistic: true
+    optimistic: false
+    has_position: true
 
 switch:
   - platform: template
@@ -457,11 +521,11 @@ font:
     id: f_text_24
     size: 24
     bpp: 4
-  - file: "fonts/segoeui.ttf"
+  - file: "fonts/materialdesignicons-webfont.ttf"
     id: f_icon_20
     size: 20
     bpp: 4
-    glyphs: "●○"
+    glyphs: "󰸽󰸾"  # mdi-valve-open, mdi-valve-closed
 
 color:
   - id: background
@@ -479,6 +543,8 @@ lvgl:
   on_boot:
     then:
       - logger.log: "LVGL boot"
+      - lvgl.page.show:
+          id: main_page
 
   top_layer:
     widgets:
@@ -518,6 +584,7 @@ lvgl:
           min_value: 0
           max_value: 100
           start_angle: 135
+          x: 3
           end_angle: 45  # 270 degree arc
           bg_opa: TRANSP
           adjustable: false
@@ -555,7 +622,7 @@ lvgl:
       # Valve status indicators (always visible)
       - label:
           id: lbl_valve_hydrant
-          text: "○"
+          text: "󰨾"
           align: LEFT_MID
           x: 15
           y: -60
@@ -565,7 +632,7 @@ lvgl:
       
       - label:
           id: lbl_valve_source
-          text: "○"
+          text: "󰨾"
           align: LEFT_MID
           x: 15
           y: -30
@@ -575,7 +642,7 @@ lvgl:
       
       - label:
           id: lbl_valve_fill
-          text: "○"
+          text: "󰨾"
           align: LEFT_MID
           x: 15
           y: 0
@@ -613,7 +680,6 @@ lvgl:
     - id: fresh_water_page
       bg_opa: 30%
       bg_color: 0x00ced1 # Turquoise background
-      scrollbar_mode: "OFF"
       on_load:
         - logger.log: "Fresh water page loaded - configuring valves"
         - valve.open: valve_input_output_hydrant  # Fresh water input
@@ -633,7 +699,6 @@ lvgl:
     - id: dirty_water_page
       bg_color: 0x654321 # Brown background
       bg_opa: 30%
-      scrollbar_mode: "OFF"
       on_load:
         - logger.log: "Dirty water page loaded - configuring valves"
         - valve.close: valve_input_output_hydrant  # Close fresh water
@@ -761,18 +826,19 @@ script:
   - id: pump_timer_countdown
     mode: restart
     then:
+      - lambda: |-
+          id(pump_timer_countdown_global) = 1200;  // Reset to 20 minutes
       - repeat:
           count: 1200  # 20 minutes * 60 seconds
           then:
-            - lvgl.label.update:
-                id: lbl_timer
-                text: !lambda |-
-                  static char buf[32];
-                  int remaining = 1200 - index;
+            - lambda: |-
+                id(pump_timer_countdown_global)--;
+                int remaining = id(pump_timer_countdown_global);
                   int mins = remaining / 60;
                   int secs = remaining % 60;
+                char buf[32];
                   snprintf(buf, sizeof(buf), "%d:%02d", mins, secs);
-                  return buf;
+                lv_label_set_text(id(lbl_timer), buf);
             - delay: 1s
       - logger.log: "Pump timer expired - turning off pump"
       - switch.turn_off: water_pump_switch
