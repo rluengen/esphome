@@ -103,6 +103,19 @@ binary_sensor:
     lambda: |-
       if (isnan(id(tank_percent).state)) return false;
       return id(tank_percent).state >= 95.0f;
+    
+    on_press:
+      then:
+        - logger.log: "Tank full - stopping fill operations"
+        - script.stop: fresh_water_fill
+        - valve.close: valve_fill
+        - lvgl.label.update:
+            id: lbl_timer
+            text: "Tank Full"
+        - delay: 3s
+        - lvgl.label.update:
+            id: lbl_timer
+            text: ""
 
   - platform: template
     id: water_tank_low
@@ -115,7 +128,9 @@ binary_sensor:
       then:
         - if:
             condition:
-              switch.is_on: water_pump_switch
+              and:
+                - switch.is_on: water_pump_switch
+                - lambda: 'return id(valve_water_pump_source).current_operation == VALVE_OPERATION_OPENING || id(valve_water_pump_source).position == VALVE_OPEN;'
             then:
               - logger.log: "Dry-run protection: Tank too low, stopping pump"
               - switch.turn_off: water_pump_switch
