@@ -63,17 +63,17 @@ binary_sensor:
   - id: !remove button_green
 
 font:
-  - file: "C:\\Windows\\Fonts\\segoeui.ttf"
+  - file: "fonts/segoeui.ttf"
     id: segoeui_16
     size: 16
     bpp: 4
   
-  - file: "C:\\Windows\\Fonts\\segoeui.ttf"
+  - file: "fonts/segoeui.ttf"
     id: segoeui_20
     size: 20
     bpp: 4
   
-  - file: "C:\\Windows\\Fonts\\segoeui.ttf"
+  - file: "fonts/segoeui.ttf"
     id: segoeui_24
     size: 24
     bpp: 4
