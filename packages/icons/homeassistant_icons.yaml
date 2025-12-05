@@ -3,7 +3,7 @@
 font:
   - file: "fonts/materialdesignicons-webfont.ttf"
     id: homeassistant_icons
-    size: 20
+    size: 40
     bpp: 4
     glyphs: [
       "\U000F07D0", # mdi-homeassistant

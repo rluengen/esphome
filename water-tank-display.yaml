@@ -24,6 +24,7 @@ packages:
           wifi_ssid: !secret wifi_ssid
           wifi_password: !secret wifi_password
       - path: packages/time/homeassistant.yaml
+      - path: packages/icons/homeassistant_icons.yaml
       - path: devices/waveshare-esp32-s3-touch-amoled-1.75.yaml
         vars:
           display_id: round_display_id
@@ -114,13 +115,13 @@ binary_sensor:
         - logger.log: "Tank full - stopping fill operations"
         - script.stop: fresh_water_fill
         - valve.close: valve_fill
-        - lvgl.label.update:
-            id: lbl_timer
-            text: "Tank Full"
+        # - lvgl.label.update:
+        #     id: lbl_timer
+        #     text: "Tank Full"
         - delay: 3s
-        - lvgl.label.update:
-            id: lbl_timer
-            text: ""
+        # - lvgl.label.update:
+        #     id: lbl_timer
+        #     text: ""
 
   - platform: template
     id: water_tank_low
@@ -140,13 +141,13 @@ binary_sensor:
               - logger.log: "Dry-run protection: Tank too low, stopping pump"
               - switch.turn_off: water_pump_switch
               - script.stop: pump_timer_countdown
-              - lvgl.label.update:
-                  id: lbl_timer
-                  text: "Tank Low!"
+              # - lvgl.label.update:
+              #     id: lbl_timer
+              #     text: "Tank Low!"
               - delay: 5s
-              - lvgl.label.update:
-                  id: lbl_timer
-                  text: ""
+              # - lvgl.label.update:
+              #     id: lbl_timer
+              #     text: ""
 
   - platform: homeassistant
     id: water_leak_detected
@@ -161,12 +162,12 @@ binary_sensor:
         - valve.close: valve_fill
         - script.stop: pump_timer_countdown
         - script.stop: fresh_water_fill
-        - lvgl.label.update:
-            id: lbl_timer
-            text: "LEAK!"
-        - lvgl.label.update:
-            id: lbl_tank_status
-            text: "Water Leak Detected"
+        # - lvgl.label.update:
+        #     id: lbl_timer
+        #     text: "LEAK!"
+        # - lvgl.label.update:
+        #     id: lbl_tank_status
+        #     text: "Water Leak Detected"
 
 sensor:
 #  - platform: adc
@@ -249,76 +250,76 @@ sensor:
             }
             id(tank_gallons).publish_state(gallons);
 
-        - lvgl.arc.update:
-            id: tank_arc
-            value: !lambda |-
-              if (isnan(x))
-              {
-                return 0.0;
-              }
-              return x;
+        # - lvgl.arc.update:
+        #     id: tank_arc
+        #     value: !lambda |-
+        #       if (isnan(x))
+        #       {
+        #         return 0.0;
+        #       }
+        #       return x;
 
-        - lvgl.label.update:
-            id: lbl_tank_percent
-            text: !lambda |-
-              static char buf[16];
-              if (isnan(x))
-              {
-              snprintf(buf, sizeof(buf), "-.- %%");
-              }
-              else
-              {
-                snprintf(buf, sizeof(buf), "%.0f %%", x);
-              }
-              return buf;
+        # - lvgl.label.update:
+        #     id: lbl_tank_percent
+        #     text: !lambda |-
+        #       static char buf[16];
+        #       if (isnan(x))
+        #       {
+        #       snprintf(buf, sizeof(buf), "-.- %%");
+        #       }
+        #       else
+        #       {
+        #         snprintf(buf, sizeof(buf), "%.0f %%", x);
+        #       }
+        #       return buf;
 
-        - lvgl.label.update:
-            id: lbl_tank_status
-            text: !lambda |-
-              if (isnan(x)) return "Unknown";
-              else if (x >= 95.0) return "Full";
-              else if (x >= 75.0) return "High";
-              else if (x >= 50.0) return "Medium";
-              else if (x >= 25.0) return "Low";
-              else if (x >= 10.0) return "Very Low";
-              else return "Empty";
+        # - lvgl.label.update:
+        #     id: lbl_tank_status
+        #     text: !lambda |-
+        #       if (isnan(x)) return "Unknown";
+        #       else if (x >= 95.0) return "Full";
+        #       else if (x >= 75.0) return "High";
+        #       else if (x >= 50.0) return "Medium";
+        #       else if (x >= 25.0) return "Low";
+        #       else if (x >= 10.0) return "Very Low";
+        #       else return "Empty";
 
         # Update arc color based on level
-        - lvgl.arc.update:
-            id: tank_arc
-            arc_color: !lambda |-
-              lv_obj_t* arc = id(tank_arc);
-              lv_obj_set_style_arc_width(arc, 35, LV_PART_INDICATOR);   // foreground
-              lv_obj_set_style_arc_width(arc, 35, LV_PART_MAIN);        // background
-              lv_obj_set_style_arc_color(arc, lv_color_hex(0xFFAA00), LV_PART_MAIN); // background
+        # - lvgl.arc.update:
+        #     id: tank_arc
+        #     arc_color: !lambda |-
+        #       lv_obj_t* arc = id(tank_arc);
+        #       lv_obj_set_style_arc_width(arc, 35, LV_PART_INDICATOR);   // foreground
+        #       lv_obj_set_style_arc_width(arc, 35, LV_PART_MAIN);        // background
+        #       lv_obj_set_style_arc_color(arc, lv_color_hex(0xFFAA00), LV_PART_MAIN); // background
 
-              if (isnan(x)) return lv_color_hex(0x7F7F7F);            // Gray - Unknown
-              else if (x >= 95.0) return lv_color_hex(0x00FF00);      // Green - Full
-              else if (x >= 75.0) return lv_color_hex(0x00FF00);      // Green - High
-              else if (x >= 50.0) return lv_color_hex(0x0080FF);      // Blue - Medium
-              else if (x >= 25.0) return lv_color_hex(0xFFAA00);      // Orange - Low
-              else return lv_color_hex(0xFF0000);                     // Red - Very Low
+        #       if (isnan(x)) return lv_color_hex(0x7F7F7F);            // Gray - Unknown
+        #       else if (x >= 95.0) return lv_color_hex(0x00FF00);      // Green - Full
+        #       else if (x >= 75.0) return lv_color_hex(0x00FF00);      // Green - High
+        #       else if (x >= 50.0) return lv_color_hex(0x0080FF);      // Blue - Medium
+        #       else if (x >= 25.0) return lv_color_hex(0xFFAA00);      // Orange - Low
+        #       else return lv_color_hex(0xFF0000);                     // Red - Very Low
 
   - platform: template
     id: tank_gallons
     name: "Tank Gallons Remaining"
     unit_of_measurement: "gal"
     accuracy_decimals: 1
-    on_value:
-      then:
-        - lvgl.label.update:
-            id: lbl_tank_gallons
-            text: !lambda |-
-              static char buf[16];
-              if (isnan(id(tank_percent).state))
-              {
-                snprintf(buf, sizeof(buf), "-.- gal", x);
-              }
-              else
-              {
-                snprintf(buf, sizeof(buf), "%.1f gal", x);
-              }
-              return buf;
+    # on_value:
+    #   then:
+    #     - lvgl.label.update:
+    #         id: lbl_tank_gallons
+    #         text: !lambda |-
+    #           static char buf[16];
+    #           if (isnan(id(tank_percent).state))
+    #           {
+    #             snprintf(buf, sizeof(buf), "-.- gal", x);
+    #           }
+    #           else
+    #           {
+    #             snprintf(buf, sizeof(buf), "%.1f gal", x);
+    #           }
+    #           return buf;
 
   - platform: template
     id: estimated_time_to_fill
@@ -357,9 +358,9 @@ valve:
           id: valve_input_output_hydrant
           current_operation: IDLE
           position: !lambda "return VALVE_OPEN;"
-      - lvgl.label.update:
-          id: lbl_valve_hydrant
-          text: "󰨽"
+      # - lvgl.label.update:
+      #     id: lbl_valve_hydrant
+      #     text: "󰨽"
       - logger.log: "Input Selection Valve Opened"
     close_action:
       - logger.log: "Input Selection Valve Closing"
@@ -371,9 +372,9 @@ valve:
           id: valve_input_output_hydrant
           current_operation: IDLE
           position: !lambda "return VALVE_CLOSED;"
-      - lvgl.label.update:
-          id: lbl_valve_hydrant
-          text: "󰨾"
+      # - lvgl.label.update:
+      #     id: lbl_valve_hydrant
+      #     text: "󰨾"
       - logger.log: "Input Selection Valve Closed"
     assumed_state: false
     optimistic: false
@@ -401,9 +402,9 @@ valve:
           id: valve_water_pump_source
           current_operation: IDLE
           position: !lambda "return VALVE_OPEN;"
-      - lvgl.label.update:
-          id: lbl_valve_source
-          text: "󰨽"
+      # - lvgl.label.update:
+      #     id: lbl_valve_source
+      #     text: "󰨽"
       - logger.log: "Water Pump Source Valve Opened"
     close_action:
       - logger.log: "Water Pump Source Valve Closing"
@@ -415,9 +416,9 @@ valve:
           id: valve_water_pump_source
           current_operation: IDLE
           position: !lambda "return VALVE_CLOSED;"
-      - lvgl.label.update:
-          id: lbl_valve_source
-          text: "󰨾"
+      # - lvgl.label.update:
+      #     id: lbl_valve_source
+      #     text: "󰨾"
       - logger.log: "Water Pump Source Valve Closed"
     assumed_state: false
     optimistic: false
@@ -444,9 +445,9 @@ valve:
           id: valve_fill
           current_operation: IDLE
           position: !lambda "return VALVE_OPEN;"
-      - lvgl.label.update:
-          id: lbl_valve_fill
-          text: "󰨽"
+      # - lvgl.label.update:
+      #     id: lbl_valve_fill
+      #     text: "󰨽"
       - logger.log: "Tank Fill Valve Opened"
     close_action:
       - logger.log: "Tank Fill Valve Closing"
@@ -458,9 +459,9 @@ valve:
           id: valve_fill
           current_operation: IDLE
           position: !lambda "return VALVE_CLOSED;"
-      - lvgl.label.update:
-          id: lbl_valve_fill
-          text: "󰨾"
+      # - lvgl.label.update:
+      #     id: lbl_valve_fill
+      #     text: "󰨾"
       - logger.log: "Tank Fill Valve Closed"
     assumed_state: false
     optimistic: false
@@ -533,6 +534,20 @@ color:
   - id: text_foreground
     hex: 'FFFFFF'
 
+api:
+  on_client_connected:
+    - if:
+        condition:
+          lambda: 'return (0 == client_info.find("Home Assistant "));'
+        then:
+          - lvgl.widget.show: lbl_connection_status
+  on_client_disconnected:
+    - if:
+        condition:
+          lambda: 'return (0 == client_info.find("Home Assistant "));'
+        then:
+          - lvgl.widget.hide: lbl_connection_status
+
 # https://docs.lvgl.io/master/details/widgets/base_widget.html
 lvgl:
   on_idle:
@@ -546,31 +561,13 @@ lvgl:
       - lvgl.page.show:
           id: main_page
 
+  touchscreens:
+    - touchscreen_id: touch_id
+      long_press_time: 400ms
+      long_press_repeat_time: 100ms
+
   top_layer:
     widgets:
-      # Invisible tap area covering the entire top layer
-      - obj:
-          id: tap_area
-          height: 466
-          width: 466
-          align: CENTER
-          bg_opa: TRANSP
-          border_opa: TRANSP
-          clickable: true
-          on_click:
-            - if:
-                condition:
-                  switch.is_on: water_pump_switch
-                then:
-                  - switch.turn_off: water_pump_switch
-                  - script.stop: pump_timer_countdown
-                  - lvgl.label.update:
-                      id: lbl_timer
-                      text: ""
-                else:
-                  - script.execute: turn_on_water_pump
-                  - script.execute: pump_timer_countdown
-      
       # Round arc meter for tank level - always visible
       - arc:
           id: tank_arc
@@ -589,131 +586,48 @@ lvgl:
           bg_opa: TRANSP
           adjustable: false
           arc_opa: COVER
-      
-      # Center gallons display - always visible
+          clickable: false
+
       - label:
-          id: lbl_tank_gallons
-          text: "-.- gal"
-          align: CENTER
-          text_font: f_value_90
-          text_color: 0xFFFFFF
-          text_align: CENTER
-      
-      # Percentage display below - always visible
-      - label:
-          id: lbl_tank_percent
-          text: "- %"
-          align: CENTER
-          y: 80
-          text_font: f_text_32
-          text_color: 0xAAAAAA
-          text_align: CENTER
-      
-      # Timer countdown display - visible when pump is running
-      - label:
-          id: lbl_timer
-          text: ""
-          align: TOP_MID
-          y: 50
-          text_font: f_text_24
-          text_color: 0xFFAA00
-          text_align: CENTER
-      
-      # Valve status indicators (always visible)
-      - label:
-          id: lbl_valve_hydrant
-          text: "󰨾"
-          align: LEFT_MID
-          x: 15
-          y: -60
-          text_font: f_icon_20
-          text_color: 0x00CED1  # Turquoise for hydrant
-          text_align: LEFT
-      
-      - label:
-          id: lbl_valve_source
-          text: "󰨾"
-          align: LEFT_MID
-          x: 15
-          y: -30
-          text_font: f_icon_20
-          text_color: 0x888888  # Gray for source
-          text_align: LEFT
-      
-      - label:
-          id: lbl_valve_fill
-          text: "󰨾"
-          align: LEFT_MID
-          x: 15
-          y: 0
-          text_font: f_icon_20
-          text_color: 0x00FF00  # Green for fill
-          text_align: LEFT
-      
-      # Water leak warning indicator (only visible when leak detected)
-      - label:
-          id: lbl_leak_warning
-          text: "⚠"
-          align: RIGHT_MID
-          x: -15
-          y: 0
-          text_font: f_text_32
-          text_color: 0xFF0000  # Red
-          text_align: RIGHT
-          hidden: true
+          id: lbl_connection_status
+          align: BOTTOM_MID
+          y: -15
+          text_align: center
+          text_font: homeassistant_icons
+          text: "\U000F07D0"
+          text_color: 0x03A9F4 # Blue color for Home Assistant icon
+          clickable: false
 
   pages:
     - id: main_page
-      bg_opa: TRANSP
-      scrollbar_mode: "OFF"
-      widgets:
-        # Tank status label at bottom
-        - label:
-            id: lbl_tank_status
-            text: "Water"
-            align: BOTTOM_MID
-            y: -15
-            text_font: f_text_32
-            text_color: 0x888888
-            text_align: CENTER
-
-    - id: fresh_water_page
-      bg_opa: 30%
-      bg_color: 0x00ced1 # Turquoise background
-      on_load:
-        - logger.log: "Fresh water page loaded - configuring valves"
-        - valve.open: valve_input_output_hydrant  # Fresh water input
-        - valve.close: valve_fill  # Enable tank fill
-        - valve.close: valve_water_pump_source  # Close dirty water source
-
+      bg_color: 0x000000
       widgets:
         - label:
-            id: lbl_fresh_water_fill
-            text: "Fresh Water Fill"
-            align: BOTTOM_MID
-            y: -15
+            id: lbl_timer
+            text: "Main Page"
+            align: CENTER
             text_font: f_text_32
-            text_color: 0x888888
-            text_align: CENTER
-        
-    - id: dirty_water_page
-      bg_color: 0x654321 # Brown background
-      bg_opa: 30%
-      on_load:
-        - logger.log: "Dirty water page loaded - configuring valves"
-        - valve.close: valve_input_output_hydrant  # Close fresh water
-        - valve.open: valve_fill  # Close tank fill
-        - valve.close: valve_water_pump_source  # Use dirty water port
-
+            text_color: 0xFFFFFF
+            
+    - id: tab_1
+      bg_color: 0x000000
       widgets:
         - label:
-            id: lbl_dirty_water_fill
-            text: "Dirty Water Fill"
-            align: BOTTOM_MID
-            y: -15
+            id: lbl_tab1
+            text: "Dog Tab"
+            align: CENTER
             text_font: f_text_32
-            text_color: 0x888888
-            text_align: CENTER
+            text_color: 0xFFFFFF
+            
+    - id: tab_2
+      bg_color: 0x000000
+      widgets:
+        - label:
+            id: lbl_tab2
+            text: "Cat Tab"
+            align: CENTER
+            text_font: f_text_32
+            text_color: 0xFFFFFF
 
 script:
   - id: turn_on_water_pump
@@ -724,13 +638,13 @@ script:
             binary_sensor.is_on: water_tank_low
           then:
             - logger.log: "Cannot start pump - tank too low for dry-run protection"
-            - lvgl.label.update:
-                id: lbl_timer
-                text: "Tank Low!"
+            # - lvgl.label.update:
+            #     id: lbl_timer
+            #     text: "Tank Low!"
             - delay: 3s
-            - lvgl.label.update:
-                id: lbl_timer
-                text: ""
+            # - lvgl.label.update:
+            #     id: lbl_timer
+            #     text: ""
             - script.stop: turn_on_water_pump
       
       - valve.open: valve_water_pump_source
@@ -778,16 +692,16 @@ script:
                       then:
                         - logger.log: "Tank full - auto-stopping pump"
                         - switch.turn_off: water_pump_switch
-                        - lvgl.label.update:
-                            id: lbl_timer
-                            text: "Tank Full"
+                        # - lvgl.label.update:
+                        #     id: lbl_timer
+                        #     text: "Tank Full"
                         - delay: 3s
-                        - lvgl.label.update:
-                            id: lbl_timer
-                            text: ""
-                        - lvgl.label.update:
-                            id: lbl_fresh_water_fill
-                            text: "Fresh Water Fill"
+                        # - lvgl.label.update:
+                        #     id: lbl_timer
+                        #     text: ""
+                        # - lvgl.label.update:
+                        #     id: lbl_fresh_water_fill
+                        #     text: "Fresh Water Fill"
                         - lvgl.page.show:
                             id: main_page
                         - script.stop: pump_timer_countdown
@@ -811,17 +725,17 @@ script:
                       }
 
                   # Update display with estimate
-                  - lvgl.label.update:
-                      id: lbl_fresh_water_fill
-                      text: !lambda |-
-                        static char buf[64];
-                        if (id(fill_rate_gpm) > 0.5) {
-                          float eta = (id(tank_capacity_in_gallons) * (100.0 - id(tank_percent).state) / 100.0) / id(fill_rate_gpm);
-                          snprintf(buf, sizeof(buf), "Fresh Fill - ETA: %.0f min", eta);
-                        } else {
-                          snprintf(buf, sizeof(buf), "Fresh Fill - Calculating...");
-                        }
-                        return buf;
+                  # - lvgl.label.update:
+                  #     id: lbl_fresh_water_fill
+                  #     text: !lambda |-
+                  #       static char buf[64];
+                  #       if (id(fill_rate_gpm) > 0.5) {
+                  #         float eta = (id(tank_capacity_in_gallons) * (100.0 - id(tank_percent).state) / 100.0) / id(fill_rate_gpm);
+                  #         snprintf(buf, sizeof(buf), "Fresh Fill - ETA: %.0f min", eta);
+                  #       } else {
+                  #         snprintf(buf, sizeof(buf), "Fresh Fill - Calculating...");
+                  #       }
+                  #       return buf;
 
   - id: pump_timer_countdown
     mode: restart
@@ -842,6 +756,6 @@ script:
             - delay: 1s
       - logger.log: "Pump timer expired - turning off pump"
       - switch.turn_off: water_pump_switch
-      - lvgl.label.update:
-          id: lbl_timer
-          text: ""
+      # - lvgl.label.update:
+      #     id: lbl_timer
+      #     text: ""
