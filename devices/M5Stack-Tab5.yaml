@@ -1,12 +1,23 @@
 # https://devices.esphome.io/devices/m5stack-tab5/
 
 esp32:
-  variant: esp32p4
+  board: esp32-p4-evboard
   flash_size: 16MB
   framework:
     type: esp-idf
     advanced:
       enable_idf_experimental_features: true
+
+packages:
+  remote_package_files:
+      url: https://github.com/m5stack/esphome-yaml
+      files: [ common/tab5-globals.yaml, common/tab5-lvgl.yaml, common/tab5-scripts.yaml]
+      refresh: 1d
+
+external_components:
+  - source: github://pr#10511
+    components: [rx8130]
+    refresh: 1h
 
 esp32_hosted:
   variant: esp32c6
@@ -178,11 +189,14 @@ touchscreen:
     reset_pin:
       pi4ioe5v6408: pi4ioe1
       number: 5
+    transform:
+      swap_xy: true
+      mirror_x: true
     calibration:
       x_min: 0
-      x_max: 720
+      x_max: 1280
       y_min: 0
-      y_max: 1280
+      y_max: 720
     id: touchscreen_id
 
 esp_ldo:
@@ -195,10 +209,10 @@ display:
       height: 1280
       width: 720
     model: M5Stack-Tab5
+    rotation: 270°
     reset_pin:
       pi4ioe5v6408: pi4ioe1
       number: 4
-    show_test_card: true
 
 output:
   - platform: ledc
@@ -214,8 +228,50 @@ light:
     restore_mode: RESTORE_DEFAULT_ON
     default_transition_length: 250ms
 
-lvgl:
-  byte_order: little_endian
+i2s_audio:
+  - id: mic_bus
+    i2s_lrclk_pin: GPIO29
+    i2s_bclk_pin: GPIO27
+    i2s_mclk_pin: GPIO30
+
+audio_adc:
+  - platform: es7210
+    id: es7210_adc
+    bits_per_sample: 16bit
+    sample_rate: 16000
+
+microphone:
+  - platform: i2s_audio
+    id: tab5_microphone
+    i2s_din_pin: GPIO28
+    sample_rate: 16000
+    bits_per_sample: 16bit
+    adc_type: external
+
+audio_dac:
+  - platform: es8388
+    id: es8388_dac
+
+speaker:
+  - platform: i2s_audio
+    id: tab5_speaker
+    i2s_dout_pin: GPIO26
+    audio_dac: es8388_dac
+    dac_type: external
+    channel: mono
+    buffer_duration: 100ms
+    bits_per_sample: 16bit
+    sample_rate: 48000
+
+media_player:
+  - platform: speaker
+    name: tab5_media_player
+    id: speaker_player
+    announcement_pipeline:
+      speaker: tab5_speaker
+      format: FLAC
+      sample_rate: 48000
+      num_channels: 1
 
 time:
   - platform: rx8130
@@ -225,6 +281,7 @@ time:
     # is much more accurate than the internal clock
     update_interval: never
     timezone: UTC
+
   - platform: homeassistant
     id: ha_time
     # instead try to synchronize via network repeatedly ...
