@@ -36,6 +36,18 @@ packages:
           display_panel_power_switch_id: display_backlight_id
           sleep_idle_time_milliseconds: 300000
 
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
+  comment: "ESP32-S3 + CO5300 (QSPI) 466x466 + CST9217 touch"
+  project:
+    name: smartvan.${project_name}
+    version: ${project_version}
+  on_boot:
+    - valve.close: valve_input_output_hydrant
+    - valve.close: valve_water_pump_source
+    - valve.close: valve_fill
+
 globals:
   - id: fill_start_time
     type: uint32_t
@@ -105,14 +117,6 @@ wifi:
     - lvgl.label.update:
         id: lbl_wifi_status
         text: "\U000F05AA"  # wifi-off
-
-esphome:
-  name: ${device_name}
-  friendly_name: ${friendly_name}
-  comment: "ESP32-S3 + CO5300 (QSPI) 466x466 + CST9217 touch"
-  project:
-    name: smartvan.${project_name}
-    version: ${project_version}
 
 # Since the board includes only 3 GPIO ports (18, 17, and 16), we either need to use I2C
 # or do something else, since we have 3 valves to control, plus the water pump relay, 
@@ -601,9 +605,6 @@ lvgl:
     then:
       - logger.log: "LVGL boot"
       - lambda: |-
-          lv_obj_t* tab_bar = lv_tabview_get_tab_btns(id(tab_view));
-          lv_obj_add_flag(tab_bar, LV_OBJ_FLAG_HIDDEN);
-
           lv_obj_t* arc = id(tank_arc);
           lv_obj_set_style_arc_width(arc, 35, LV_PART_INDICATOR);   // foreground
           lv_obj_set_style_arc_width(arc, 35, LV_PART_MAIN);        // background
@@ -714,107 +715,85 @@ lvgl:
           clickable: false
 
   widgets:
-    - tabview:
-        id: tab_view
+    - obj:
+        align: CENTER
+        height: 100%
+        width: 100%
         bg_color: 0x000000
-        tabs:
-          - id: tab_1
-            name: "Tab 1"
+        on_click:
+          then:
+            - logger.log: "Pump switch clicked"
+            - if:
+                condition:
+                  switch.is_on: water_pump_switch
+                then:
+                  - logger.log: "Water pump is on, turning off"
+                  - script.stop: pump_timer_countdown
+                  - switch.turn_off: water_pump_switch
+                  - lvgl.label.update:
+                      id: lbl_timer
+                      text: ""
+                  - lvgl.widget.hide: lbl_timer
+                else:
+                  - logger.log: "Water pump is off, turning on"
+                  - script.execute: turn_on_water_pump
 
-            widgets:
-              - obj:
-                  align: CENTER
-                  height: 100%
-                  width: 100%
-                  bg_color: 0x000000
-                  on_click:
-                    then:
-                      - logger.log: "Tab 1 clicked"
-                      - if:
-                          condition:
-                            switch.is_on: water_pump_switch
-                          then:
-                            - logger.log: "Water pump is on, turning off"
-                            - script.stop: pump_timer_countdown
-                            - switch.turn_off: water_pump_switch
-                            - lvgl.label.update:
-                                id: lbl_timer
-                                text: ""
-                            - lvgl.widget.hide: lbl_timer
-                          else:
-                            - logger.log: "Water pump is off, turning on"
-                            - switch.turn_on: water_pump_switch
-                  widgets:
+        widgets:
+        - roller:
+            align: CENTER
+            id: roller_id
+            options:
+                - Run
+                - Fresh Fill
+                - Dirty Fill
+            bg_color: 0x000000
+            text_color: 0xFFFFFF
+            border_width: 0
+            on_change:
+                then:
+                - logger.log: "Roller changed to new value"
+                - lvgl.label.update:
+                    id: lbl_timer
+                    text: ""
+                - lvgl.widget.hide: lbl_timer
 
-                    - roller:
-                        align: CENTER
-                        id: roller_id
-                        options:
-                          - Run
-                          - Fresh Fill
-                          - Dirty Fill
-                        bg_color: 0x000000
-                        text_color: 0xFFFFFF
-                        border_width: 0
-                        on_change:
-                          then:
-                            - logger.log: "Roller changed to new value"
-                            - lvgl.label.update:
-                                id: lbl_timer
-                                text: ""
-                            - lvgl.widget.hide: lbl_timer
+        # Center gallons display
+        - label:
+            id: lbl_tank_gallons
+            text: "-.- gal"
+            align: CENTER
+            y: -15
+            text_font: f_value_90
+            text_color: 0xFFFFFF
+            text_align: CENTER
+            clickable: false
 
-                    # Center gallons display
-                    - label:
-                        id: lbl_tank_gallons
-                        text: "-.- gal"
-                        align: CENTER
-                        y: -15
-                        text_font: f_value_90
-                        text_color: 0xFFFFFF
-                        text_align: CENTER
-                        clickable: false
+        # Percentage display below
+        - label:
+            id: lbl_tank_percent
+            text: "- %"
+            align: CENTER
+            y: 80
+            text_font: f_text_32
+            text_color: 0xAAAAAA
+            text_align: CENTER
+            clickable: false
 
-                    # Percentage display below
-                    - label:
-                        id: lbl_tank_percent
-                        text: "- %"
-                        align: CENTER
-                        y: 80
-                        text_font: f_text_32
-                        text_color: 0xAAAAAA
-                        text_align: CENTER
-                        clickable: false
-
-          - id: tab_2
-            name: "Fresh Water Fill"
-            widgets:
-            # fresh fill should have the amount of time remaining to fill the tank
-              - label:
-                  align: CENTER
-                  text: "Content 2"
-
-          - id: tab_3
-            name: "Dirty Water Fill"
-            widgets:
-              - label:
-                  align: CENTER
-                  text: "Content 2"
-
-    # Timer countdown display - visible when pump is running
-    - label:
-        id: lbl_timer
-        text: ""
-        align: TOP_MID
-        y: 50
-        text_font: f_text_24
-        text_color: 0xFFAA00
-        text_align: CENTER
-        clickable: false
-        hidden: true  # Hide by default, show only during countdown
+        # Timer countdown display - visible when pump is running
+        - label:
+            id: lbl_timer
+            text: ""
+            align: TOP_MID
+            y: 50
+            text_font: f_text_24
+            text_color: 0xFFAA00
+            text_align: CENTER
+            clickable: false
+            hidden: true  # Hide by default, show only during countdown
             
 script:
   - id: turn_on_water_pump
+    mode: restart
     then:
       # Check for dry-run condition before starting pump
       - if:
@@ -831,10 +810,10 @@ script:
             #     id: lbl_timer
             #     text: ""
             - script.stop: turn_on_water_pump
-      
-      - valve.open: valve_water_pump_source
-      - valve.open: valve_input_output_hydrant
-      - switch.turn_on: water_pump_switch
+          else:
+            - valve.open: valve_water_pump_source
+            - valve.open: valve_input_output_hydrant
+            - switch.turn_on: water_pump_switch
 
   - id: turn_off_water_pump
     then:

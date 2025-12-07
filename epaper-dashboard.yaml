@@ -257,4 +257,4 @@ lvgl:
               y: 5
               text: "\U000F0091"
               text_font: battery_icons
-              text_color: 0xFFFFFF      
+              text_color: 0xFFFFFF
