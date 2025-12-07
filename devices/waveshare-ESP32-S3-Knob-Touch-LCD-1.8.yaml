@@ -1,0 +1,227 @@
+# https://community.home-assistant.io/t/display-knob/905249/8
+# https://github.com/KrX3D/WaveShare-Knob-Esp32S3/tree/main/components/rotary_encoder_custom
+
+
+substitutions:
+  name: esphome-web-d1e9b4
+  friendly_name: Xiaozhi Knob
+
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
+  min_version: 2025.5.0
+  name_add_mac_suffix: false
+
+esp32:
+  board: esp32-s3-devkitc-1
+  flash_size: 16MB
+  cpu_frequency: 240MHz
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      CONFIG_ESP32S3_DEFAULT_CPU_FREQ_240: "y"
+      CONFIG_ESP32S3_DATA_CACHE_64KB: "y"
+      CONFIG_ESP32S3_DATA_CACHE_LINE_64B: "y"
+
+psram:
+  mode: octal
+  speed: 80MHz
+
+api:
+
+ota:
+  - platform: esphome
+    id: ota_esphome
+
+logger:
+  level: DEBUG
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: "Xiaozhi 3.5 Hotspot"
+    password: "RZ7D3EzJdPM6"
+
+captive_portal:
+
+uart:
+  id: audio_uart
+  tx_pin: GPIO41
+  rx_pin: GPIO40
+  baud_rate: 115200
+
+i2c:
+  - id: bus_a
+    sda: GPIO11
+    scl: GPIO12
+    scan: true
+
+sensor:
+  - platform: adc
+    pin: 1
+    name: "Battery Voltage"
+    id: battery_voltage
+    attenuation: 12db
+    accuracy_decimals: 2
+    update_interval: 1s
+    unit_of_measurement: "V"
+    icon: mdi:battery-medium
+    filters:
+      - multiply: 2.0
+      - median:
+          window_size: 7
+          send_every: 7
+          send_first_at: 7
+      - throttle: 1min
+    on_value:
+      then:
+        - component.update: battery_percentage
+
+  - platform: rotary_encoder
+    id: knob
+    name: "Rotary Knob Raw"
+    pin_a:
+      number: GPIO8
+      mode: INPUT_PULLUP
+    pin_b:
+      number: GPIO7
+      mode: INPUT_PULLUP
+    resolution: 2
+    on_clockwise:
+      then:
+        - logger.log: "Knob turned ? CLOCKWISE"
+    on_anticlockwise:
+      then:
+        - logger.log: "Knob turned ? COUNTER-CLOCKWISE"
+
+
+  - platform: template
+    id: battery_percentage
+    name: "Battery Percentage"
+    lambda: return id(battery_voltage).state;
+    accuracy_decimals: 0
+    unit_of_measurement: "%"
+    icon: mdi:battery-medium
+    filters:
+      - calibrate_linear:
+         method: exact
+         datapoints:
+          - 2.80 -> 0.0
+          - 3.10 -> 10.0
+          - 3.30 -> 20.0
+          - 3.45 -> 30.0
+          - 3.60 -> 40.0
+          - 3.70 -> 50.0
+          - 3.75 -> 60.0
+          - 3.80 -> 70.0
+          - 3.90 -> 80.0
+          - 4.00 -> 90.0
+          - 4.20 -> 100.0
+      - lambda: |-
+          if (x > 100) return 100;
+          if (x < 0) return 0;
+          return x;
+
+switch:
+  - platform: gpio
+    name: "PA CTRL"
+    pin: 48
+    restore_mode: RESTORE_DEFAULT_ON
+
+i2s_audio:
+  - id: i2s_in
+    i2s_lrclk_pin: GPIO45
+    i2s_bclk_pin: GPIO42
+
+
+microphone:
+  - platform: i2s_audio
+    id: i2s_microphone
+    i2s_audio_id: i2s_in
+    i2s_din_pin: GPIO46
+    adc_type: external
+    pdm: false
+    channel: left
+    sample_rate: 16000
+    bits_per_sample: 32bit
+
+time:
+  - platform: sntp
+    id: sntp_time
+    timezone: "Europe/Berlin"
+
+font:
+  - file: "gfonts://Roboto"
+    id: my_font
+    size: 28
+  - file: "gfonts://Roboto"
+    id: roboto_52
+    size: 52
+
+binary_sensor:
+  - platform: template
+    name: "Touch Button"
+    id: touch_input
+
+# SCREEN & TOUCH
+
+output:
+  - platform: ledc
+    pin: 47
+    id: backlight_output
+
+light:
+  - platform: monochromatic
+    id: Sled
+    name: Screen
+    icon: "mdi:television"
+    entity_category: config
+    output: backlight_output
+    restore_mode: ALWAYS_ON
+    default_transition_length: 250ms
+
+external_components:
+  - source: github://pr#10392
+    components: [mipi_spi]
+    refresh: 1d
+
+spi:
+  id: display_qspi
+  type: quad
+  clk_pin: 13
+  data_pins: [15, 16, 17, 18]
+
+touchscreen:
+  - platform: cst816
+    id: my_touchscreen
+    interrupt_pin: GPIO9
+    reset_pin: GPIO10
+    display: main_display
+    on_touch:
+      then:
+        - logger.log:
+            format: "Touch at (%d, %d)"
+            args: [touch.x, touch.y]
+        - binary_sensor.template.publish:
+            id: touch_input
+            state: ON
+    on_release:
+      then:
+        - binary_sensor.template.publish:
+            id: touch_input
+            state: OFF
+
+display:
+  - platform: mipi_spi
+    id: main_display
+    model: JC3636W518V2
+    rotation: 180
+    cs_pin: 14
+    reset_pin: 21
+    update_interval: 1s
+
+    lambda: |-
+      auto black = Color(0,0,0), red = Color(255,0,0), green = Color(0,255,0), blue = Color(0,0,255), yellow = Color(255,255,0), white = Color(255,255, 255), cyberlightgreen = Color(0,255,159), cyberlightblue = Color(0,184,255), cyberpink = Color(214,0,255);
+      it.fill(black);
+      it.strftime(180, 180, id(roboto_52), cyberlightgreen, TextAlign::CENTER, "%H:%M:%S", id(sntp_time).now());
