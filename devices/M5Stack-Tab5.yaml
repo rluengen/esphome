@@ -183,7 +183,7 @@ touchscreen:
       x_max: 720
       y_min: 0
       y_max: 1280
-    id: touch
+    id: touchscreen_id
 
 esp_ldo:
   - voltage: 2.5V
