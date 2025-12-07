@@ -55,6 +55,11 @@ globals:
     restore_value: false
     initial_value: '16.0'  # 16 gallon tank
 
+  - id: pump_timer_remaining
+    type: int
+    restore_value: false
+    initial_value: '0'
+
 number:
   - platform: template
     id: tank_capacity_setting
@@ -503,6 +508,7 @@ switch:
           id: lbl_pump_status
           text: "\U000F1036"  # pump-on icon
           text_color: 0x00BFFF  # Deep sky blue for running
+
     turn_off_action:
       - valve.close: valve_water_pump_source
       - valve.close: valve_input_output_hydrant
@@ -734,10 +740,10 @@ lvgl:
                             - lvgl.label.update:
                                 id: lbl_timer
                                 text: ""
+                            - lvgl.widget.hide: lbl_timer
                           else:
                             - logger.log: "Water pump is off, turning on"
-                            - script.execute: turn_on_water_pump
-                            - script.execute: pump_timer_countdown
+                            - switch.turn_on: water_pump_switch
                   widgets:
 
                     - roller:
@@ -756,6 +762,7 @@ lvgl:
                             - lvgl.label.update:
                                 id: lbl_timer
                                 text: ""
+                            - lvgl.widget.hide: lbl_timer
 
                     # Center gallons display
                     - label:
@@ -804,6 +811,7 @@ lvgl:
         text_color: 0xFFAA00
         text_align: CENTER
         clickable: false
+        hidden: true  # Hide by default, show only during countdown
             
 script:
   - id: turn_on_water_pump
@@ -909,21 +917,24 @@ script:
   - id: pump_timer_countdown
     mode: restart
     then:
-      - repeat:
-          count: !lambda 'return (int)id(pump_timer_duration).state;'
+      - lvgl.widget.show: lbl_timer  # Show the timer label
+      - lambda: 'id(pump_timer_remaining) = (int)id(pump_timer_duration).state;'
+      - while:
+          condition:
+            lambda: 'return id(pump_timer_remaining) > 0;'
           then:
             - lambda: |-
-                int duration = (int)id(pump_timer_duration).state;
-                int elapsed = repeat.index;
-                int remaining = duration - elapsed;
+                int remaining = id(pump_timer_remaining);
                 int mins = remaining / 60;
                 int secs = remaining % 60;
                 char buf[32];
                 snprintf(buf, sizeof(buf), "%d:%02d", mins, secs);
                 lv_label_set_text(id(lbl_timer), buf);
+                id(pump_timer_remaining)--;
             - delay: 1s
       - logger.log: "Pump timer expired - turning off pump"
       - switch.turn_off: water_pump_switch
       - lvgl.label.update:
           id: lbl_timer
           text: ""
+      - lvgl.widget.hide: lbl_timer  # Hide the timer label
