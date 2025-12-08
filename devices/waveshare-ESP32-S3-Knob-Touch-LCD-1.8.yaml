@@ -1,16 +1,10 @@
 # https://community.home-assistant.io/t/display-knob/905249/8
 # https://github.com/KrX3D/WaveShare-Knob-Esp32S3/tree/main/components/rotary_encoder_custom
 
-
 substitutions:
   name: esphome-web-d1e9b4
   friendly_name: Xiaozhi Knob
-
-esphome:
-  name: ${name}
-  friendly_name: ${friendly_name}
-  min_version: 2025.5.0
-  name_add_mac_suffix: false
+  rotary_encoder_id: rotary_encoder_button_id
 
 esp32:
   board: esp32-s3-devkitc-1
@@ -79,8 +73,8 @@ sensor:
         - component.update: battery_percentage
 
   - platform: rotary_encoder
-    id: knob
-    name: "Rotary Knob Raw"
+    id: ${rotary_encoder_button_id}
+    name: "Rotary Encoder Knob"
     pin_a:
       number: GPIO8
       mode: INPUT_PULLUP

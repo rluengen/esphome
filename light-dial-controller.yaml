@@ -8,7 +8,9 @@
 substitutions:
   device_name: light_dial_controller
   friendly_name: Light Dial Controller
+  project_name:  Mercedes Sprinter Control Modules
   project_version: "1.0.0"
+  log_level: DEBUG
 
 packages:
   remote_packages:
@@ -28,7 +30,9 @@ packages:
         vars:
           display_id: round_display
           display_panel_power_switch_id: display_backlight_id
-      - path: devices/viewe-esp32c3-rotary-knob.yaml
+      - path: devices/waveshare-ESP32-S3-Knob-Touch-LCD-1.8.yaml
+        vars:
+          rotary_encoder_id: encoder_button_id
       - path: packages/icons/network_icons.yaml
       - path: packages/icons/weather_icons.yaml
       - path: packages/icons/battery_icons.yaml
@@ -38,6 +42,13 @@ packages:
 #        vars:
 #          light_id: rear_can_lights
 #          entity_id: light.rear_can_lights
+
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
+  project:
+    name: smartvan.${project_name}
+    version: ${project_version}
 
 font:
   - file: "gfonts://Roboto"

@@ -8,7 +8,7 @@ substitutions:
   friendly_name: Water Tank Display
   project_name:  Mercedes Sprinter Control Modules
   project_version: "1.0.0"
-  log_level: VERBOSE
+  log_level: DEBUG
 
 packages:
   remote_packages:
