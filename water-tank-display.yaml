@@ -26,7 +26,7 @@ packages:
       - path: packages/time/homeassistant.yaml
       - path: packages/icons/homeassistant_icons.yaml
       - path: packages/icons/network_icons.yaml
-      - path: devices/waveshare-esp32-s3-touch-amoled-1.75.yaml
+      - path: devices/waveshare-ESP32-S3-Touch-LCD-2.8C.yaml
         vars:
           display_id: round_display_id
           display_backlight_id: display_backlight_id
@@ -39,7 +39,6 @@ packages:
 esphome:
   name: ${device_name}
   friendly_name: ${friendly_name}
-  comment: "ESP32-S3 + CO5300 (QSPI) 466x466 + CST9217 touch"
   project:
     name: smartvan.${project_name}
     version: ${project_version}
