@@ -1,14 +1,13 @@
-# 2.8" Round Display Development Board, 480×480
+# 2.8" Round Display Development Board, 480ï¿½480
 #
 # Hardware configuration file
 # https://github.com/agillis/esphome-modular-lvgl-buttons/blob/main/hardware/waveshare-esp32-s3-touch-lcd-2.8c.yaml
 # https://community.home-assistant.io/t/waveshare-esp32-s3-touch-lcd-2-8c-working-config/836834
 
-esphome:
-  min_version: 2025.7.0
-  project:
-    name: "Sunton.ESP32-S3-8048S070"
-    version: "1.0"
+substitutions:
+  touchscreen_id: touch_id
+  display_id: touch_lcd_display_id
+  display_backlight_id: display_backlight_id
 
 esp32:
   board: esp32-s3-devkitc-1
@@ -51,7 +50,7 @@ light:
     output: gpio_backlight_pwm
     name: Display Backlight
     icon: mdi:lightbulb-on
-    id: display_backlight
+    id: ${display_backlight_id}
     restore_mode: ALWAYS_ON
     gamma_correct: 1
 
@@ -66,7 +65,7 @@ i2c:
 # GT911 Touchscreen Controller
 touchscreen:
   - platform: gt911
-    id: my_touchscreen
+    id: ${touchscreen_id}
     i2c_id: bus_a
     reset_pin:
       pca9554: p_c_a
@@ -94,7 +93,7 @@ spi:
 
 display:
   - platform: st7701s
-    id: my_display
+    id: ${display_id}
     spi_id: spi_lcd
     spi_mode: MODE1
     color_order: bgr
