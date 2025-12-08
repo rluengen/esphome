@@ -30,11 +30,11 @@ packages:
         vars:
           display_id: round_display_id
           display_backlight_id: display_backlight_id
-      - path: packages/display/sleep.yaml
-        vars:
-          display_id: round_display_id
-          display_panel_power_switch_id: display_backlight_id
-          sleep_idle_time_milliseconds: 300000
+      # - path: packages/display/sleep.yaml
+      #   vars:
+      #     display_id: round_display_id
+      #     display_panel_power_switch_id: display_backlight_id
+      #     sleep_idle_time_milliseconds: 300000
 
 esphome:
   name: ${device_name}
@@ -104,8 +104,8 @@ display:
 
 touchscreen:
   - id: !extend ${touchscreen_id}
-    on_touch:
-      - script.execute: screen_bump_activity
+    # on_touch:
+    #   - script.execute: screen_bump_activity
 
 wifi:
   on_connect:
@@ -116,6 +116,12 @@ wifi:
     - lvgl.label.update:
         id: lbl_wifi_status
         text: "\U000F05AA"  # wifi-off
+
+# XL9535 I2C GPIO expander for relay control (using sx1509 component - compatible)
+sx1509:
+  - id: xl9535_relays
+    i2c_id: i2c_bus
+    address: 0x24  # Common address for XL9535, may be 0x20, 0x21, 0x24, or 0x27
 
 # Since the board includes only 3 GPIO ports (18, 17, and 16), we either need to use I2C
 # or do something else, since we have 3 valves to control, plus the water pump relay, 
@@ -384,6 +390,7 @@ valve:
       return {};
     open_action:
       - logger.log: "Input Selection Valve Opening"
+      - switch.turn_on: relay_hydrant_valve
       - valve.template.publish:
           id: valve_input_output_hydrant
           current_operation: OPENING
@@ -398,6 +405,7 @@ valve:
       - logger.log: "Input Selection Valve Opened"
     close_action:
       - logger.log: "Input Selection Valve Closing"
+      - switch.turn_off: relay_hydrant_valve
       - valve.template.publish:
           id: valve_input_output_hydrant
           current_operation: CLOSING
@@ -427,6 +435,7 @@ valve:
       return {};
     open_action:
       - logger.log: "Water Pump Source Valve Opening"
+      - switch.turn_on: relay_source_valve
       - valve.template.publish:
           id: valve_water_pump_source
           current_operation: OPENING
@@ -442,6 +451,7 @@ valve:
       - logger.log: "Water Pump Source Valve Opened"
     close_action:
       - logger.log: "Water Pump Source Valve Closing"
+      - switch.turn_off: relay_source_valve
       - valve.template.publish:
           id: valve_water_pump_source
           current_operation: CLOSING
@@ -471,6 +481,7 @@ valve:
       return {};
     open_action:
       - logger.log: "Tank Fill Valve Opening"
+      - switch.turn_on: relay_fill_valve
       - valve.template.publish:
           id: valve_fill
           current_operation: OPENING
@@ -485,6 +496,7 @@ valve:
       - logger.log: "Tank Fill Valve Opened"
     close_action:
       - logger.log: "Tank Fill Valve Closing"
+      - switch.turn_off: relay_fill_valve
       - valve.template.publish:
           id: valve_fill
           current_operation: CLOSING
@@ -519,6 +531,48 @@ switch:
           id: lbl_pump_status
           text: "\U000F1037"  # pump-off icon
           text_color: 0x888888  # Gray for off
+
+  # XL9535 relay outputs
+  - platform: gpio
+    id: relay_hydrant_valve
+    name: "Hydrant Valve Relay"
+    internal: true
+    pin:
+      sx1509: xl9535_relays
+      number: 0
+      mode: OUTPUT
+      inverted: false
+
+  - platform: gpio
+    id: relay_source_valve
+    name: "Source Valve Relay"
+    internal: true
+    pin:
+      sx1509: xl9535_relays
+      number: 1
+      mode: OUTPUT
+      inverted: false
+
+  - platform: gpio
+    id: relay_fill_valve
+    name: "Fill Valve Relay"
+    internal: true
+    pin:
+      sx1509: xl9535_relays
+      number: 2
+      mode: OUTPUT
+      inverted: false
+
+  - platform: gpio
+    id: relay_water_pump
+    name: "Water Pump Relay"
+    internal: true
+    pin:
+      sx1509: xl9535_relays
+      number: 3
+      mode: OUTPUT
+      inverted: false
+
 #    open_action:
 #      - switch.turn_on: relay_fill_open
 #    close_action:
@@ -812,10 +866,12 @@ script:
           else:
             - valve.open: valve_water_pump_source
             - valve.open: valve_input_output_hydrant
+            - switch.turn_on: relay_water_pump
             - switch.turn_on: water_pump_switch
 
   - id: turn_off_water_pump
     then:
+      - switch.turn_off: relay_water_pump
       - switch.turn_off: water_pump_switch
       - delay: 500ms  # Wait for pump to stop before closing valves
       - valve.close: valve_water_pump_source
