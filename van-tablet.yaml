@@ -65,13 +65,13 @@ time:
       - seconds: /3
         then:
           - lvgl.label.update:
-              id: time_label
+              id: lbl_time
               text: !lambda |-
                 auto t = id(ha_time).now();
                 return t.strftime("%H:%M").c_str();
 
           - lvgl.label.update:
-              id: date_label
+              id: lbl_date
               text: !lambda |-
                 auto t = id(ha_time).now();
                 return t.strftime("%Y-%m-%d %a").c_str();
@@ -119,6 +119,11 @@ lvgl:
 
           widgets:
             - label:
+                id: lbl_time
+            - label:
+                id: lbl_date
+
+            - label:
                 id: lbl_connection_status
                 text_font: homeassistant_icons
                 text: "\U000F07D0"
@@ -132,7 +137,7 @@ lvgl:
 
             - label:
                 id: lbl_battery_power_cord
-                text: "?"
+                text: "\U000F1C3B"
                 text_font: battery_icons
                 text_color: 0xFFFFFF
                 hidden: true  # Initially hidden
