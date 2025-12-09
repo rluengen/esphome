@@ -3,6 +3,7 @@
 
 substitutions:
   rotary_encoder_id: rotary_encoder_id
+  display_backlight_id: display_backlight_id
 
 esp32:
   board: esp32-s3-devkitc-1
@@ -125,7 +126,6 @@ i2s_audio:
     i2s_lrclk_pin: GPIO45
     i2s_bclk_pin: GPIO42
 
-
 microphone:
   - platform: i2s_audio
     id: i2s_microphone
@@ -164,7 +164,7 @@ output:
 
 light:
   - platform: monochromatic
-    id: Sled
+    id: ${display_backlight_id}
     name: Screen
     icon: "mdi:television"
     entity_category: config
