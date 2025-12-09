@@ -26,15 +26,10 @@ packages:
           wifi_ssid: !secret wifi_ssid
           wifi_password: !secret wifi_password
       - path: packages/time/homeassistant.yaml
-      - path: packages/display/sleep.yaml
-        vars:
-          display_id: round_display
-          display_panel_power_switch_id: display_backlight_id
       - path: devices/waveshare-ESP32-S3-Knob-Touch-LCD-1.8.yaml
         vars:
-          rotary_encoder_id: encoder_button_id
+          rotary_encoder_id: rotary_encoder_id
       - path: packages/icons/network_icons.yaml
-      - path: packages/icons/weather_icons.yaml
       - path: packages/icons/battery_icons.yaml
       - path: packages/icons/homeassistant_icons.yaml
 
@@ -49,27 +44,39 @@ esphome:
   project:
     name: smartvan.${project_name}
     version: ${project_version}
+  on_boot:
+    priority: -100  # Run after everything is initialized
+    then:
+      - delay: 1s
+      - script.execute: restore_roller_position
 
 font:
-  - file: "gfonts://Roboto"
-    id: roboto_16
+  - file: "fonts/segoeui.ttf"
+    id: segoeui_16
     size: 16
     glyphs: "!%()+=,-_.:°0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz"
-  - file: "gfonts://Roboto"
-    id: roboto_24
+
+  - file: "fonts/segoeui.ttf"
+    id: segoeui_24
     size: 24
     glyphs: "!%()+=,-_.:°0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz"
 
+  - file: "fonts/materialdesignicons-webfont.ttf"
+    id: mdi_icons_large
+    size: 40
+    bpp: 4
+    glyphs: []  # Will be populated dynamically by ESPHome
+
 number:
   - platform: template
-    name: LVGL Screen timeout
+    name: Screen Timeout
     optimistic: true
     id: display_timeout
     unit_of_measurement: "s"
     initial_value: 60
     restore_value: true
     min_value: 10
-    max_value: 180
+    max_value: 720
     step: 5
     mode: box
 
@@ -82,11 +89,23 @@ lvgl:
       - light.turn_off: display_backlight_id
       - lvgl.pause:
 
+  on_boot:
+    then:
+      - script.execute: restore_roller_position
+
   disp_bg_color: 0x000000
 
   top_layer:
     widgets:
-      # WiFi signal strength indicator (top-left)
+      - label:
+          id: battery_icon
+          align: TOP_LEFT
+          x: 5
+          y: 30
+          text: "\U000F05A8"  # mdi:battery
+          text_font: battery_icons
+          text_color: 0xFFFFFF
+
       - label:
           id: wifi_icon
           align: TOP_LEFT
@@ -95,32 +114,24 @@ lvgl:
           text: "\U000F05A9"  # mdi:wifi
           text_font: battery_icons
           text_color: 0xFFFFFF
+
       - label:
           id: wifi_signal_label
           align: TOP_LEFT
           x: 25
           y: 5
           text: "-"
-          text_font: roboto_16
+          text_font: segoeui_16
           text_color: 0x00FF00
       
-      # Home Assistant connection status (top-right)
       - label:
           id: ha_status_icon
           align: TOP_RIGHT
           x: -25
           y: 5
-          text: "\U000F02DC"  # mdi:home
-          text_font: battery_icons
+          text: "\U000F07D0"
+          text_font: homeassistant_icons
           text_color: 0xFFFFFF
-      - label:
-          id: ha_connection_label
-          align: TOP_RIGHT
-          x: -5
-          y: 5
-          text: "?"
-          text_font: roboto_16
-          text_color: 0xFFFF00
 
   pages:
     - id: main_page
@@ -131,8 +142,6 @@ lvgl:
             align: CENTER
             x: 0
             y: 0
-            width: 180
-            height: 180
             arc_color: 0x444444
             arc_width: 12
             min_value: 0
@@ -152,8 +161,8 @@ lvgl:
             align: CENTER
             x: 0
             y: -35
-            text: "💡"
-            text_font: roboto_24
+            text: "\U000F0335"  # mdi:lightbulb as default
+            text_font: mdi_icons_large
             text_color: 0xFFFFFF
 
         # Light name (centered)
@@ -163,7 +172,7 @@ lvgl:
             x: 0
             y: 10
             text: "Living Room"
-            text_font: roboto_16
+            text_font: segoeui_16
             text_color: 0xFFFFFF
 
         # Brightness percentage (centered, below name)
@@ -172,16 +181,85 @@ lvgl:
             align: CENTER
             x: 0
             y: 40
-            text: "0%"
-            text_font: roboto_24
+            text: "%"
+            text_font: segoeui_16
             text_color: 0xFFDD44
+
+        # Light selector roller (left side)
+        - roller:
+            id: light_roller
+            align: LEFT_MID
+            x: 10
+            y: 0
+            width: 140
+            height: 100
+            options:
+              - "All Lights"
+              - "Bed Interior"
+              - "Main Can"
+              - "Bed Can"
+              - "LED Capsule"
+              - "Exterior"
+              - "Door"
+              - "Dog Crate"
+            selected_index: 0
+            visible_row_count: 3
+            on_value:
+              - lambda: |-
+                  // Map roller index to light entity
+                  const char* lights[] = {
+                    "light.all_lights",
+                    "light.bed_interior_lights",
+                    "light.main_can_lights",
+                    "light.bed_can_lights",
+                    "light.cwww_led_capsule_lights",
+                    "light.exterior_lights",
+                    "light.door_light",
+                    "light.cwww_led_dog_crate_lights"
+                  };
+                  int index = id(light_roller).get_selected_index();
+                  if (index >= 0 && index < 8) {
+                    id(dial_selected_light).set_selected_index(index);
+                  }
+              - script.execute: update_light_display
+
+        # Toggle button (right side)
+        - obj:
+            align: RIGHT_MID
+            x: -10
+            y: 0
+            width: 60
+            height: 60
+            bg_opa: COVER
+            bg_color: 0x333333
+            border_width: 2
+            border_color: 0xFFDD44
+            radius: 30
+            on_click:
+              - homeassistant.service:
+                  service: light.toggle
+                  data:
+                    entity_id: !lambda |-
+                      auto index = id(dial_selected_light).active_index();
+                      if (index.has_value()) {
+                        return id(dial_selected_light).at(index.value()).value();
+                      }
+                      return std::string("light.bed_interior_lights");
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "ON"
+                  text_font: segoeui_16
+                  text_color: 0xFFDD44
 
 select:
   - platform: template
     name: "Dial Selected Light"
     id: dial_selected_light
-    initial_option: light.bed_interior_lights
+    initial_option: light.all_lights
+    restore_value: false
     options:
+      - light.all_lights
       - light.bed_interior_lights
       - light.main_can_lights
       - light.bed_can_lights
@@ -217,6 +295,16 @@ globals:
     restore_value: yes
 
 script:
+  - id: restore_roller_position
+    then:
+      - lambda: |-
+          // Sync roller with saved selection
+          auto index = id(dial_selected_light).active_index();
+          if (index.has_value()) {
+            id(light_roller).set_selected_index(index.value());
+          }
+      - script.execute: update_light_display
+
   - id: update_light_display
     then:
       - lambda: |-
@@ -228,7 +316,9 @@ script:
             auto selected_option = id(dial_selected_light).at(index.value());
 
             int brightness = 0;
-            if (strcmp(selected_option.c_str(), "light.bed_interior_lights") == 0) {
+            if (strcmp(selected_option.c_str(), "light.all_lights") == 0) {
+                brightness = (int)roundf((id(light_all_lights_brightness).state / 255.0f) * 100.0f);
+            } else if (strcmp(selected_option.c_str(), "light.bed_interior_lights") == 0) {
                 brightness = (int)roundf((id(light_bed_interior_lights_brightness).state / 255.0f) * 100.0f);
             } else if (strcmp(selected_option.c_str(), "light.main_can_lights") == 0) {
                 brightness = (int)roundf((id(light_main_can_lights_brightness).state / 255.0f) * 100.0f);
@@ -247,6 +337,9 @@ script:
             }
 
             id(current_brightness) = brightness;
+            
+            // Update the icon sensor to track the currently selected light
+            id(selected_light_icon).set_entity_id(selected_option.c_str());
           }
 
           // Update LVGL widgets
@@ -299,27 +392,21 @@ sensor:
     name: "Rotary Encoder"
     on_clockwise:
       then:
-        - script.execute: screen_bump_activity
-        - if:
-            condition:
-              lambda: 'return id(encoder_button_id).state;'
-            then:
-              - select.next: dial_selected_light
-            else:
-              - script.execute: increase_light_brightness
+        - script.execute: increase_light_brightness
 
     on_anticlockwise:
       then:
-        - script.execute: screen_bump_activity
-        - if:
-            condition:
-              lambda: 'return id(encoder_button_id).state;'
-            then:
-              - select.previous: dial_selected_light
-            else:
-              - script.execute: decrease_light_brightness
+        - script.execute: decrease_light_brightness
 
   # Home Assistant brightness attribute sensors for each selectable light.
+  - platform: homeassistant
+    id: light_all_lights_brightness
+    entity_id: light.all_lights
+    attribute: brightness
+    internal: true
+    on_value:
+      - script.execute: update_light_display
+
   - platform: homeassistant
     id: light_bed_interior_lights_brightness
     entity_id: light.bed_interior_lights
@@ -376,33 +463,50 @@ sensor:
     on_value:
       - script.execute: update_light_display
 
-binary_sensor:
-  - id: !extend encoder_button_id
-    on_multi_click:
-      # Single click
-      - timing:
-          - ON for at most 500ms
-          - OFF for at least 100ms
-        then:
-          - script.execute: screen_bump_activity
-          - homeassistant.service:
-              service: light.toggle
-              data:
-                entity_id: !lambda 'return id(selected_entity);'
-
-      # Double click
-      - timing:
-          - ON for at most 500ms
-          - OFF for at most 500ms
-          - ON for at most 500ms
-          - OFF for at least 100ms
-        then:
-          - logger.log: "Double click detected - no action assigned"
-          - script.execute: screen_bump_activity
-
-      # Long press
-      - timing:
-          - ON for at least 1000ms
-        then:
-          - logger.log: "Long press detected - no action assigned"
-          - script.execute: screen_bump_activity
+text_sensor:
+  - platform: homeassistant
+    id: selected_light_icon
+    entity_id: light.all_lights  # Will be updated dynamically
+    attribute: icon
+    internal: true
+    on_value:
+      - lambda: |-
+          // Convert mdi:icon-name to Unicode character
+          std::string icon_name = x;
+          
+          // Remove "mdi:" prefix if present
+          if (icon_name.find("mdi:") == 0) {
+            icon_name = icon_name.substr(4);
+          }
+          
+          // Map MDI icon names to Unicode codepoints
+          // Reference: https://pictogrammers.com/library/mdi/
+          std::map<std::string, const char*> icon_map = {
+            {"lightbulb", "\U000F0335"},
+            {"lightbulb-outline", "\U000F0336"},
+            {"lightbulb-on", "\U000F06E8"},
+            {"lightbulb-on-outline", "\U000F06E9"},
+            {"floor-lamp", "\U000F08DD"},
+            {"ceiling-light", "\U000F0769"},
+            {"lamp", "\U000F06B5"},
+            {"lava-lamp", "\U000F07D5"},
+            {"led-strip", "\U000F07D6"},
+            {"led-strip-variant", "\U000F1051"},
+            {"spotlight", "\U000F0CF3"},
+            {"spotlight-beam", "\U000F0CF4"},
+            {"vanity-light", "\U000F11E1"},
+            {"wall-sconce", "\U000F091C"},
+            {"wall-sconce-flat", "\U000F091D"},
+            {"wall-sconce-round", "\U000F0748"},
+            {"outdoor-lamp", "\U000F1054"},
+          };
+          
+          auto it = icon_map.find(icon_name);
+          if (it != icon_map.end()) {
+            id(light_icon_label).set_text(it->second);
+          } else {
+            // Default to lightbulb if icon not found
+            id(light_icon_label).set_text("\U000F0335");
+          }
+          
+          ESP_LOGI("icon", "Light icon changed to: %s", x.c_str());
