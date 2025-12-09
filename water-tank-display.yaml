@@ -30,11 +30,6 @@ packages:
         vars:
           display_id: round_display_id
           display_backlight_id: display_backlight_id
-      # - path: packages/display/sleep.yaml
-      #   vars:
-      #     display_id: round_display_id
-      #     display_panel_power_switch_id: display_backlight_id
-      #     sleep_idle_time_milliseconds: 300000
 
 esphome:
   name: ${device_name}
@@ -43,9 +38,11 @@ esphome:
     name: smartvan.${project_name}
     version: ${project_version}
   on_boot:
+    # ensure that all the valves are closed on first start
     - valve.close: valve_input_output_hydrant
     - valve.close: valve_water_pump_source
     - valve.close: valve_fill
+    - switch.turn_off: water_pump_switch
 
 globals:
   - id: fill_start_time
@@ -93,20 +90,10 @@ number:
     max_value: 3600
     step: 60
     initial_value: 1200
+    entity_category: config
     optimistic: true
     mode: box
     unit_of_measurement: "s"
-
-display:
-  - id: !extend round_display_id
-    dimensions:
-      height: 466
-      width: 472
-
-touchscreen:
-  - id: !extend ${touchscreen_id}
-    # on_touch:
-    #   - script.execute: screen_bump_activity
 
 wifi:
   on_connect:
@@ -118,9 +105,9 @@ wifi:
         id: lbl_wifi_status
         text: "\U000F05AA"  # wifi-off
 
-# XL9535 I2C GPIO expander for relay control (using sx1509 component - compatible)
-sx1509:
-  - id: xl9535_relays
+# https://esphome.io/components/xl9535/
+xl9535:
+  - id: xl9535_hub
     i2c_id: i2c_bus
     address: 0x24  # Common address for XL9535, may be 0x20, 0x21, 0x24, or 0x27
 
@@ -175,7 +162,6 @@ binary_sensor:
       then:
         - logger.log: "Water leak detected - emergency shutdown"
         - switch.turn_off: water_pump_switch
-        - delay: 500ms  # Let pump stop first
         - valve.close: valve_water_pump_source
         - valve.close: valve_input_output_hydrant
         - valve.close: valve_fill
@@ -187,6 +173,16 @@ binary_sensor:
         # - lvgl.label.update:
         #     id: lbl_tank_status
         #     text: "Water Leak Detected"
+
+# todo: figure out how to hook up this button!
+  - platform: gpio
+    id: water_pump_button
+    name: "Water Pump Button"
+    pin: GPIO00
+    on_press:
+      then:
+        - logger.log: "Water pump button pressed"
+        - switch.toggle: water_pump_switch
 
 sensor:
 #  - platform: adc
@@ -390,20 +386,32 @@ valve:
     lambda: |-
       return {};
     open_action:
-      - logger.log: "Input Selection Valve Opening"
-      - switch.turn_on: relay_hydrant_valve
-      - valve.template.publish:
-          id: valve_input_output_hydrant
-          current_operation: OPENING
-      - delay: 4s  # Valve actuation time
-      - valve.template.publish:
-          id: valve_input_output_hydrant
-          current_operation: IDLE
-          position: !lambda "return VALVE_OPEN;"
-      - lvgl.label.update:
-          id: lbl_valve_hydrant
-          text: "\U000F1068"
-      - logger.log: "Input Selection Valve Opened"
+      - if:
+          condition:
+            binary_sensor.is_on: water_tank_full
+          then:
+            - logger.log: "Cannot open hydrant valve - tank is full"
+            - lvgl.label.update:
+                id: lbl_timer
+                text: "Tank Full!"
+            - lvgl.widget.show: lbl_timer
+            - delay: 3s
+            - lvgl.widget.hide: lbl_timer
+          else:
+            - logger.log: "Input Selection Valve Opening"
+            - switch.turn_on: relay_hydrant_valve
+            - valve.template.publish:
+                id: valve_input_output_hydrant
+                current_operation: OPENING
+            - delay: 4s  # Valve actuation time
+            - valve.template.publish:
+                id: valve_input_output_hydrant
+                current_operation: IDLE
+                position: !lambda "return VALVE_OPEN;"
+            - lvgl.label.update:
+                id: lbl_valve_hydrant
+                text: "\U000F1068"
+            - logger.log: "Input Selection Valve Opened"
     close_action:
       - logger.log: "Input Selection Valve Closing"
       - switch.turn_off: relay_hydrant_valve
@@ -435,21 +443,33 @@ valve:
     lambda: |-
       return {};
     open_action:
-      - logger.log: "Water Pump Source Valve Opening"
-      - switch.turn_on: relay_source_valve
-      - valve.template.publish:
-          id: valve_water_pump_source
-          current_operation: OPENING
-      - valve.close: valve_fill
-      - delay: 4s  # Valve actuation time
-      - valve.template.publish:
-          id: valve_water_pump_source
-          current_operation: IDLE
-          position: !lambda "return VALVE_OPEN;"
-      - lvgl.label.update:
-          id: lbl_valve_source
-          text: "\U000F1068"
-      - logger.log: "Water Pump Source Valve Opened"
+      - if:
+          condition:
+            binary_sensor.is_on: water_tank_low
+          then:
+            - logger.log: "Cannot open water pump source valve - tank is too low"
+            - lvgl.label.update:
+                id: lbl_timer
+                text: "Tank Low!"
+            - lvgl.widget.show: lbl_timer
+            - delay: 3s
+            - lvgl.widget.hide: lbl_timer
+          else:
+            - logger.log: "Water Pump Source Valve Opening"
+            - switch.turn_on: relay_source_valve
+            - valve.template.publish:
+                id: valve_water_pump_source
+                current_operation: OPENING
+            - valve.close: valve_fill
+            - delay: 4s  # Valve actuation time
+            - valve.template.publish:
+                id: valve_water_pump_source
+                current_operation: IDLE
+                position: !lambda "return VALVE_OPEN;"
+            - lvgl.label.update:
+                id: lbl_valve_source
+                text: "\U000F1068"
+            - logger.log: "Water Pump Source Valve Opened"
     close_action:
       - logger.log: "Water Pump Source Valve Closing"
       - switch.turn_off: relay_source_valve
@@ -481,20 +501,32 @@ valve:
     lambda: |-
       return {};
     open_action:
-      - logger.log: "Tank Fill Valve Opening"
-      - switch.turn_on: relay_fill_valve
-      - valve.template.publish:
-          id: valve_fill
-          current_operation: OPENING
-      - delay: 4s  # Valve actuation time
-      - valve.template.publish:
-          id: valve_fill
-          current_operation: IDLE
-          position: !lambda "return VALVE_OPEN;"
-      - lvgl.label.update:
-          id: lbl_valve_fill
-          text: "\U000F1068"
-      - logger.log: "Tank Fill Valve Opened"
+      - if:
+          condition:
+            binary_sensor.is_on: water_tank_full
+          then:
+            - logger.log: "Cannot open fill valve - tank is full"
+            - lvgl.label.update:
+                id: lbl_timer
+                text: "Tank Full!"
+            - lvgl.widget.show: lbl_timer
+            - delay: 3s
+            - lvgl.widget.hide: lbl_timer
+          else:
+            - logger.log: "Tank Fill Valve Opening"
+            - switch.turn_on: relay_fill_valve
+            - valve.template.publish:
+                id: valve_fill
+                current_operation: OPENING
+            - delay: 4s  # Valve actuation time
+            - valve.template.publish:
+                id: valve_fill
+                current_operation: IDLE
+                position: !lambda "return VALVE_OPEN;"
+            - lvgl.label.update:
+                id: lbl_valve_fill
+                text: "\U000F1068"
+            - logger.log: "Tank Fill Valve Opened"
     close_action:
       - logger.log: "Tank Fill Valve Closing"
       - switch.turn_off: relay_fill_valve
@@ -518,14 +550,33 @@ switch:
   - platform: template
     id: water_pump_switch
     name: "Water Pump"
+    lambda: |-
+      return id(relay_water_pump).state;
     turn_on_action:
-      - script.execute: turn_on_water_pump
-      - lvgl.label.update:
-          id: lbl_pump_status
-          text: "\U000F1036"  # pump-on icon
-          text_color: 0x00BFFF  # Deep sky blue for running
+      - if:
+          condition:
+            and:
+              - binary_sensor.is_on: water_tank_low
+              - lambda: 'return id(valve_water_pump_source).current_operation == VALVE_OPERATION_OPENING || id(valve_water_pump_source).position == VALVE_OPEN;'
+          then:
+            - logger.log: "Dry-run protection: Cannot start pump - tank too low"
+            - lvgl.label.update:
+                id: lbl_timer
+                text: "Tank Low!"
+            - lvgl.widget.show: lbl_timer
+            - delay: 3s
+            - lvgl.widget.hide: lbl_timer
+          else:
+            - valve.open: valve_water_pump_source
+            - switch.turn_on: relay_water_pump
+            - lvgl.label.update:
+                id: lbl_pump_status
+                text: "\U000F1036"  # pump-on icon
+                text_color: 0x00BFFF  # Deep sky blue for running
 
     turn_off_action:
+      - switch.turn_off: relay_water_pump
+      - delay: 250ms  # Wait for pump to stop before closing valves
       - valve.close: valve_water_pump_source
       - valve.close: valve_input_output_hydrant
       - lvgl.label.update:
@@ -539,7 +590,7 @@ switch:
     name: "Hydrant Valve Relay"
     internal: true
     pin:
-      sx1509: xl9535_relays
+      xl9535: xl9535_hub
       number: 0
       mode: OUTPUT
       inverted: false
@@ -549,7 +600,7 @@ switch:
     name: "Source Valve Relay"
     internal: true
     pin:
-      sx1509: xl9535_relays
+      xl9535: xl9535_hub
       number: 1
       mode: OUTPUT
       inverted: false
@@ -559,7 +610,7 @@ switch:
     name: "Fill Valve Relay"
     internal: true
     pin:
-      sx1509: xl9535_relays
+      xl9535: xl9535_hub
       number: 2
       mode: OUTPUT
       inverted: false
@@ -568,7 +619,7 @@ switch:
     id: relay_water_pump
     name: "Water Pump Relay"
     pin:
-      sx1509: xl9535_relays
+      xl9535: xl9535_hub
       number: 3
       mode: OUTPUT
       inverted: false
@@ -786,20 +837,7 @@ lvgl:
         on_click:
           then:
             - logger.log: "Pump switch clicked"
-            - if:
-                condition:
-                  switch.is_on: water_pump_switch
-                then:
-                  - logger.log: "Water pump is on, turning off"
-                  - script.stop: pump_timer_countdown
-                  - switch.turn_off: water_pump_switch
-                  - lvgl.label.update:
-                      id: lbl_timer
-                      text: ""
-                  - lvgl.widget.hide: lbl_timer
-                else:
-                  - logger.log: "Water pump is off, turning on"
-                  - script.execute: turn_on_water_pump
+            - switch.toggle: water_pump_switch
 
         widgets:
         - roller:
@@ -855,41 +893,6 @@ lvgl:
             hidden: true  # Hide by default, show only during countdown
             
 script:
-  - id: turn_on_water_pump
-    mode: restart
-    then:
-      # Check for dry-run condition before starting pump
-      - if:
-          condition:
-            and:
-              - binary_sensor.is_on: water_tank_low
-              - lambda: 'return id(valve_water_pump_source).current_operation == VALVE_OPERATION_OPENING || id(valve_water_pump_source).position == VALVE_OPEN;'
-          then:
-            - logger.log: "Cannot start pump - tank too low for dry-run protection"
-            # replace with the icon: https://pictogrammers.com/library/mdi/icon/water-off/
-            - lvgl.label.update:
-                id: lbl_timer
-                text: "Tank Low!"
-            - delay: 3s
-            - lvgl.label.update:
-                id: lbl_timer
-                text: ""
-            - switch.turn_off: relay_water_pump
-            - script.stop: turn_on_water_pump
-          else:
-            - valve.open: valve_water_pump_source
-            - valve.open: valve_input_output_hydrant
-            - switch.turn_on: relay_water_pump
-            - switch.turn_on: water_pump_switch
-
-  - id: turn_off_water_pump
-    then:
-      - switch.turn_off: relay_water_pump
-      - switch.turn_off: water_pump_switch
-      - delay: 500ms  # Wait for pump to stop before closing valves
-      - valve.close: valve_water_pump_source
-      - valve.close: valve_input_output_hydrant
-
   - id: fresh_water_fill
     then:
       - if:
@@ -968,7 +971,7 @@ script:
       - lambda: 'id(pump_timer_remaining) = (int)id(pump_timer_duration).state;'
       - while:
           condition:
-            lambda: 'return id(pump_timer_remaining) > 0;'
+            lambda: 'return id(pump_timer_remaining) > 0 && id(water_pump_switch).state;'
           then:
             - lambda: |-
                 int remaining = id(pump_timer_remaining);
@@ -979,8 +982,14 @@ script:
                 lv_label_set_text(id(lbl_timer), buf);
                 id(pump_timer_remaining)--;
             - delay: 1s
-      - logger.log: "Pump timer expired - turning off pump"
-      - switch.turn_off: water_pump_switch
+      - if:
+          condition:
+            lambda: 'return id(pump_timer_remaining) <= 0;'
+          then:
+            - logger.log: "Pump timer expired - turning off pump"
+            - switch.turn_off: water_pump_switch
+          else:
+            - logger.log: "Pump turned off - stopping countdown"
       - lvgl.label.update:
           id: lbl_timer
           text: ""

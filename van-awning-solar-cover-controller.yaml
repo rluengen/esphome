@@ -3,7 +3,6 @@
 # receiver to track the position of the sun and adjust the solar panel cover.
 
 # figure out why the second ina260 isn't working properly.
-# change the update frequency of the current sensor to high when the relays are turned on.
 # hook up in/out switches for awning controller to GPIO pins.
 
 substitutions:
