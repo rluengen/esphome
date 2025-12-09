@@ -53,15 +53,6 @@ packages:
           ina260_current_sensor_name: "Solar Panel Motor Current Sensor"
 
       - path: devices/bevrlink-4ch-esp32-relay.yaml
-        vars:
-          button_1_name: "Open Nomadic Awning"
-          button_1_press_action: open_nomadic_awning_script
-          button_2_name: "Close Nomadic Awning Button"
-          button_2_press_action: close_nomadic_awning_script
-          button_3_name: "Open Solar Panel"
-          button_3_press_action: open_solar_awning_script
-          button_4_name: "Close Solar Panel Button"
-          button_4_press_action: close_solar_awning_script
 
       - path: packages/relay-current-cover-controller.yaml
         vars:
@@ -78,6 +69,16 @@ packages:
           current_sensor_id: solar_panel_motor_current_sensor
           relay_1_id: relay3
           relay_2_id: relay4
+
+switch:
+  - id: !extend relay1
+    internal: true
+  - id: !extend relay2
+    internal: true
+  - id: !extend relay3
+    internal: true
+  - id: !extend relay4
+    internal: true
 
 sensor:
   - platform: homeassistant
