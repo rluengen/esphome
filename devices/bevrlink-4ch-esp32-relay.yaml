@@ -1,17 +1,3 @@
-substitutions:
-  button_1_name: "Button 1"
-  button_1_press_action: noop_script
-  button_1_release_action: noop_script
-  button_2_name: "Button 2"
-  button_2_press_action: noop_script
-  button_2_release_action: noop_script
-  button_3_name: "Button 3"
-  button_3_press_action: noop_script
-  button_3_release_action: noop_script
-  button_4_name: "Button 4"
-  button_4_press_action: noop_script
-  button_4_release_action: noop_script
-
 esp32:
   board: esp32-c6-devkitc-1
   framework:
@@ -27,58 +13,58 @@ script:
     then:
       - logger.log: "No-op script executed"
 
-binary_sensor:
-  - platform: gpio
-    name: ${button_1_name}
-    id: button1
-    pin:
-      number: GPIO18
-      mode: INPUT_PULLUP
-    on_press:
-      then:
-        - script.execute: ${button_1_press_action}
-    on_release:
-      then:
-        - script.execute: ${button_1_release_action}
+# binary_sensor:
+#   - platform: gpio
+#     name: ${button_1_name}
+#     id: button1
+#     pin:
+#       number: GPIO18
+#       mode: INPUT_PULLUP
+#     on_press:
+#       then:
+#         - script.execute: ${button_1_press_action}
+#     on_release:
+#       then:
+#         - script.execute: ${button_1_release_action}
 
-  - platform: gpio
-    name: ${button_2_name}
-    id: button2
-    pin:
-      number: GPIO19
-      mode: INPUT_PULLUP
-    on_press:
-      then:
-        - script.execute: ${button_2_press_action}
-    on_release:
-      then:
-        - script.execute: ${button_2_release_action}
+#   - platform: gpio
+#     name: ${button_2_name}
+#     id: button2
+#     pin:
+#       number: GPIO19
+#       mode: INPUT_PULLUP
+#     on_press:
+#       then:
+#         - script.execute: ${button_2_press_action}
+#     on_release:
+#       then:
+#         - script.execute: ${button_2_release_action}
 
-  - platform: gpio
-    name: ${button_3_name}
-    id: button3
-    pin:
-      number: GPIO20
-      mode: INPUT_PULLUP
-    on_press:
-      then:
-        - script.execute: ${button_3_press_action}
-    on_release:
-      then:
-        - script.execute: ${button_3_release_action}
+#   - platform: gpio
+#     name: ${button_3_name}
+#     id: button3
+#     pin:
+#       number: GPIO20
+#       mode: INPUT_PULLUP
+#     on_press:
+#       then:
+#         - script.execute: ${button_3_press_action}
+#     on_release:
+#       then:
+#         - script.execute: ${button_3_release_action}
 
-  - platform: gpio
-    name: ${button_4_name}
-    id: button4
-    pin:
-      number: GPIO21
-      mode: INPUT_PULLUP
-    on_press:
-      then:
-        - script.execute: ${button_4_press_action}
-    on_release:
-      then:
-        - script.execute: ${button_4_release_action}
+#   - platform: gpio
+#     name: ${button_4_name}
+#     id: button4
+#     pin:
+#       number: GPIO21
+#       mode: INPUT_PULLUP
+#     on_press:
+#       then:
+#         - script.execute: ${button_4_press_action}
+#     on_release:
+#       then:
+#         - script.execute: ${button_4_release_action}
   
 switch:
   - platform: gpio
