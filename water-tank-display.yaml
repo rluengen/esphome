@@ -80,6 +80,7 @@ number:
     step: 0.5
     initial_value: 16.0
     optimistic: true
+    entity_category: config
     set_action:
       - globals.set:
           id: tank_capacity_in_gallons
