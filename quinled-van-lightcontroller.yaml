@@ -273,7 +273,7 @@ script:
     then:
       - if:
           condition:
-            lambda: 'return id(sun_elevation).state < 0;'
+            lambda: 'return id(sun_elevation).state < 10;'
           then:
             - light.turn_on: light_exterior_roof_rear
             - light.turn_on: light_exterior_roof_driver
