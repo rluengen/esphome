@@ -566,12 +566,21 @@ switch:
   - platform: gpio
     id: relay_water_pump
     name: "Water Pump Relay"
-    internal: true
     pin:
       sx1509: xl9535_relays
       number: 3
       mode: OUTPUT
       inverted: false
+    interlock_wait_time: 100ms
+    on_turn_on:
+      - if:
+          condition:
+            and:
+              - binary_sensor.is_on: water_tank_low
+              - lambda: 'return id(valve_water_pump_source).current_operation == VALVE_OPERATION_OPENING || id(valve_water_pump_source).position == VALVE_OPEN;'
+          then:
+            - logger.log: "Dry-run protection: Cannot turn on pump - tank low and source is tank"
+            - switch.turn_off: relay_water_pump
 
 #    open_action:
 #      - switch.turn_on: relay_fill_open
@@ -851,7 +860,9 @@ script:
       # Check for dry-run condition before starting pump
       - if:
           condition:
-            binary_sensor.is_on: water_tank_low
+            and:
+              - binary_sensor.is_on: water_tank_low
+              - lambda: 'return id(valve_water_pump_source).current_operation == VALVE_OPERATION_OPENING || id(valve_water_pump_source).position == VALVE_OPEN;'
           then:
             - logger.log: "Cannot start pump - tank too low for dry-run protection"
             # replace with the icon: https://pictogrammers.com/library/mdi/icon/water-off/
@@ -859,9 +870,10 @@ script:
                 id: lbl_timer
                 text: "Tank Low!"
             - delay: 3s
-            # - lvgl.label.update:
-            #     id: lbl_timer
-            #     text: ""
+            - lvgl.label.update:
+                id: lbl_timer
+                text: ""
+            - switch.turn_off: relay_water_pump
             - script.stop: turn_on_water_pump
           else:
             - valve.open: valve_water_pump_source
