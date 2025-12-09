@@ -210,9 +210,3 @@ display:
     rotation: 180
     cs_pin: 14
     reset_pin: 21
-    update_interval: 1s
-
-    lambda: |-
-      auto black = Color(0,0,0), red = Color(255,0,0), green = Color(0,255,0), blue = Color(0,0,255), yellow = Color(255,255,0), white = Color(255,255, 255), cyberlightgreen = Color(0,255,159), cyberlightblue = Color(0,184,255), cyberpink = Color(214,0,255);
-      it.fill(black);
-      it.strftime(180, 180, id(roboto_52), cyberlightgreen, TextAlign::CENTER, "%H:%M:%S", id(sntp_time).now());
