@@ -2,9 +2,7 @@
 # https://github.com/KrX3D/WaveShare-Knob-Esp32S3/tree/main/components/rotary_encoder_custom
 
 substitutions:
-  name: esphome-web-d1e9b4
-  friendly_name: Xiaozhi Knob
-  rotary_encoder_id: rotary_encoder_button_id
+  rotary_encoder_id: rotary_encoder_id
 
 esp32:
   board: esp32-s3-devkitc-1
@@ -73,7 +71,7 @@ sensor:
         - component.update: battery_percentage
 
   - platform: rotary_encoder
-    id: ${rotary_encoder_button_id}
+    id: ${rotary_encoder_id}
     name: "Rotary Encoder Knob"
     pin_a:
       number: GPIO8
@@ -88,7 +86,6 @@ sensor:
     on_anticlockwise:
       then:
         - logger.log: "Knob turned ? COUNTER-CLOCKWISE"
-
 
   - platform: template
     id: battery_percentage
