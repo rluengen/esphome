@@ -110,8 +110,8 @@ binary_sensor:
          - cover.open: nomadic_awning_cover
 
    - platform: gpio
-     name: Open Nomadic Awning
-     id: button1
+     name: Close Nomadic Awning
+     id: button2
      pin:
        number: GPIO5
        mode: INPUT
