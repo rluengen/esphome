@@ -39,6 +39,7 @@ binary_sensor:
   - platform: template
     id: ha_connected
     name: "Home Assistant Connected"
+    internal: true
 
 # Restart switch
 switch:
