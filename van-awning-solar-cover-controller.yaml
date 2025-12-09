@@ -63,6 +63,7 @@ packages:
           cover_name: Nomadic Awning
           cover_id: nomadic_awning_cover
           current_sensor_id: nomadic_motor_current_sensor
+          current_sensor_parent_id: nomadic_awning_cover_motor_current
           relay_1_id: relay1
           relay_2_id: relay2
 
@@ -71,6 +72,7 @@ packages:
           cover_name: Solar Panel
           cover_id: solar_panel_cover
           current_sensor_id: solar_panel_motor_current_sensor
+          current_sensor_parent_id: solar_panel_cover_motor_current
           relay_1_id: relay3
           relay_2_id: relay4
 

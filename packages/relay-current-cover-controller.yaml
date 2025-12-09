@@ -13,6 +13,7 @@ substitutions:
   cover_name: "Default Cover"
   cover_id: default_cover
   current_sensor_id: 
+  current_sensor_parent_id: 
   relay_1_id: relay_1
   relay_2_id: relay_2
 
@@ -90,7 +91,7 @@ script:
                     auto state = id(${cover_id}).current_operation;
                     return state == COVER_OPERATION_OPENING || state == COVER_OPERATION_CLOSING;
                 then:
-                  - component.update: ${current_sensor_id}
+                  - component.update: ${current_sensor_parent_id}
                   - delay: 100ms
                 else:
                   - script.stop: ${cover_id}_update_current_sensor_script
