@@ -28,7 +28,7 @@ number:
     optimistic: true
     initial_value: 30
     restore_value: true
-    entity_category: CONFIG
+    entity_category: config
 
   - platform: template
     name: ${cover_name} Close Duration
@@ -41,7 +41,7 @@ number:
     optimistic: true
     initial_value: 30
     restore_value: true
-    entity_category: CONFIG
+    entity_category: config
 
 #switch:
 #  - id: ${relay_1_id}
