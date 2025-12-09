@@ -35,24 +35,7 @@ packages:
 #inputs:
 # gear in park
 
-# If your Waveshare board outputs HIGH when triggered (e.g., 12V signal activates optocoupler), and the ESP32 pin sees 3.3V:
 binary_sensor:
-  - platform: gpio
-    pin:
-      number: GPIO18
-      mode: INPUT
-    name: "Awning Open Trigger"
-    id: awning_open_trigger
-
-# If the signal is active-low (e.g., pulled to GND when triggered):
-  - platform: gpio
-    pin:
-      number: GPIO18
-      mode: INPUT_PULLUP
-      inverted: true
-    name: "Awning Open Trigger"
-    id: awning_open_trigger
-
   - platform: template
     id: any-door-open
     name: "Any Door Open"

@@ -1,5 +1,7 @@
 # The Van Awning and Solar cover controller uses a BEVRLink 4 Relay + 4 Button
-# controller to control the cover states for two awnings.
+# controller to control the cover states for two awnings. It also contains a GPS
+# receiver to track the position of the sun and adjust the solar panel cover.
+
 substitutions:
   device_name: van_cover_relay_controller
   friendly_name: Van Cover Controller
@@ -69,13 +71,13 @@ packages:
           relay_1_id: relay1
           relay_2_id: relay2
 
-#      - path: packages/relay-current-cover-controller.yaml
-#        vars:
-#          cover_name: Solar Panel
-#          cover_id: solar_panel_cover
-#          current_sensor_id: solar_current_template
-#          relay_1_id: relay3
-#          relay_2_id: relay4
+      - path: packages/relay-current-cover-controller.yaml
+        vars:
+          cover_name: Solar Panel
+          cover_id: solar_panel_cover
+          current_sensor_id: solar_panel_motor_current_sensor
+          relay_1_id: relay3
+          relay_2_id: relay4
 
 sensor:
   - platform: homeassistant
@@ -99,7 +101,7 @@ script:
             lambda: 'return id(sun_elevation).state < 0.0;'
           then:
             - logger.log: "Sun is low - retracting solar awning"
-#            - cover.close: solar_panel_cover
+            - cover.close: solar_panel_cover
 
   - id: open_nomadic_awning_script
     then:
@@ -111,8 +113,10 @@ script:
 
   - id: open_solar_awning_script
     then:
-      - logger.log: "Solar panel open - not yet implemented"
+      - logger.log: "Open solar panel"
+      - cover.open: solar_panel_cover
 
   - id: close_solar_awning_script
     then:
-      - logger.log: "Solar panel close - not yet implemented"
+      - logger.log: "Close solar panel"
+      - cover.close: solar_panel_cover
