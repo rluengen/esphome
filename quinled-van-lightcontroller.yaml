@@ -363,6 +363,7 @@ script:
 binary_sensor:
   - id: !extend button_1
     name: "Garage LED Light Button"
+    internal: true
     on_press:
       - if:
           condition:
@@ -383,6 +384,7 @@ binary_sensor:
 
   - id: !extend button_2
     name: "Cabin Interior Lights Button"
+    internal: true
     on_multi_click:
       # Single click
       - timing:
@@ -408,6 +410,7 @@ binary_sensor:
     internal: true
 
   - id: !extend button_3
+    internal: true
     name: "Button 3"
     on_press:
       - light.turn_on:
@@ -434,12 +437,10 @@ binary_sensor:
   - id: !extend button_4
     internal: true
 
-
-
-
 # PFC8574 Buttons
   - id: !extend pcf8574_button_0
     name: "Upper Exterior Driver Light Switch"
+    internal: true
     on_press:
       - light.turn_on:
           id: light_exterior_roof_driver
@@ -455,6 +456,7 @@ binary_sensor:
 
   - id: !extend pcf8574_button_1
     name: "Lower Exterior Driver Light Switch"
+    internal: true
     on_press:
       - light.turn_on:
           id: light_exterior_driver_capsule
@@ -465,6 +467,7 @@ binary_sensor:
 
   - id: !extend pcf8574_button_2
     name: "Rear Exterior Light Switch"
+    internal: true
     on_multi_click:
       # Single click
       - timing:
@@ -490,6 +493,7 @@ binary_sensor:
 
   - id: !extend pcf8574_button_3
     name: "Upper Exterior Passenger Light Switch"
+    internal: true
     on_press:
       - light.turn_on:
           id: light_exterior_roof_passenger
@@ -506,6 +510,7 @@ binary_sensor:
 
   - id: !extend pcf8574_button_4
     name: "Lower Exterior Passenger Light Switch"
+    internal: true
     on_press:
       - light.turn_on:
           id: light_exterior_passenger_capsule
@@ -526,14 +531,17 @@ binary_sensor:
 
 # Wizmote Remote Control Buttons
   - id: !extend wizmote_on
+    internal: true
     on_press:
       - script.execute: turn_on_lights
   
   - id: !extend wizmote_off
+    internal: true
     on_press:
       - script.execute: turn_off_lights
 
   - id: !extend wizmote_sleep
+    internal: true
     on_press:
       - script.execute: turn_off_exterior_flood_lights
       - light.turn_off: main_can_lights
@@ -543,17 +551,22 @@ binary_sensor:
       - light.turn_off: bed_can_lights
 
   - id: !extend wizmote_1
+    internal: true
     on_press:
       - script.execute: toggle_interior_lights
 
   - id: !extend wizmote_2
+    internal: true
     on_press:
       - script.execute: toggle_exterior_flood_lights
 
   - id: !extend wizmote_3
+    internal: true
   - id: !extend wizmote_4
+    internal: true
 
   - id: !extend wizmote_up
+    internal: true
     on_press:
       - lambda: |-
           // Increase brightness for all lights that are currently on
@@ -625,6 +638,7 @@ binary_sensor:
           ESP_LOGD("wizmote", "Increased brightness for all active lights");
 
   - id: !extend wizmote_down
+    internal: true
     on_press:
       - lambda: |-
           // Decrease brightness for all lights that are currently on
@@ -701,6 +715,7 @@ switch:
     id: auto_color_temp_enabled
     optimistic: true
     restore_mode: RESTORE_DEFAULT_ON
+    entity_category: config
     on_turn_on:
       - script.execute: adjust_light_color_temperature
     on_turn_off:
