@@ -36,7 +36,7 @@
 # Bed Dial Controller           Connected to home assistant to control brightness of various light groups
 
 substitutions:
-  device_name: quinled_van_lightcontroller
+  device_name: lightcontroller
   friendly_name: QuinLED An-Penta-Deca LED Controller
   project_name: Van Light Controller
   project_version: "1.0.0"
