@@ -30,11 +30,6 @@ packages:
         vars:
           display_id: round_display_id
           display_backlight_id: display_backlight_id
-      # - path: packages/display/sleep.yaml
-      #   vars:
-      #     display_id: round_display_id
-      #     display_panel_power_switch_id: display_backlight_id
-      #     sleep_idle_time_milliseconds: 300000
 
 esphome:
   name: ${device_name}

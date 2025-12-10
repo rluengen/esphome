@@ -37,9 +37,10 @@
 
 substitutions:
   device_name: lightcontroller
-  friendly_name: QuinLED An-Penta-Deca LED Controller
+  friendly_name: Light Controller
   project_name: Van Light Controller
   project_version: "1.0.0"
+  log_level: DEBUG
 
 packages:
   remote_packages:
@@ -407,7 +408,6 @@ binary_sensor:
           - ON for at least 1000ms
         then:
           - script.execute: turn_off_interior_lights
-    internal: true
 
   - id: !extend button_3
     internal: true

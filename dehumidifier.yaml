@@ -9,8 +9,11 @@ substitutions:
   project_version: "1.0.0"
 
 esphome:
-  name: ${device_name}
+  name: dehumidifier
   friendly_name: ${friendly_name}
+  project:
+    name: smartvan.${project_name}
+    version: ${project_version}
 
 packages:
   remote_packages:
@@ -253,17 +256,17 @@ script:
           else:
             - logger.log: "Defrost cycle timed out after 30 minutes"
 
-# https://github.com/esphome/esphome-docs/pull/2110/files#diff-3c675dcb29f3fd96aad388c1be4d93423f29af77d446fa1c152fd2c066addab7
-humidifier:
-      - platform: hygrostat
-        name: "Hygrostat Humidifier Controller"
-        sensor: my_humidity_sensor
-        default_target_thumidity_high: 70%
-        min_dehumidifying_off_time: 300s
-        min_dehumidifying_run_time: 300s
-        min_idle_time: 30s
-        dehumidify_action:
-          - switch.turn_on: central_fan
-        idle_action:
-          - switch.turn_off: central_fan
+# # https://github.com/esphome/esphome-docs/pull/2110/files#diff-3c675dcb29f3fd96aad388c1be4d93423f29af77d446fa1c152fd2c066addab7
+# humidifier:
+#       - platform: hygrostat
+#         name: "Hygrostat Humidifier Controller"
+#         sensor: my_humidity_sensor
+#         default_target_thumidity_high: 70%
+#         min_dehumidifying_off_time: 300s
+#         min_dehumidifying_run_time: 300s
+#         min_idle_time: 30s
+#         dehumidify_action:
+#           - switch.turn_on: central_fan
+#         idle_action:
+#           - switch.turn_off: central_fan
 
