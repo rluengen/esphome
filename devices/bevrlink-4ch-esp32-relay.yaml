@@ -1,7 +1,7 @@
 esp32:
   board: esp32-c6-devkitc-1
   framework:
-    type: arduino
+    type: esp-idf
 
 i2c:
   sda: GPIO6
