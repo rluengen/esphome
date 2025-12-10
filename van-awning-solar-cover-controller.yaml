@@ -7,7 +7,7 @@
 
 substitutions:
   device_name: van_cover_relay_controller
-  friendly_name: Van Cover Controller
+  friendly_name: Cover Controller
   project_name: Van Cover Controller
   project_version: "1.0.0"
   log_level: VERBOSE

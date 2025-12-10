@@ -51,6 +51,7 @@ cover:
     device_class: awning
 
     open_action:
+      - logger.log: "Opening cover ${cover_name}, turn off ${relay_2_id}, turn on ${relay_1_id}"
       - script.execute: ${cover_id}_update_current_sensor_script
       - switch.turn_off: ${relay_2_id}
       - switch.turn_on: ${relay_1_id}
@@ -62,6 +63,7 @@ cover:
     open_sensor: ${current_sensor_id}
 
     close_action:
+      - logger.log: "Closing cover ${cover_name}, turn off ${relay_2_id}, turn on ${relay_1_id}"
       - script.execute: ${cover_id}_update_current_sensor_script
       - switch.turn_off: ${relay_1_id}
       - switch.turn_on: ${relay_2_id}
@@ -69,6 +71,7 @@ cover:
     close_duration: 15s
 
     stop_action:
+      - logger.log: "Stop cover ${cover_name}, turn off ${relay_2_id}, ${relay_1_id}"
       - switch.turn_off: ${relay_1_id}
       - switch.turn_off: ${relay_2_id}
 

@@ -231,7 +231,6 @@ display:
     reset_pin:
       pi4ioe5v6408: pi4ioe1
       number: 4
-    show_test_card: true
 
 lvgl:
   buffer_size: 100%
