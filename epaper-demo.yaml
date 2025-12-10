@@ -36,6 +36,7 @@ packages:
 esphome:
   name: ${device_name}
   friendly_name: ${friendly_name}
+  comment: "Terminal Dashboard Display"
   on_boot:
     then:
       - logger.log: "esphome on_boot"
