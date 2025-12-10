@@ -13,6 +13,7 @@ substitutions:
   cover_name: "Default Cover"
   cover_id: default_cover
   current_sensor_id: 
+  current_sensor_parent_id: 
   relay_1_id: relay_1
   relay_2_id: relay_2
 
@@ -43,15 +44,6 @@ number:
     restore_value: true
     entity_category: config
 
-#switch:
-#  - id: ${relay_1_id}
-#    interlock: &interlock_group [${relay_1_id}, ${relay_2_id}]
-#    interlock_wait_time: 100ms
-#
-#  - id: ${relay_2_id}
-#    interlock: *interlock_group
-#    interlock_wait_time: 100ms
-
 cover:
   - platform: current_based
     name: ${cover_name}
@@ -59,6 +51,7 @@ cover:
     device_class: awning
 
     open_action:
+      - script.execute: ${cover_id}_update_current_sensor_script
       - switch.turn_off: ${relay_2_id}
       - switch.turn_on: ${relay_1_id}
 
@@ -69,6 +62,7 @@ cover:
     open_sensor: ${current_sensor_id}
 
     close_action:
+      - script.execute: ${cover_id}_update_current_sensor_script
       - switch.turn_off: ${relay_1_id}
       - switch.turn_on: ${relay_2_id}
 
@@ -83,3 +77,21 @@ cover:
     close_obstacle_current_threshold: 0.8
 
     max_duration: 30s
+
+script:
+  - id: ${cover_id}_update_current_sensor_script
+    mode: restart
+    then:
+      - repeat:
+          count: 600  # 60 seconds max (600 * 100ms)
+          then:
+            - if:
+                condition:
+                  lambda: |-
+                    auto state = id(${cover_id}).current_operation;
+                    return state == COVER_OPERATION_OPENING || state == COVER_OPERATION_CLOSING;
+                then:
+                  - component.update: ${current_sensor_parent_id}
+                  - delay: 100ms
+                else:
+                  - script.stop: ${cover_id}_update_current_sensor_script
