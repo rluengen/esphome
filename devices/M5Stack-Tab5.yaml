@@ -233,6 +233,10 @@ display:
       number: 4
     show_test_card: true
 
+lvgl:
+  buffer_size: 100%
+  byte_order: little_endian
+
 output:
   - platform: ledc
     pin: GPIO22
