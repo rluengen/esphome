@@ -1,0 +1,32 @@
+substitutions:
+  device_name: gps
+  friendly_name: Global Positioning System
+  project_name:  Mercedes Sprinter Control Modules
+  project_version: "1.0.0"
+  log_level: DEBUG
+
+packages:
+  remote_packages:
+    url: https://github.com/rluengen/esphome
+    ref: main
+    refresh: always
+    files:
+      - path: packages/common.yaml
+        vars:
+          api_encryption_key: !secret encryption_key
+      - path: packages/network/wifi.yaml
+        vars:
+          wifi_ssid: !secret wifi_ssid
+          wifi_password: !secret wifi_password
+      - path: packages/time/homeassistant.yaml
+      - path: packages/gps-receiver.yaml
+        vars:
+          tx_pin: GPIO21
+          rx_pin: GPIO20
+
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
+  project:
+    name: smartvan.${project_name}
+    version: ${project_version}

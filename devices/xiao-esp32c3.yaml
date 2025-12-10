@@ -1,0 +1,15 @@
+# https://wiki.seeedstudio.com/xiao-esp32c3-esphome/
+substitutions:
+  name: "xiao-esp32c3"
+  friendly_name: "XIAO ESP32C3"
+
+esphome:
+  platformio_options:
+    board_build.flash_mode: dio
+    board_build.mcu: esp32c3
+
+esp32:
+  board: esp32-c3-devkitm-1
+  variant: esp32c3
+  framework:
+    type: esp-idf
