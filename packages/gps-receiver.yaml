@@ -22,4 +22,7 @@ gps:
   update_interval: 30s
 
 time:
-  - platform: gps    
+  - platform: gps
+
+logger:
+  baud_rate: 0  # disables UART0 logging, allows GPS UART to be clean
