@@ -1,8 +1,10 @@
 # Template for a dial controller using ESP32 with a rotary encoder and display.
 
-# pushing the button will toggle the current device on/off.
+# tapping the screen when off will wake the device
+# tapping the screen will toggle the current device on/off.
 # rotating the dial will adjust a value (e.g., brightness).
-# pressing and holding the button for 2 seconds will turn the device off.
+# pressing and holding the screen for 2 seconds will turn the device off.
+# double-tap the screen will turn the light on?
 # automatically turn off the display after a period of inactivity.
 
 substitutions:
@@ -71,6 +73,7 @@ number:
   - platform: template
     name: Screen Timeout
     optimistic: true
+    entity_category: config
     id: display_timeout
     unit_of_measurement: "s"
     initial_value: 60

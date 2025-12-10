@@ -4,7 +4,7 @@
 # or water tank), and the water fill valve.
 
 substitutions:
-  device_name: water_tank_display
+  device_name: water
   friendly_name: Water Tank Display
   project_name:  Mercedes Sprinter Control Modules
   project_version: "1.0.0"
@@ -125,6 +125,7 @@ binary_sensor:
   - platform: template
     id: water_tank_full
     name: "Water Tank Full"
+    entity_category: diagnostics
     lambda: |-
       if (isnan(id(tank_percent).state)) return false;
       return id(tank_percent).state >= 95.0f;
@@ -139,6 +140,7 @@ binary_sensor:
   - platform: template
     id: water_tank_low
     name: "Water Tank Low"
+    entity_category: diagnostics
     lambda: |-
       if (isnan(id(tank_percent).state)) return true;
       return id(tank_percent).state <= 5.0f;

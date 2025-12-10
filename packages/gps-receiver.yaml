@@ -19,7 +19,7 @@ gps:
     name: "Satellites"
   hdop:
     name: "Horizontal Dilution of Precision"
-  update_interval: 5s
+  update_interval: 30s
 
 time:
   - platform: gps    
