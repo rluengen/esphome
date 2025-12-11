@@ -27,12 +27,6 @@ time:
     on_time_sync:
       then:
         - logger.log: "GPS time synchronized"
-    # Optional: Add scheduled actions based on GPS time
-    # on_time:
-    #   - seconds: 0
-    #     minutes: /15
-    #     then:
-    #       - logger.log: "GPS time tick every 15 minutes"
 
 text_sensor:
   - platform: template

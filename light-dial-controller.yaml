@@ -90,6 +90,7 @@ lvgl:
   on_boot:
     then:
       - script.execute: restore_roller_position
+      - lvgl.resume:
 
   disp_bg_color: 0x000000
 

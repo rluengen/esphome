@@ -95,6 +95,19 @@ number:
     mode: box
     unit_of_measurement: "s"
 
+  - platform: template
+    id: valve_actuation_time
+    name: "Valve Actuation Time"
+    min_value: 1
+    max_value: 10
+    step: 0.5
+    initial_value: 4.0
+    entity_category: config
+    optimistic: true
+    mode: box
+    unit_of_measurement: "s"
+    icon: "mdi:timer-cog"
+
 wifi:
   on_connect:
     - lvgl.label.update:
@@ -173,7 +186,7 @@ binary_sensor:
             id: lbl_tank_status
             text: "Water Leak"
 
-# todo: figure out how to hook up this button!
+# todo: figure out how to hook up the remote water tank switch
   - platform: gpio
     id: water_pump_button
     name: "Water Pump Button"
@@ -184,6 +197,25 @@ binary_sensor:
         - switch.toggle: water_pump_switch
 
 sensor:
+# https://esphome.io/components/sensor/adc/#esp32-pins-and-hardware-details
+# there is a 12 pin multi-functional pin header on the waveshare board. This is an ESP32-S3
+# So ADC1 pins are GPIO1-GPIO10, ADC2 pins are GPIO11-GPIO20. So, on the waveshare board
+# we don't have access to any of these items, so i2c seems like the best option. Should I use
+# a MCP3221 or NAU7802 or something else?
+
+# GPIO0
+# GND
+# RXD (GPIO44)
+# TXD (GPIO43)
+# SDA (GPIO15)
+# SCL (GPIO07)
+# 3V3
+# GND
+# D+ (GPIO20)
+# D- (GPIO19)
+# VBUS (+5V)
+# GND
+
 #  - platform: adc
 #    pin: GPIO4
 #    id: water_tank_adc_v
@@ -279,7 +311,7 @@ sensor:
               static char buf[16];
               if (isnan(x))
               {
-              snprintf(buf, sizeof(buf), "-.- %%");
+                snprintf(buf, sizeof(buf), "-.- %%");
               }
               else
               {
@@ -400,7 +432,7 @@ valve:
             - valve.template.publish:
                 id: valve_input_output_hydrant
                 current_operation: OPENING
-            - delay: 4s  # Valve actuation time
+            - delay: !lambda 'return (uint32_t)(id(valve_actuation_time).state * 1000);'
             - valve.template.publish:
                 id: valve_input_output_hydrant
                 current_operation: IDLE
@@ -415,7 +447,7 @@ valve:
       - valve.template.publish:
           id: valve_input_output_hydrant
           current_operation: CLOSING
-      - delay: 4s  # Valve actuation time
+      - delay: !lambda 'return (uint32_t)(id(valve_actuation_time).state * 1000);'
       - valve.template.publish:
           id: valve_input_output_hydrant
           current_operation: IDLE
@@ -452,7 +484,7 @@ valve:
                 id: valve_water_pump_source
                 current_operation: OPENING
             - valve.close: valve_fill
-            - delay: 4s  # Valve actuation time
+            - delay: !lambda 'return (uint32_t)(id(valve_actuation_time).state * 1000);'
             - valve.template.publish:
                 id: valve_water_pump_source
                 current_operation: IDLE
@@ -467,7 +499,7 @@ valve:
       - valve.template.publish:
           id: valve_water_pump_source
           current_operation: CLOSING
-      - delay: 4s  # Valve actuation time
+      - delay: !lambda 'return (uint32_t)(id(valve_actuation_time).state * 1000);'
       - valve.template.publish:
           id: valve_water_pump_source
           current_operation: IDLE
@@ -503,7 +535,7 @@ valve:
             - valve.template.publish:
                 id: valve_fill
                 current_operation: OPENING
-            - delay: 4s  # Valve actuation time
+            - delay: !lambda 'return (uint32_t)(id(valve_actuation_time).state * 1000);'
             - valve.template.publish:
                 id: valve_fill
                 current_operation: IDLE
@@ -518,7 +550,7 @@ valve:
       - valve.template.publish:
           id: valve_fill
           current_operation: CLOSING
-      - delay: 4s  # Valve actuation time
+      - delay: !lambda 'return (uint32_t)(id(valve_actuation_time).state * 1000);'
       - valve.template.publish:
           id: valve_fill
           current_operation: IDLE
@@ -927,9 +959,8 @@ script:
                         binary_sensor.is_on: water_tank_full
                       then:
                         - logger.log: "Tank full - auto-stopping pump"
-                        - lvgl.widget.hide: lbl_timer  # Hide the timer label
+                        - lvgl.widget.hide: lbl_timer  # Hide the timer label which should have been showing the fill ETA
                         - switch.turn_off: water_pump_switch
-                        - delay: 3s
                         - script.stop: pump_timer_countdown
                         - script.stop: fresh_water_fill
 
