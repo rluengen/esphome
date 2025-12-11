@@ -23,6 +23,32 @@ gps:
 
 time:
   - platform: gps
+    id: gps_time
+    on_time_sync:
+      then:
+        - logger.log: "GPS time synchronized"
+    # Optional: Add scheduled actions based on GPS time
+    # on_time:
+    #   - seconds: 0
+    #     minutes: /15
+    #     then:
+    #       - logger.log: "GPS time tick every 15 minutes"
+
+text_sensor:
+  - platform: template
+    name: "GPS Time"
+    id: gps_time_text
+    update_interval: 1s
+    lambda: |-
+      char buffer[20];
+      auto time = id(gps_time).now();
+      if (time.is_valid()) {
+        snprintf(buffer, sizeof(buffer), "%04d-%02d-%02d %02d:%02d:%02d",
+                 time.year, time.month, time.day_of_month,
+                 time.hour, time.minute, time.second);
+        return {buffer};
+      }
+      return {"GPS time not available"};
 
 logger:
   baud_rate: 0  # disables UART0 logging, allows GPS UART to be clean

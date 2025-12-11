@@ -23,6 +23,7 @@ packages:
         vars:
           tx_pin: GPIO21
           rx_pin: GPIO20
+      - path: devices/xiao-esp32c3.yaml
 
 esphome:
   name: ${device_name}

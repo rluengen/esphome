@@ -83,7 +83,7 @@ time:
                 return t.strftime("%Y-%m-%d %a").c_str();
 
 lvgl:
-  bg_color: 0x00FF00
+  bg_color: 0x000000  # Black background
   on_idle:
     timeout: 30s
     then:
@@ -108,8 +108,17 @@ lvgl:
       long_press_time: 400ms
       long_press_repeat_time: 100ms
 
+  pages:
+    - id: main_page
+      widgets:
+        - label:
+            align: CENTER
+            text: "Van Tablet Controller"
+            text_font: ROBOTO_48
+            text_color: 0xFFFFFF
+
   top_layer:
-    bg_color: 0x00FF00
+    bg_color: 0x000000  # Black background for header
     widgets:
       - obj:
           id: header_container

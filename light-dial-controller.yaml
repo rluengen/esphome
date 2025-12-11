@@ -3,7 +3,7 @@
 # tapping the screen when off will wake the device
 # tapping the screen will toggle the current device on/off.
 # rotating the dial will adjust a value (e.g., brightness).
-# pressing and holding the screen for 2 seconds will turn the device off.
+# pressing and holding the touch screen for 2 seconds will turn the device off.
 # double-tap the screen will turn the light on?
 # automatically turn off the display after a period of inactivity.
 
@@ -46,11 +46,6 @@ esphome:
   project:
     name: smartvan.${project_name}
     version: ${project_version}
-  on_boot:
-    priority: -100  # Run after everything is initialized
-    then:
-      - delay: 1s
-      - script.execute: restore_roller_position
 
 font:
   - file: "fonts/segoeui.ttf"
