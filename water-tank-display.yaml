@@ -3,6 +3,39 @@
 # (which automatically turns off after a timeout), the pump supply source (dirty water 
 # or water tank), and the water fill valve.
 
+# https://esphome.io/components/sensor/adc/#esp32-pins-and-hardware-details
+# there is a 12 pin multi-functional pin header on the waveshare board. This is an ESP32-S3
+# So ADC1 pins are GPIO1-GPIO10, ADC2 pins are GPIO11-GPIO20. So, on the waveshare board
+# we don't have access to any of these items, so i2c seems like the best option. Should I use
+# a MCP3221 or NAU7802 or something else?
+
+# GPIO0
+# GND
+# RXD (GPIO44)
+# TXD (GPIO43)
+# SDA (GPIO15)
+# SCL (GPIO07)
+# 3V3
+# GND
+# D+ (GPIO20)
+# D- (GPIO19)
+# VBUS (+5V)
+# GND
+
+# TODO: ADS1115 via I2C to read water tank level sensor, connected from a stemma QT port to the ADS1115 to the i2c relay.
+# https://www.adafruit.com/product/1085
+# https://www.adafruit.com/product/4424
+# Then I just need the voltage divider circuit from the water tank sensor to the ADS1115 input.
+
+# xl9535 Device
+# Relay 1: relay_hydrant_valve
+# Relay 2: relay_source_valve
+# Relay 3: relay_fill_valve
+# Relay 4: relay_water_pump
+
+# and now I have the hot water heater on a 30 amp relay and the water pump switch on an input. I can drive both of those
+# with the PCF8574 I2C expander if needed.
+
 substitutions:
   device_name: water
   friendly_name: Water Tank Display
@@ -196,45 +229,39 @@ binary_sensor:
         - logger.log: "Water pump button pressed"
         - switch.toggle: water_pump_switch
 
+ads1115:
+  - id: ads_device_id
+    address: 0x48 # Address pin is pulled to GND (Default)
+
 sensor:
-# https://esphome.io/components/sensor/adc/#esp32-pins-and-hardware-details
-# there is a 12 pin multi-functional pin header on the waveshare board. This is an ESP32-S3
-# So ADC1 pins are GPIO1-GPIO10, ADC2 pins are GPIO11-GPIO20. So, on the waveshare board
-# we don't have access to any of these items, so i2c seems like the best option. Should I use
-# a MCP3221 or NAU7802 or something else?
-
-# GPIO0
-# GND
-# RXD (GPIO44)
-# TXD (GPIO43)
-# SDA (GPIO15)
-# SCL (GPIO07)
-# 3V3
-# GND
-# D+ (GPIO20)
-# D- (GPIO19)
-# VBUS (+5V)
-# GND
-
-#  - platform: adc
-#    pin: GPIO4
-#    id: water_tank_adc_v
-#    attenuation: 12db
-#    update_interval: 500ms
-
-  - platform: template
+  # How to choose gain:
+  #   Measure your voltage divider output range:
+  #   With tank empty (240 ohm sender): What voltage do you get?
+  #   With tank full (33 ohm sender): What voltage do you get?
+  # For a typical voltage divider with 220 ohm reference resistor and 3.3V supply:
+  #   Empty (240 ohm): ~3.3V × 240/(240+220) = 1.72V
+  #   Full (33 ohm): ~3.3V × 33/(33+220) = 0.43V
+  # Range: 0.4V to 1.7V
+  # Pick the smallest gain that fits your range:
+  # Your range is 0-1.7V → Use gain: 2.048 (gives you headroom + best resolution)
+  - platform: ads1115
     id: water_tank_adc_v
+    ads1115_id: ads_device_id
+    multiplexer: 'A0_GND'
+    gain: 2.048  # ±2.048V range - 0.0625 mV per bit
+    name: "ADS1115 Channel A0-GND"
 
   # It's a software helper in ESPHome that calculates resistance (in ohms) from an ADC voltage 
   # reading using a known reference resistor in a voltage divider.
   # https://esphome.io/components/sensor/resistance/
+  # +3.3v --- [5.6k Resistor] -- A0_GND -- [Tank Resistor] -- GND
   - platform: resistance
     id: sender_ohms
     name: "Fresh Water Sender Resistance (ohms)"
     sensor: water_tank_adc_v  # This is your ADC voltage sensor
     configuration: DOWNSTREAM # Position of unknown resistor in divider
-    resistor: 220.0 Ohm # (Required, float): The value of the resistor with a constant value.
-    # reference_voltage: 3.3 V # (Optional, float): The reference voltage. Defaults to 3.3V.
+    resistor: 5.6kOhm # (Required, float): The value of the resistor with a constant value.
+    reference_voltage: 3.3 V # (Optional, float): The reference voltage. Defaults to 3.3V.
 
     filters:
       # Multi-point calibration for percentage. Add a point for each gallon mark (measured while filling).
@@ -512,10 +539,10 @@ valve:
     optimistic: false
     has_position: true
 
-# The water fill valve controls if water is pumped into the water tank.
-# This should not be an option if the water source is the water tank.
-# Closed (default) = no fill
-# Open = Fill Water Tank from Water Pump
+  # The water fill valve controls if water is pumped into the water tank.
+  # This should not be an option if the water source is the water tank.
+  # Closed (default) = no fill
+  # Open = Fill Water Tank from Water Pump
   - platform: template
     device_class: water
     id: valve_fill
