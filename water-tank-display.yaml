@@ -141,6 +141,32 @@ number:
     unit_of_measurement: "s"
     icon: "mdi:timer-cog"
 
+  - platform: template
+    id: tank_empty_resistance
+    name: "Tank Empty Resistance"
+    min_value: 0
+    max_value: 500
+    step: 1
+    initial_value: 240.0
+    entity_category: config
+    optimistic: true
+    mode: box
+    unit_of_measurement: "Ohms"
+    icon: "mdi:omega"
+
+  - platform: template
+    id: tank_full_resistance
+    name: "Tank Full Resistance"
+    min_value: 0
+    max_value: 500
+    step: 1
+    initial_value: 33.0
+    entity_category: config
+    optimistic: true
+    mode: box
+    unit_of_measurement: "Ohms"
+    icon: "mdi:omega"
+
 wifi:
   on_connect:
     - lvgl.label.update:
@@ -264,25 +290,6 @@ sensor:
     reference_voltage: 3.3 V # (Optional, float): The reference voltage. Defaults to 3.3V.
 
     filters:
-      # Multi-point calibration for percentage. Add a point for each gallon mark (measured while filling).
-      - calibrate_linear:
-          - 33.0 -> 0.0    # 33? = 0%
-          - 33.0 -> 6.25
-          - 33.0 -> 12.5
-          - 36.0 -> 18.75
-          - 39.0 -> 25.0
-          - 43.0 -> 31.25
-          - 48.0 -> 37.5
-          - 54.0 -> 43.75
-          - 61.0 -> 50.0
-          - 69.0 -> 56.25
-          - 78.0 -> 62.5
-          - 89.0 -> 68.75
-          - 102.0 -> 75.0
-          - 118.0 -> 81.25
-          - 137.0 -> 87.5
-          - 160.0 -> 93.75
-          - 240.0 -> 100.0 # 240? = 100%
       - median:
           window_size: 15
           send_every: 5
@@ -297,21 +304,26 @@ sensor:
     name: "Fresh Water Tank Level (%)"
     unit_of_measurement: "%"
     accuracy_decimals: 0
+    
+    # Calibrate non-linear tank by mapping resistance (ohms) to percentage
+    # Measure resistance at different fill levels and add points here
     filters:
+      - calibrate_linear:
+          # Format: resistance -> percentage
+          # Measure at empty, 1/4, 1/2, 3/4, full and add points
+          - 240.0 -> 0.0    # Empty
+          - 160.0 -> 25.0   # 1/4 full (example - measure actual)
+          - 100.0 -> 50.0   # 1/2 full (example - measure actual)
+          - 60.0 -> 75.0    # 3/4 full (example - measure actual)
+          - 33.0 -> 100.0   # Full
       - clamp:
           min_value: 0.0
           max_value: 100.0
 
     lambda: |-
-      // Map your measured ohms to % (example: 33?=100% full, 240?=0% empty)
+      // Return raw ohms reading for calibration filter
       if (isnan(id(sender_ohms).state)) return NAN;
-      const float ohms = id(sender_ohms).state;
-      const float full_ohms  = 33.0f;
-      const float empty_ohms = 240.0f;
-      float pct = (empty_ohms - ohms) * 100.0f / (empty_ohms - full_ohms);
-      if (pct < 0)   pct = 0;
-      if (pct > 100) pct = 100;
-      return roundf(pct);
+      return id(sender_ohms).state;
 
     on_value:
       then:
