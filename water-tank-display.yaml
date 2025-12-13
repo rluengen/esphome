@@ -104,6 +104,11 @@ globals:
     restore_value: false
     initial_value: '0'
 
+  - id: hot_water_heater_timer_remaining
+    type: int
+    restore_value: false
+    initial_value: '0'
+
 number:
   - platform: template
     id: tank_capacity_setting
@@ -126,6 +131,18 @@ number:
     max_value: 3600
     step: 60
     initial_value: 1200
+    entity_category: config
+    optimistic: true
+    mode: box
+    unit_of_measurement: "s"
+
+  - platform: template
+    id: hot_water_heater_timer_duration
+    name: "Hot Water Heater Timer Duration (seconds)"
+    min_value: 60
+    max_value: 7200
+    step: 60
+    initial_value: 1800
     entity_category: config
     optimistic: true
     mode: box
@@ -199,6 +216,12 @@ xl9535:
     i2c_id: i2c_bus
     address: 0x24  # Common address for XL9535, may be 0x20, 0x21, 0x24, or 0x27
 
+pcf8574:
+  - id: pcf8574_hub
+    i2c_id: i2c_bus
+    address: 0x20       # The I2C address of the driver. Defaults to 0x21.
+    pcf8575: false      # Whether this is a 16-pin PCF8575
+
 binary_sensor:
   - platform: template
     id: water_tank_full
@@ -249,11 +272,18 @@ binary_sensor:
             id: lbl_tank_status
             text: "Water Leak"
 
-# todo: figure out how to hook up the remote water tank switch
   - platform: gpio
+    name: "Water Pump Remote Switch"
     id: water_pump_button
-    name: "Water Pump Button"
-    pin: GPIO00
+    pin:
+      pcf8574: pcf8574_hub
+      number: 0
+      mode:
+        input: true
+      inverted: true
+    filters:
+      - delayed_on: 10ms
+      - delayed_off: 10ms
     on_press:
       then:
         - logger.log: "Water pump button pressed"
@@ -622,7 +652,10 @@ switch:
             - logger.log: "Dry-run protection: Cannot start pump - tank too low"
           else:
             - valve.open: valve_water_pump_source
-  # todo: wait here until the water pump source valve finishes opening all the way to turn on the relay?
+            - wait_until:
+                condition:
+                  lambda: 'return id(valve_water_pump_source).position == VALVE_OPEN;'
+                timeout: 15s
             - switch.turn_on: relay_water_pump
             - lvgl.label.update:
                 id: lbl_pump_status
@@ -637,6 +670,19 @@ switch:
           id: lbl_pump_status
           text: "\U000F1037"  # pump-off icon
           text_color: 0x888888  # Gray for off
+
+  - platform: template
+    id: hot_water_heater_switch
+    name: "Hot Water Heater"
+    icon: "mdi:water-boiler"
+    lambda: |-
+      return id(hot_water_heater_relay).state;
+    turn_on_action:
+      - switch.turn_on: hot_water_heater_relay
+      - script.execute: hot_water_heater_timer_countdown
+    turn_off_action:
+      - switch.turn_off: hot_water_heater_relay
+      - script.stop: hot_water_heater_timer_countdown
 
   # XL9535 relay outputs
   - platform: gpio
@@ -688,6 +734,17 @@ switch:
           then:
             - logger.log: "Dry-run protection: Cannot turn on pump - tank low and source is tank"
             - switch.turn_off: relay_water_pump
+
+  # PCF8574 outputs
+  - platform: gpio
+    id: hot_water_heater_relay
+    name: "Hot Water Heater Relay"
+    internal: true
+    pin:
+      pcf8574: pcf8574_hub
+      number: 1
+      mode: OUTPUT
+      inverted: false
 
 font:
   - file: "fonts/segoeui.ttf"
@@ -910,11 +967,7 @@ lvgl:
                       lambda: 'return id(roller_id).get_selected_index() == 2;'
                     then:
                       - logger.log: "Mode: Dirty Fill - Pumping from dirty water source"
-                      - valve.close: valve_water_pump_source
-                      - valve.open: valve_fill
-                      - valve.close: valve_input_output_hydrant
-                      - switch.turn_on: water_pump_switch
-                      - script.execute: pump_timer_countdown
+                      - script.execute: dirty_water_fill
 
         # Center gallons display
         - label:
@@ -951,6 +1004,73 @@ lvgl:
             hidden: true  # Hide by default, show only during countdown
             
 script:
+  - id: dirty_water_fill
+    then:
+      - if:
+          condition:
+            binary_sensor.is_off: water_tank_full
+          then:
+            # Record start conditions
+            - lambda: |-
+                id(fill_start_time) = millis();
+                id(fill_start_level) = id(tank_percent).state;
+
+            - logger.log: "Dirty Fill: Configuring valves"
+            - valve.close: valve_water_pump_source
+            - valve.open: valve_fill
+            - valve.close: valve_input_output_hydrant
+            
+            # Wait for valves to reach their positions
+            - logger.log: "Dirty Fill: Waiting for valves"
+            - wait_until:
+                condition:
+                  and:
+                    - lambda: 'return id(valve_water_pump_source).position == VALVE_CLOSED;'
+                    - lambda: 'return id(valve_fill).position == VALVE_OPEN;'
+                timeout: 20s
+            
+            # Turn on pump
+            - logger.log: "Dirty Fill: Starting pump"
+            - switch.turn_on: relay_water_pump
+            - lvgl.label.update:
+                id: lbl_pump_status
+                text: "\U000F1036"  # pump-on icon
+                text_color: 0x00BFFF  # Deep sky blue for running
+            
+            # Monitor fill progress
+            - repeat:
+                count: 1800 # 30 minutes * 60 seconds
+                then:
+                  - delay: 1s
+
+                  # Check if tank is full and auto-stop
+                  - if:
+                      condition:
+                        binary_sensor.is_on: water_tank_full
+                      then:
+                        - logger.log: "Dirty Fill: Tank full - auto-stopping"
+                        - lambda: |-
+                            auto roller = id(roller_id);
+                            roller->set_selected(0, LV_ANIM_OFF);
+                        - switch.turn_off: water_pump_switch
+                        - script.stop: dirty_water_fill
+
+                  # Check if level is increasing after 30 seconds
+                  - lambda: |-
+                      uint32_t elapsed_ms = millis() - id(fill_start_time);
+                      float elapsed_min = elapsed_ms / 60000.0;
+                      
+                      if (elapsed_min > 0.5) {  // After 30 seconds
+                        float level_change = id(tank_percent).state - id(fill_start_level);
+                        
+                        // If level hasn't increased by at least 0.5% in 30 seconds, stop
+                        if (level_change < 0.5) {
+                          ESP_LOGW("dirty_fill", "Tank level not increasing - stopping pump");
+                          id(water_pump_switch).turn_off();
+                          id(dirty_water_fill).stop();
+                        }
+                      }
+
   - id: fresh_water_fill
     then:
       - if:
@@ -1046,3 +1166,23 @@ script:
           id: lbl_timer
           text: ""
       - lvgl.widget.hide: lbl_timer  # Hide the timer label
+
+  - id: hot_water_heater_timer_countdown
+    mode: restart
+    then:
+      - lambda: 'id(hot_water_heater_timer_remaining) = (int)id(hot_water_heater_timer_duration).state;'
+      - while:
+          condition:
+            lambda: 'return id(hot_water_heater_timer_remaining) > 0 && id(hot_water_heater_switch).state;'
+          then:
+            - lambda: |-
+                id(hot_water_heater_timer_remaining)--;
+            - delay: 1s
+      - if:
+          condition:
+            lambda: 'return id(hot_water_heater_timer_remaining) <= 0;'
+          then:
+            - logger.log: "Hot water heater timer expired - turning off heater"
+            - switch.turn_off: hot_water_heater_switch
+          else:
+            - logger.log: "Hot water heater turned off - stopping countdown"
