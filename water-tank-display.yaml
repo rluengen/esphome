@@ -6,21 +6,21 @@
 # https://esphome.io/components/sensor/adc/#esp32-pins-and-hardware-details
 # there is a 12 pin multi-functional pin header on the waveshare board. This is an ESP32-S3
 # So ADC1 pins are GPIO1-GPIO10, ADC2 pins are GPIO11-GPIO20. So, on the waveshare board
-# we don't have access to any of these items, so i2c seems like the best option. Should I use
-# a MCP3221 or NAU7802 or something else?
+# we don't have access to any of these items, so i2c seems like the best option.
 
-# GPIO0
-# GND
-# RXD (GPIO44)
-# TXD (GPIO43)
-# SDA (GPIO15)
-# SCL (GPIO07)
-# 3V3
-# GND
-# D+ (GPIO20)
-# D- (GPIO19)
-# VBUS (+5V)
-# GND
+# The 10 pin header on the board includes:
+#   GPIO0
+#   GND
+#   RXD (GPIO44)
+#   TXD (GPIO43)
+# - SDA (GPIO15)
+# - SCL (GPIO07)
+# - 3V3
+# - GND
+#   D+ (GPIO20)
+#   D- (GPIO19)
+#   VBUS (+5V)
+#   GND
 
 # TODO: ADS1115 via I2C to read water tank level sensor, connected from a stemma QT port to the ADS1115 to the i2c relay.
 # https://www.adafruit.com/product/1085
@@ -33,8 +33,11 @@
 # Relay 3: relay_fill_valve
 # Relay 4: relay_water_pump
 
-# and now I have the hot water heater on a 30 amp relay and the water pump switch on an input. I can drive both of those
-# with the PCF8574 I2C expander if needed.
+# and now I have the hot water heater on a 30 amp relay, the water pump switch on an input, and an LED on the 
+# switch to show if the water pump is currently on. I can hook the 12V LED straight to the water pump power.
+# The 30 amp relay for hot water and the switch I can connect with the PCF8574 I2C expander if needed, or possibly
+# use GPIO 43/44?
+# https://www.adafruit.com/product/5545
 
 substitutions:
   device_name: water
@@ -142,6 +145,19 @@ number:
     icon: "mdi:timer-cog"
 
   - platform: template
+    id: full_empty_threshold_value
+    name: "Tank Threshold"
+    min_value: 1
+    max_value: 15
+    step: 0.5
+    initial_value: 5.0
+    entity_category: config
+    optimistic: true
+    mode: box
+    unit_of_measurement: "%"
+    icon: "mdi:percent"
+
+  - platform: template
     id: tank_empty_resistance
     name: "Tank Empty Resistance"
     min_value: 0
@@ -183,16 +199,6 @@ xl9535:
     i2c_id: i2c_bus
     address: 0x24  # Common address for XL9535, may be 0x20, 0x21, 0x24, or 0x27
 
-# Since the board includes only 3 GPIO ports (18, 17, and 16), we either need to use I2C
-# or do something else, since we have 3 valves to control, plus the water pump relay, 
-# plus the water level input (ADC).
-
-# functionality:
-# turn the water pump on/off via manual control or automations based on water level
-# display water level on the screen
-# turn on drain valve to drain the tank
-# rotate the valves to fill from a dirty water source or a clean water source
-
 binary_sensor:
   - platform: template
     id: water_tank_full
@@ -200,8 +206,7 @@ binary_sensor:
     entity_category: diagnostic
     lambda: |-
       if (isnan(id(tank_percent).state)) return false;
-      return id(tank_percent).state >= 95.0f;
-    
+      return id(tank_percent).state >= (100.0f - (float)id(full_empty_threshold_value).state);
     on_press:
       then:
         - logger.log: "Tank full - stopping fill operations"
@@ -215,8 +220,7 @@ binary_sensor:
     entity_category: diagnostic
     lambda: |-
       if (isnan(id(tank_percent).state)) return true;
-      return id(tank_percent).state <= 5.0f;
-
+      return id(tank_percent).state <= (float)id(full_empty_threshold_value).state;
     on_press:
       then:
         - if:
@@ -618,14 +622,16 @@ switch:
             - logger.log: "Dry-run protection: Cannot start pump - tank too low"
           else:
             - valve.open: valve_water_pump_source
+  # todo: wait here until the water pump source valve finishes opening all the way to turn on the relay?
             - switch.turn_on: relay_water_pump
+            - switch.turn_on: water_pump_led
             - lvgl.label.update:
                 id: lbl_pump_status
                 text: "\U000F1036"  # pump-on icon
                 text_color: 0x00BFFF  # Deep sky blue for running
-
     turn_off_action:
       - switch.turn_off: relay_water_pump
+      - switch.turn_off: water_pump_led
       - delay: 250ms  # Wait for pump to stop before closing valves
       - valve.close: valve_water_pump_source
       - valve.close: valve_input_output_hydrant
@@ -668,6 +674,7 @@ switch:
   - platform: gpio
     id: relay_water_pump
     name: "Water Pump Relay"
+    internal: true
     pin:
       xl9535: xl9535_hub
       number: 3
@@ -683,31 +690,6 @@ switch:
           then:
             - logger.log: "Dry-run protection: Cannot turn on pump - tank low and source is tank"
             - switch.turn_off: relay_water_pump
-
-#    open_action:
-#      - switch.turn_on: relay_fill_open
-#    close_action:
-#      - switch.turn_off: relay_fill_open
-
-#switch:
-#  - platform: gpio
-#    id: valve_open
-#    name: "Valve OPEN relay"
-#    pin: GPIO10
-#    interlock: [valve_open, valve_close]
-#    interlock_wait_time: 100ms
-#
-#  - platform: gpio
-#    id: valve_close
-#    name: "Valve CLOSE relay"
-#    pin: GPIO11
-#    interlock: [valve_open, valve_close]
-#    interlock_wait_time: 100ms
-#
-#  - platform: gpio
-#    id: water_pump_relay
-#    name: "Water Pump"
-#    pin: GPIO12
 
 font:
   - file: "fonts/segoeui.ttf"
