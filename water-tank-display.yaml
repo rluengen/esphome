@@ -624,14 +624,12 @@ switch:
             - valve.open: valve_water_pump_source
   # todo: wait here until the water pump source valve finishes opening all the way to turn on the relay?
             - switch.turn_on: relay_water_pump
-            - switch.turn_on: water_pump_led
             - lvgl.label.update:
                 id: lbl_pump_status
                 text: "\U000F1036"  # pump-on icon
                 text_color: 0x00BFFF  # Deep sky blue for running
     turn_off_action:
       - switch.turn_off: relay_water_pump
-      - switch.turn_off: water_pump_led
       - delay: 250ms  # Wait for pump to stop before closing valves
       - valve.close: valve_water_pump_source
       - valve.close: valve_input_output_hydrant
