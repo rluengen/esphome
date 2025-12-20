@@ -1,0 +1,28 @@
+substitutions:
+  relay_1_id: relay_1
+  relay_2_id: relay_2
+
+esp32:
+  variant: esp32
+
+output:
+  - platform: gpio
+    pin: GPIO23
+    id: output_led
+
+light:
+  - platform: binary
+    id: light_led
+    name: LED
+    output: output_led
+
+switch:
+  - platform: gpio
+    pin: GPIO16
+    id: ${relay_1_id}
+    name: Relay 1
+
+  - platform: gpio
+    pin: GPIO17
+    id: ${relay_2_id}
+    name: Relay 2
