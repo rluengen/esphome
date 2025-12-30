@@ -36,21 +36,21 @@ i2c:
 #     allow_other_uses: true
 #   mosi_pin: GPIO6
 
-light:
-  - platform: monochromatic
-    output: lcd_backlight
-    name: "LCD Backlight"
-    restore_mode: ALWAYS_ON
+# light:
+#   - platform: monochromatic
+#     output: lcd_backlight
+#     name: "LCD Backlight"
+#     restore_mode: ALWAYS_ON
 
-output:
-  - platform: ledc
-    pin:
-      ch422g: ch422g_hub
-      number: 0
-      mode:
-        output: true
-      inverted: false
-    id: lcd_backlight
+# output:
+#   - platform: ledc
+#     pin:
+#       ch422g: ch422g_hub
+#       number: 0
+#       mode:
+#         output: true
+#       inverted: false
+#     id: lcd_backlight
 
 # https://esphome.io/components/ch422g/
 ch422g:
