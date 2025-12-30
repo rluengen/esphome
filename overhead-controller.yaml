@@ -1,5 +1,5 @@
 substitutions:
-  device_name: overhead-controller
+  device_name: overhead_controller
   friendly_name: Controller
   project_name:  Mercedes Sprinter Control Modules
   project_version: "1.0.0"
@@ -22,3 +22,30 @@ packages:
       - path: packages/icons/homeassistant_icons.yaml
       - path: packages/icons/network_icons.yaml
       - path: devices/waveshare-ESP32-S3-Touch-LCD-5B.yaml
+
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
+  name_add_mac_suffix: true
+  project:
+    name: smartvan.${project_name}
+    version: ${project_version}
+
+# add a status bar across the top showing the time, location, latitude, longitude
+# also include the interior and exterior temperature, current humidity levels, and forecast.
+
+# in the main page of the lvgl graphics, put a switch for all lights, interior and exterior lights
+# awning cover controls, and solar panel display. Also put a status for the water tank level.
+
+# do we need to show the water detector error message if water leak is detected?
+
+display:
+  - id: !extend main_display
+    auto_clear_enabled: false
+    update_interval: never
+
+lvgl:
+  widgets:
+    - label:
+        align: CENTER
+        text: 'Hello World!'    

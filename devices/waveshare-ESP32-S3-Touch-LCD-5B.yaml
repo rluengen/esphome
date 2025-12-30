@@ -50,7 +50,6 @@ touchscreen:
 display:
   - platform: rpi_dpi_rgb
     id: main_display
-    show_test_card: true
     color_order: RGB
     pclk_frequency: 16MHz
     dimensions:
