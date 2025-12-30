@@ -39,6 +39,14 @@
 # use GPIO 43/44?
 # https://www.adafruit.com/product/5545
 
+
+# F1502 water-alert
+# F150A water-plus
+# F150C water-remove
+# F0F93 water-pump-off
+# F058F water-pump
+# 
+
 substitutions:
   device_name: water
   friendly_name: Water Tank Display
@@ -119,6 +127,7 @@ number:
     initial_value: 16.0
     optimistic: true
     entity_category: config
+    mode: box
     set_action:
       - globals.set:
           id: tank_capacity_in_gallons
@@ -126,27 +135,27 @@ number:
 
   - platform: template
     id: pump_timer_duration
-    name: "Pump Timer Duration (seconds)"
-    min_value: 60
-    max_value: 3600
-    step: 60
-    initial_value: 1200
+    name: "Pump Timer Duration (minutes)"
+    min_value: 1
+    max_value: 120
+    step: 1
+    initial_value: 30
     entity_category: config
     optimistic: true
     mode: box
-    unit_of_measurement: "s"
+    unit_of_measurement: "minutes"
 
   - platform: template
     id: hot_water_heater_timer_duration
-    name: "Hot Water Heater Timer Duration (seconds)"
-    min_value: 60
-    max_value: 7200
-    step: 60
-    initial_value: 1800
+    name: "Hot Water Heater Timer Duration (minutes)"
+    min_value: 1
+    max_value: 120
+    step: 1
+    initial_value: 30
     entity_category: config
     optimistic: true
     mode: box
-    unit_of_measurement: "s"
+    unit_of_measurement: "minutes"
 
   - platform: template
     id: valve_actuation_time
@@ -204,22 +213,22 @@ wifi:
   on_connect:
     - lvgl.label.update:
         id: lbl_wifi_status
-        text: "\U000F0928"  # wifi-strength-4 as default when connected
+        text: "\U000F16BD"  # wifi-check
   on_disconnect:
     - lvgl.label.update:
         id: lbl_wifi_status
-        text: "\U000F05AA"  # wifi-off
+        text: "\U000F16C5"  # wifi-remove
 
 # https://esphome.io/components/xl9535/
 xl9535:
   - id: xl9535_hub
     i2c_id: i2c_bus
-    address: 0x24  # Common address for XL9535, may be 0x20, 0x21, 0x24, or 0x27
+    address: 0x20  # Common address for XL9535, may be 0x20, 0x21, 0x24, or 0x27
 
 pcf8574:
   - id: pcf8574_hub
     i2c_id: i2c_bus
-    address: 0x20       # The I2C address of the driver. Defaults to 0x21.
+    address: 0x21       # The I2C address of the driver. 0x20 is the default, bridge A0 to get 0x21 not to conflict with the board.
     pcf8575: false      # Whether this is a 16-pin PCF8575
 
 binary_sensor:
@@ -457,7 +466,7 @@ sensor:
           id: lbl_wifi_status
           text: !lambda |-
             if (isnan(x)) {
-              return "\U000F05AA";  // wifi-off
+              return "\U000F16C5";  // wifi-remove
             }
             int bars = 0;
             if (x > -55) bars = 4;
@@ -754,7 +763,7 @@ font:
 
   - file: "fonts/segoeui.ttf"
     id: f_value_90
-    size: 90
+    size: 60
     bpp: 4
 
   - file: "fonts/segoeui.ttf"
@@ -764,7 +773,7 @@ font:
 
   - file: "fonts/materialdesignicons-webfont.ttf"
     id: valve_icon_40
-    size: 40
+    size: 30
     bpp: 4
     glyphs: [
       "\U000F1066", # valve
@@ -807,8 +816,8 @@ lvgl:
       - logger.log: "LVGL boot"
       - lambda: |-
           lv_obj_t* arc = id(tank_arc);
-          lv_obj_set_style_arc_width(arc, 35, LV_PART_INDICATOR);   // foreground
-          lv_obj_set_style_arc_width(arc, 35, LV_PART_MAIN);        // background
+          lv_obj_set_style_arc_width(arc, 25, LV_PART_INDICATOR);   // foreground
+          lv_obj_set_style_arc_width(arc, 25, LV_PART_MAIN);        // background
           lv_obj_set_style_arc_color(arc, lv_color_hex(0xFFAA00), LV_PART_MAIN); // background
 
   touchscreens:
@@ -824,7 +833,7 @@ lvgl:
           height: 460
           width: 460
           align: CENTER
-          arc_width: 35
+          arc_width: 25
           arc_color: 0x0080FF
           arc_rounded: true
           value: 0
@@ -1049,9 +1058,10 @@ script:
                         binary_sensor.is_on: water_tank_full
                       then:
                         - logger.log: "Dirty Fill: Tank full - auto-stopping"
-                        - lambda: |-
-                            auto roller = id(roller_id);
-                            roller->set_selected(0, LV_ANIM_OFF);
+                        # TODO: roller doesn't have set_selected
+                        # - lambda: |-
+                        #     auto roller = id(roller_id);
+                        #     roller->set_selected(0, LV_ANIM_OFF);
                         - switch.turn_off: water_pump_switch
                         - script.stop: dirty_water_fill
 
@@ -1140,7 +1150,7 @@ script:
     mode: restart
     then:
       - lvgl.widget.show: lbl_timer  # Show the timer label
-      - lambda: 'id(pump_timer_remaining) = (int)id(pump_timer_duration).state;'
+      - lambda: 'id(pump_timer_remaining) = (int)id(pump_timer_duration).state * 60;'
       - while:
           condition:
             lambda: 'return id(pump_timer_remaining) > 0 && id(water_pump_switch).state;'
@@ -1170,7 +1180,7 @@ script:
   - id: hot_water_heater_timer_countdown
     mode: restart
     then:
-      - lambda: 'id(hot_water_heater_timer_remaining) = (int)id(hot_water_heater_timer_duration).state;'
+      - lambda: 'id(hot_water_heater_timer_remaining) = (int)id(hot_water_heater_timer_duration).state * 60;'
       - while:
           condition:
             lambda: 'return id(hot_water_heater_timer_remaining) > 0 && id(hot_water_heater_switch).state;'

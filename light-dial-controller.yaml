@@ -43,6 +43,7 @@ packages:
 esphome:
   name: ${device_name}
   friendly_name: ${friendly_name}
+  name_add_mac_suffix: true
   project:
     name: smartvan.${project_name}
     version: ${project_version}

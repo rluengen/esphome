@@ -4,6 +4,8 @@ substitutions:
 
 esp32:
   variant: esp32
+  framework:
+    type: esp-idf
 
 output:
   - platform: gpio

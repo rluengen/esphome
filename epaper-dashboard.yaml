@@ -79,14 +79,8 @@ script:
     then:
       - lvgl.label.update:
           id: lbl_wifi_status
-          text: "📶" # Will be updated by WiFi callbacks
+          text: "\U000F092E" # wifi-strength-off-outline
 
-  - id: update_ha_status  
-    then:
-      - lvgl.label.update:
-          id: lbl_ha_status
-          text: "🏠" # Will be updated by API callbacks
-          
   - id: set_wifi_connected
     then:
       - lvgl.label.update:
@@ -117,7 +111,7 @@ script:
     then:
       - lvgl.label.update:
           id: lbl_ha_status
-          text: "🏠" # HA connected
+          text: "\U000F07D0" # HA connected
           
   - id: set_ha_disconnected
     then:
@@ -165,7 +159,6 @@ script:
     then:
       - lvgl.resume:  # Ensure LVGL is active
       - script.execute: update_wifi_status
-      - script.execute: update_ha_status  
       - script.execute: update_battery_icon
 #      - lvgl.label.update: temperature_label
 #      - lvgl.label.update: humidity_label
@@ -234,8 +227,8 @@ lvgl:
               align: TOP_LEFT
               x: 90
               y: 5
-              text: "🏠"
-              text_font: battery_icons
+              text: "\U000F07D0"
+              text_font: homeassistant_icons
               text_color: 0xFFFFFF
               
           # Battery power cord (right side, second from right)

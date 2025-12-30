@@ -1,0 +1,93 @@
+# https://community.home-assistant.io/t/problem-with-waveshare-5inch-display-not-showing-anything/783274
+# https://community.home-assistant.io/t/driver-waveshare-esp32-s3-5inch-32-bit-lx7/781584
+
+esphome:
+  platformio_options: 
+    build_flags: "-DBOARD_HAS_PSRAM"
+    board_build.esp-idf.memory_type: qio_opi
+    board_build.flash_mode: dio
+
+esp32:
+  board: esp32-s3-devkitc-1
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      CONFIG_FREERTOS_HZ: "1000"
+      CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240: y
+      CONFIG_SPIRAM_SPEED_120M: y
+      CONFIG_SPIRAM_FETCH_INSTRUCTIONS: y
+      CONFIG_SPIRAM_RODATA: y
+      CONFIG_ESP32S3_DATA_CACHE_64KB: y
+      CONFIG_COMPILER_OPTIMIZATION_PERF: y
+
+psram:
+  mode: octal
+  speed: 80MHz
+
+i2c:
+  sda: GPIO8
+  scl: GPIO9
+  scan: true
+  id: bus_a
+
+touchscreen:
+  platform: gt911
+  id: main_touch
+  interrupt_pin: GPIO4
+
+# output:
+#   - platform: ledc
+#     pin: 2
+#     frequency: 1220
+#     id: gpio_backlight_pwm
+# light:
+#   - platform: monochromatic
+#     output: gpio_backlight_pwm
+#     name: Display Backlight
+#     id: back_light
+#     restore_mode: ALWAYS_ON
+
+display:
+  - platform: rpi_dpi_rgb
+    id: main_display
+    show_test_card: true
+    color_order: RGB
+    pclk_frequency: 16MHz
+    dimensions:
+      width: 1024
+      height: 600
+    de_pin:
+      number: 5
+    hsync_pin:
+      number: 46
+      ignore_strapping_warning: true
+    vsync_pin:
+      number: 3
+      ignore_strapping_warning: true
+    pclk_pin: 7
+    hsync_back_porch: 30
+    hsync_front_porch: 210
+    hsync_pulse_width: 30
+    vsync_back_porch: 4
+    vsync_front_porch: 4
+    vsync_pulse_width: 4
+    data_pins:
+      red:
+        - 1         #r3
+        - 2         #r4
+        - 42        #r5
+        - 41        #r6
+        - 40        #r7
+      blue:
+        - 14        #b3
+        - 38        #b4
+        - 18        #b5
+        - 17        #b6
+        - 10        #b7
+      green:
+        - 39        #g2
+        - 0         #g3
+        - 45        #g4
+        - 48        #g5
+        - 47        #g6
+        - 21        #g7
