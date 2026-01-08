@@ -4,6 +4,7 @@ substitutions:
   rx_pin: 
 
 uart:
+  id: gps_uart
   tx_pin: ${tx_pin}
   rx_pin: ${rx_pin}
   baud_rate: 9600
@@ -11,15 +12,25 @@ uart:
 gps:
   latitude:
     name: "Latitude"
+    filters:
+      - delta: 0.00001 # ~1 meter
   longitude:
     name: "Longitude"
+    filters:
+      - delta: 0.00001 # ~1 meter
   altitude:
     name: "Altitude"
+    filters:
+      - delta: 1.0 # one meter
   satellites:
     name: "Satellites"
+    filters:
+      - delta: 1
   hdop:
     name: "Horizontal Dilution of Precision"
-  update_interval: 30s
+    filters:
+      - delta: 0.1
+  update_interval: 1s
 
 time:
   - platform: gps
@@ -27,6 +38,27 @@ time:
     on_time_sync:
       then:
         - logger.log: "GPS time synchronized"
+
+select:
+  - platform: template
+    name: "GPS Update Rate"
+    id: gps_rate_select
+    optimistic: true
+    options:
+      - "1Hz (Low Power)"
+      - "5Hz (Normal)"
+      - "10Hz (High Speed)"
+    initial_option: "5Hz (Normal)"
+    restore_value: true  # Persist across reboots
+    set_action:
+      - lambda: |-
+          if (x == "1Hz (Low Power)") {
+            id(gps_uart).write_str("$PMTK220,1000*1F\r\n");
+          } else if (x == "5Hz (Normal)") {
+            id(gps_uart).write_str("$PMTK220,200*2C\r\n");
+          } else if (x == "10Hz (High Speed)") {
+            id(gps_uart).write_str("$PMTK220,100*2F\r\n");
+          }
 
 text_sensor:
   - platform: template
