@@ -36,12 +36,20 @@ esphome:
     then:
       - delay: 500ms  # Let GPS stabilize
       - lambda: |-
+          // First set baud rate to 115200
+          id(gps_uart).write_str("$PCAS01,7*18\r\n");
+      - delay: 100ms
+      - lambda: |-
+          // Set the speedse according to selected rate
           std::string rate = id(gps_rate_select).state;
           if (rate == "1Hz (Low Power)") {
-            id(gps_uart).write_str("$PMTK220,1000*1F\r\n");
+            id(gps_uart).write_str("$PCAS04,3*1A\r\n");  // GPS+GLONASS+Galileo
+            id(gps_uart).write_str("$PCAS02,1000*2E\r\n");
           } else if (rate == "5Hz (Normal)") {
-            id(gps_uart).write_str("$PMTK220,200*2C\r\n");
+            id(gps_uart).write_str("$PCAS04,1*18\r\n");  // GPS only (faster)
+            id(gps_uart).write_str("$PCAS02,200*18\r\n");
           } else if (rate == "10Hz (High Speed)") {
-            id(gps_uart).write_str("$PMTK220,100*2F\r\n");
+            id(gps_uart).write_str("$PCAS04,1*18\r\n");  // GPS only (faster)
+            id(gps_uart).write_str("$PCAS02,100*1F\r\n");
           }
-          ESP_LOGI("gps", "Applied saved GPS rate: %s", rate.c_str());
+          ESP_LOGI("gps", "Applied GPS rate: %s", rate.c_str());
