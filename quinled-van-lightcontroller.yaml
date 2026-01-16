@@ -247,11 +247,21 @@ script:
           condition:
             lambda: 'return id(sun_elevation).state < 10;'
           then:
-            - light.turn_on: light_exterior_roof_rear
-            - light.turn_on: light_exterior_roof_driver
-            - light.turn_on: light_exterior_roof_passenger
-            - light.turn_on: light_exterior_passenger_capsule
-            - light.turn_on: light_exterior_driver_capsule
+#            - light.turn_on: 
+#                id: light_exterior_roof_rear
+#                brightness: 100%
+#            - light.turn_on:
+#                id: light_exterior_roof_driver
+#                brightness: 100%
+#            - light.turn_on:
+#                id: light_exterior_roof_passenger
+#                brightness: 100%
+            - light.turn_on:
+                id: light_exterior_passenger_capsule
+                brightness: 100%
+            - light.turn_on:
+                id: light_exterior_driver_capsule
+                brightness: 100%
           else:
             - logger.log: "Exterior lights not turned on - it's daytime"
 
@@ -549,8 +559,16 @@ binary_sensor:
 
   - id: !extend wizmote_3
     internal: true
+    on_press:
+      - light.turn_on:
+          id: light_exterior_driver_capsule
+          brightness: 100%
+
   - id: !extend wizmote_4
     internal: true
+      - light.turn_on:
+          id: light_exterior_passenger_capsule
+          brightness: 100%
 
   - id: !extend wizmote_up
     internal: true
