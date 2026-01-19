@@ -1,6 +1,46 @@
 # https://community.home-assistant.io/t/problem-with-waveshare-5inch-display-not-showing-anything/783274
 # https://community.home-assistant.io/t/driver-waveshare-esp32-s3-5inch-32-bit-lx7/781584
 
+# TODO: ota updates don't register properly for some reason, connects to WIFI
+# huge number of i2c devices, what are these?
+# rs485?
+# tf card slot?
+# rtc? PCF85063
+# CAN transmit/receive?
+# [12:41:32.141][C][i2c.idf:117]: Found device at address 0x20
+# [12:41:32.142][C][i2c.idf:117]: Found device at address 0x21
+# [12:41:32.143][C][i2c.idf:117]: Found device at address 0x22
+# [12:41:32.143][C][i2c.idf:117]: Found device at address 0x23
+# [12:41:32.144][C][i2c.idf:117]: Found device at address 0x24
+# [12:41:32.145][C][i2c.idf:117]: Found device at address 0x25
+# [12:41:32.145][C][i2c.idf:117]: Found device at address 0x26
+# [12:41:32.146][C][i2c.idf:117]: Found device at address 0x27
+# [12:41:32.146][C][i2c.idf:117]: Found device at address 0x30
+# [12:41:32.147][C][i2c.idf:117]: Found device at address 0x31
+# [12:41:32.148][C][i2c.idf:117]: Found device at address 0x32
+# [12:41:32.148][C][i2c.idf:117]: Found device at address 0x33
+# [12:41:32.149][C][i2c.idf:117]: Found device at address 0x34
+# [12:41:32.150][C][i2c.idf:117]: Found device at address 0x35
+# [12:41:32.150][C][i2c.idf:117]: Found device at address 0x36
+# [12:41:32.151][C][i2c.idf:117]: Found device at address 0x37
+# [12:41:32.152][C][i2c.idf:117]: Found device at address 0x38
+# [12:41:32.152][C][i2c.idf:117]: Found device at address 0x39
+# [12:41:32.153][C][i2c.idf:117]: Found device at address 0x3A
+# [12:41:32.154][C][i2c.idf:117]: Found device at address 0x3B
+# [12:41:32.154][C][i2c.idf:117]: Found device at address 0x3C
+# [12:41:32.155][C][i2c.idf:117]: Found device at address 0x3D
+# [12:41:32.156][C][i2c.idf:117]: Found device at address 0x3E
+# [12:41:32.156][C][i2c.idf:117]: Found device at address 0x3F
+# [12:41:32.157][C][i2c.idf:117]: Found device at address 0x51
+# [12:41:32.157][C][i2c.idf:117]: Found device at address 0x5D
+
+# AP3032KTR-G1 display backlight boost converter
+
+# defaults i2c communication on 0x51
+time:
+  - platform: pcf85063
+    id: pcf85063_time
+
 esphome:
   platformio_options: 
     build_flags: "-DBOARD_HAS_PSRAM"
@@ -42,19 +82,21 @@ i2c:
 #     name: "LCD Backlight"
 #     restore_mode: ALWAYS_ON
 
-# output:
-#   - platform: ledc
-#     pin:
-#       ch422g: ch422g_hub
-#       number: 0
-#       mode:
-#         output: true
-#       inverted: false
-#     id: lcd_backlight
+switch:
+  - platform: gpio
+    name: backlight
+    pin:
+      ch422g: ch422g_hub
+      number: 2
+      mode:
+        output: true
+      inverted: False
+    restore_mode: ALWAYS_ON
 
 # https://esphome.io/components/ch422g/
 ch422g:
   - id: ch422g_hub
+    address: 0x24 
 
 touchscreen:
   platform: gt911

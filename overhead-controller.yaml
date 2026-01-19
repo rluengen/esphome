@@ -1,5 +1,5 @@
 substitutions:
-  device_name: overhead_controller
+  device_name: tabcontroller
   friendly_name: Controller
   project_name:  Mercedes Sprinter Control Modules
   project_version: "1.0.0"
@@ -26,7 +26,6 @@ packages:
 esphome:
   name: ${device_name}
   friendly_name: ${friendly_name}
-  name_add_mac_suffix: true
   project:
     name: smartvan.${project_name}
     version: ${project_version}
@@ -42,10 +41,299 @@ esphome:
 display:
   - id: !extend main_display
     auto_clear_enabled: false
-    update_interval: never
+
+
+sensor:
+  - platform: homeassistant
+    id: interior_temp
+    entity_id: sensor.interior_temperature
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: interior_temp_label
+            text: !lambda |-
+              return (to_string(x) + "°C").c_str();
+
+  - platform: homeassistant
+    id: exterior_temp
+    entity_id: sensor.exterior_temperature
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: exterior_temp_label
+            text: !lambda |-
+              return (to_string(x) + "°C").c_str();
+
+  - platform: homeassistant
+    id: interior_humidity
+    entity_id: sensor.interior_humidity
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: interior_humidity_label
+            text: !lambda |-
+              return (to_string(x) + "%").c_str();
+
+  - platform: homeassistant
+    id: water_level
+    entity_id: sensor.fresh_water_percent
+    on_value:
+      then:
+        - lvgl.bar.update:
+            id: water_level_bar
+            value: !lambda 'return x;'
+
+text_sensor:
+  - platform: homeassistant
+    id: weather_condition
+    entity_id: weather.home
+    attribute: condition
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: weather_condition_label
+            text: !lambda 'return x.c_str();'
+
+  - platform: homeassistant
+    id: location_name
+    entity_id: zone.home
+    attribute: friendly_name
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: location_label
+            text: !lambda 'return x.c_str();'
+
+  - platform: homeassistant
+    id: latitude
+    entity_id: zone.home
+    attribute: latitude
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: latlon_label
+            text: !lambda |-
+              return ("Lat: " + x + " Lon: " + id(longitude).state).c_str();
+
+  - platform: homeassistant
+    id: longitude
+    entity_id: zone.home
+    attribute: longitude
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: latlon_label
+            text: !lambda |-
+              return ("Lat: " + id(latitude).state + " Lon: " + x).c_str();
+
+switch:
+  - platform: homeassistant
+    id: awning_switch
+    entity_id: switch.awning
+
+light:
+  - platform: homeassistant
+    id: cabin_lights
+    entity_id: light.cabin
 
 lvgl:
   widgets:
     - label:
         align: CENTER
-        text: 'Hello World!'    
+        text: 'Hello World!'
+
+lvgl:
+  theme:
+    preset: default
+
+  widgets:
+
+    # -----------------------------
+    # TITLE BAR
+    # -----------------------------
+    - label:
+        id: title_label
+        text: "Dashboard"
+        align: TOP_MID
+        y: 5
+
+    - label:
+        id: time_label
+        text: "--:--"
+        align: TOP_LEFT
+        x: 5
+        y: 30
+
+    - label:
+        id: date_label
+        text: "---- --, ----"
+        align: TOP_LEFT
+        x: 5
+        y: 50
+
+    - label:
+        id: location_label
+        text: "Location"
+        align: TOP_RIGHT
+        x: -5
+        y: 30
+
+    - label:
+        id: latlon_label
+        text: "Lat: -- Lon: --"
+        align: TOP_RIGHT
+        x: -5
+        y: 55
+
+    - label:
+        id: wifi_label
+        text: "WiFi: Connected"
+        align: TOP_LEFT
+        x: 5
+        y: 55
+
+    # -----------------------------
+    # INTERIOR / EXTERIOR DATA
+    # -----------------------------
+    - label:
+        id: interior_temp_label
+        text: "--°C"
+        align: LEFT_MID
+        x: 10
+        y: -40
+
+    - label:
+        id: interior_humidity_label
+        text: "--%"
+        align: LEFT_MID
+        x: 10
+        y: -10
+
+    - label:
+        id: exterior_temp_label
+        text: "--°C"
+        align: LEFT_MID
+        x: 10
+        y: 40
+
+    # -----------------------------
+    # WEATHER
+    # -----------------------------
+    - label:
+        id: weather_condition_label
+        text: "Weather: --"
+        align: CENTER
+        y: -40
+
+    # -----------------------------
+    # LIGHT DIMMER
+    # -----------------------------
+    - slider:
+        id: cabin_slider
+        align: BOTTOM_LEFT
+        x: 10
+        y: -40
+        width: 180
+        min_value: 0
+        max_value: 100
+        on_value:
+          then:
+            - lambda: |-
+                float b = id(cabin_slider).get_value() / 100.0f;
+                id(cabin_lights).make_call().set_brightness(b).perform();
+
+    - label:
+        id: cabin_slider_label
+        text: "Cabin Lights"
+        align_to:
+          id: cabin_slider
+          align: OUT_TOP_MID
+          y: -5
+
+    # -----------------------------
+    # AWNING BUTTON
+    # -----------------------------
+    - button:
+        id: awning_button
+        align: BOTTOM_RIGHT
+        x: -10
+        y: -40
+        on_click:
+          then:
+            - lambda: |-
+                id(awning_switch).toggle();
+
+    - label:
+        id: awning_button_label
+        text: "Awning"
+        parent: awning_button
+
+    # -----------------------------
+    # WATER LEVEL BAR
+    # -----------------------------
+    - bar:
+        id: water_level_bar
+        align: RIGHT_MID
+        x: -10
+        width: 20
+        height: 120
+        min_value: 0
+        max_value: 100
+
+    - label:
+        id: water_label
+        text: "Water"
+        align_to:
+          id: water_level_bar
+          align: OUT_TOP_MID
+          y: -5
+
+globals:
+  - id: screen_on
+    type: bool
+    restore_value: no
+    initial_value: "true"
+
+# output:
+#   - platform: ledc
+#     id: backlight_pwm
+#     pin: 21
+
+# light:
+#   - platform: monochromatic
+#     id: backlight
+#     output: backlight_pwm
+#     on_turn_on:
+#       then:
+#         - lambda: |-
+#             id(screen_on) = true;
+#     on_turn_off:
+#       then:
+#         - lambda: |-
+#             id(screen_on) = false;
+
+# -----------------------------
+# TIME UPDATES
+# -----------------------------
+interval:
+  - interval: 60s
+    then:
+      - if:
+          condition:
+            lambda: 'return id(screen_on);'
+          then:
+            - lvgl.label.update:
+                id: time_label
+                text: !lambda |-
+                  char buf[16];
+                  time_t now = ::time(nullptr);
+                  strftime(buf, sizeof(buf), "%H:%M", localtime(&now));
+                  return std::string(buf).c_str();
+
+            - lvgl.label.update:
+                id: date_label
+                text: !lambda |-
+                  char buf[32];
+                  time_t now = ::time(nullptr);
+                  strftime(buf, sizeof(buf), "%a, %b %d %Y", localtime(&now));
+                  return std::string(buf).c_str();

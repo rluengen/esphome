@@ -1,8 +1,4 @@
 # https://wiki.seeedstudio.com/xiao-esp32c3-esphome/
-substitutions:
-  name: "xiao-esp32c3"
-  friendly_name: "XIAO ESP32C3"
-
 esphome:
   platformio_options:
     board_build.flash_mode: dio

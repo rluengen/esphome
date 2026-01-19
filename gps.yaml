@@ -19,6 +19,7 @@ packages:
           wifi_ssid: !secret wifi_ssid
           wifi_password: !secret wifi_password
       - path: packages/time/homeassistant.yaml
+      # https://wiki.seeedstudio.com/get_start_l76k_gnss/
       - path: packages/gps-receiver.yaml
         vars:
           tx_pin: GPIO21

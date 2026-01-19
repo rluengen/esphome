@@ -82,7 +82,7 @@ number:
 lvgl:
 # https://esphome.io/cookbook/lvgl/#turn-off-screen-when-idle
   on_idle:
-    timeout: !lambda "return (id(display_timeout).state * 1000);"
+    timeout: 60s
     then:
       - logger.log: "LVGL is idle"
       - light.turn_off: display_backlight_id
@@ -115,14 +115,14 @@ lvgl:
           text_font: battery_icons
           text_color: 0xFFFFFF
 
-      - label:
-          id: wifi_signal_label
-          align: TOP_LEFT
-          x: 25
-          y: 5
-          text: "-"
-          text_font: segoeui_16
-          text_color: 0x00FF00
+      # - label:
+      #     id: wifi_signal_label
+      #     align: TOP_LEFT
+      #     x: 25
+      #     y: 5
+      #     text: "-"
+      #     text_font: segoeui_16
+      #     text_color: 0x00FF00
       
       - label:
           id: ha_status_icon
@@ -202,28 +202,7 @@ lvgl:
               - "Exterior"
               - "Door"
               - "Dog Crate"
-            selected_index: 0
-            visible_row_count: 3
-            on_value:
-              - lambda: |-
-                  // Map roller index to light entity
-                  const char* lights[] = {
-                    "light.all_lights",
-                    "light.bed_interior_lights",
-                    "light.main_can_lights",
-                    "light.bed_can_lights",
-                    "light.cwww_led_capsule_lights",
-                    "light.exterior_lights",
-                    "light.door_light",
-                    "light.cwww_led_dog_crate_lights"
-                  };
-                  int index = id(light_roller).get_selected_index();
-                  if (index >= 0 && index < 8) {
-                    id(dial_selected_light).set_selected_index(index);
-                  }
-              - script.execute: update_light_display
 
-        # Toggle button (right side)
         - obj:
             align: RIGHT_MID
             x: -10
@@ -235,22 +214,6 @@ lvgl:
             border_width: 2
             border_color: 0xFFDD44
             radius: 30
-            on_click:
-              - homeassistant.service:
-                  service: light.toggle
-                  data:
-                    entity_id: !lambda |-
-                      auto index = id(dial_selected_light).active_index();
-                      if (index.has_value()) {
-                        return id(dial_selected_light).at(index.value()).value();
-                      }
-                      return std::string("light.bed_interior_lights");
-            widgets:
-              - label:
-                  align: CENTER
-                  text: "ON"
-                  text_font: segoeui_16
-                  text_color: 0xFFDD44
 
 select:
   - platform: template
@@ -297,12 +260,12 @@ globals:
 script:
   - id: restore_roller_position
     then:
-      - lambda: |-
-          // Sync roller with saved selection
-          auto index = id(dial_selected_light).active_index();
-          if (index.has_value()) {
-            id(light_roller).set_selected_index(index.value());
-          }
+      # - lambda: |-
+      #     // Sync roller with saved selection
+      #     auto index = id(dial_selected_light).active_index();
+      #     if (index.has_value()) {
+      #       id(light_roller).set_selected_index(index.value());
+      #     }
       - script.execute: update_light_display
 
   - id: update_light_display
@@ -316,37 +279,38 @@ script:
             auto selected_option = id(dial_selected_light).at(index.value());
 
             int brightness = 0;
-            if (strcmp(selected_option.c_str(), "light.all_lights") == 0) {
-                brightness = (int)roundf((id(light_all_lights_brightness).state / 255.0f) * 100.0f);
-            } else if (strcmp(selected_option.c_str(), "light.bed_interior_lights") == 0) {
-                brightness = (int)roundf((id(light_bed_interior_lights_brightness).state / 255.0f) * 100.0f);
-            } else if (strcmp(selected_option.c_str(), "light.main_can_lights") == 0) {
-                brightness = (int)roundf((id(light_main_can_lights_brightness).state / 255.0f) * 100.0f);
-            } else if (strcmp(selected_option.c_str(), "light.bed_can_lights") == 0) {
-                brightness = (int)roundf((id(light_bed_can_lights_brightness).state / 255.0f) * 100.0f);
-            } else if (strcmp(selected_option.c_str(), "light.cwww_led_capsule_lights") == 0) {
-                brightness = (int)roundf((id(light_cwww_led_capsule_lights_brightness).state / 255.0f) * 100.0f);
-            } else if (strcmp(selected_option.c_str(), "light.exterior_lights") == 0) {
-                brightness = (int)roundf((id(light_exterior_lights_brightness).state / 255.0f) * 100.0f);
-            } else if (strcmp(selected_option.c_str(), "light.door_light") == 0) {
-                brightness = (int)roundf((id(light_door_light_brightness).state / 255.0f) * 100.0f);
-            } else if (strcmp(selected_option.c_str(), "light.cwww_led_dog_crate_lights") == 0) {
-                brightness = (int)roundf((id(light_cwww_led_dog_crate_lights_brightness).state / 255.0f) * 100.0f);
-            } else {
-                brightness = 0;
-            }
+            // TODO:
+            // if (strcmp(selected_option.c_str(), "light.all_lights") == 0) {
+            //     brightness = (int)roundf((id(light_all_lights_brightness).state / 255.0f) * 100.0f);
+            // } else if (strcmp(selected_option.c_str(), "light.bed_interior_lights") == 0) {
+            //     brightness = (int)roundf((id(light_bed_interior_lights_brightness).state / 255.0f) * 100.0f);
+            // } else if (strcmp(selected_option.c_str(), "light.main_can_lights") == 0) {
+            //     brightness = (int)roundf((id(light_main_can_lights_brightness).state / 255.0f) * 100.0f);
+            // } else if (strcmp(selected_option.c_str(), "light.bed_can_lights") == 0) {
+            //     brightness = (int)roundf((id(light_bed_can_lights_brightness).state / 255.0f) * 100.0f);
+            // } else if (strcmp(selected_option.c_str(), "light.cwww_led_capsule_lights") == 0) {
+            //     brightness = (int)roundf((id(light_cwww_led_capsule_lights_brightness).state / 255.0f) * 100.0f);
+            // } else if (strcmp(selected_option.c_str(), "light.exterior_lights") == 0) {
+            //     brightness = (int)roundf((id(light_exterior_lights_brightness).state / 255.0f) * 100.0f);
+            // } else if (strcmp(selected_option.c_str(), "light.door_light") == 0) {
+            //     brightness = (int)roundf((id(light_door_light_brightness).state / 255.0f) * 100.0f);
+            // } else if (strcmp(selected_option.c_str(), "light.cwww_led_dog_crate_lights") == 0) {
+            //     brightness = (int)roundf((id(light_cwww_led_dog_crate_lights_brightness).state / 255.0f) * 100.0f);
+            // } else {
+            //     brightness = 0;
+            // }
 
             id(current_brightness) = brightness;
             
             // Update the icon sensor to track the currently selected light
-            id(selected_light_icon).set_entity_id(selected_option.c_str());
+            // TODO: id(selected_light_icon).set_entity_id(selected_option.c_str());
           }
 
           // Update LVGL widgets
-          id(brightness_arc).set_value(id(current_brightness));
-          char buf[8];
-          snprintf(buf, sizeof(buf), "%d%%", id(current_brightness));
-          id(brightness_pct_label).set_text(buf);
+          // TODO: id(brightness_arc).set_value(id(current_brightness));
+          // char buf[8];
+          // snprintf(buf, sizeof(buf), "%d%%", id(current_brightness));
+          // id(brightness_pct_label).set_text(buf);
 
   - id: increase_light_brightness
     then:
@@ -374,18 +338,18 @@ script:
                 service: light.turn_off
                 data:
                   entity_id: !lambda 'return id(selected_entity);'
-          else:
-            - homeassistant.service:
-                service: light.turn_on
-                data:
-                  entity_id: !lambda 'return id(selected_entity);'
-                  brightness: !lambda |-
-                    // convert 0..100 -> 0..255 and clamp
-                    int val = id(current_brightness);
-                    int b = (int)(val * 255.0 / 100.0 + 0.5);
-                    if (b < 1) b = 1;   // avoid sending 0
-                    if (b > 255) b = 255;
-                    return b;
+          # else:
+          #   - homeassistant.service:
+          #       service: light.turn_on
+          #       data:
+          #         entity_id: !lambda 'return id(selected_entity);'
+          #         brightness: !lambda |-
+          #           // convert 0..100 -> 0..255 and clamp
+          #           int val = id(current_brightness);
+          #           int b = (int)(val * 255.0 / 100.0 + 0.5);
+          #           if (b < 1) b = 1;   // avoid sending 0
+          #           if (b > 255) b = 255;
+          #           return b;
 
 sensor:
   - id: !extend rotary_encoder_id
@@ -501,12 +465,13 @@ text_sensor:
             {"outdoor-lamp", "\U000F1054"},
           };
           
-          auto it = icon_map.find(icon_name);
-          if (it != icon_map.end()) {
-            id(light_icon_label).set_text(it->second);
-          } else {
-            // Default to lightbulb if icon not found
-            id(light_icon_label).set_text("\U000F0335");
-          }
+          // TODO: 
+          // auto it = icon_map.find(icon_name);
+          // if (it != icon_map.end()) {
+          //   id(light_icon_label).set_text(it->second);
+          // } else {
+          //   // Default to lightbulb if icon not found
+          //   id(light_icon_label).set_text("\U000F0335");
+          // }
           
           ESP_LOGI("icon", "Light icon changed to: %s", x.c_str());
