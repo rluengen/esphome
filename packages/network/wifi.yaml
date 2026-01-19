@@ -2,7 +2,7 @@
 # Include this in your device configs with: <<: !include templates/base/wifi.yaml
 
 wifi:
-  fast_connect: true
+#  fast_connect: true
   ssid: ${wifi_ssid}
   password: ${wifi_password}
   on_connect: 

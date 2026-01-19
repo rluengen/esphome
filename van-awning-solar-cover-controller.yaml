@@ -91,27 +91,39 @@ sensor:
       then:
         - script.execute: adjust_solar_awning_based_on_sun
 
-# # https://esphome.io/components/binary_sensor/gpio/
-# binary_sensor:
-#    - platform: gpio
-#      name: Open Nomadic Awning
-#      id: button1
-#      pin:
-#        number: GPIO4
-#        mode: INPUT
-#      on_press:
-#        then:
-#          - cover.open: nomadic_awning_cover
+# GPIO buttons to control the awning covers.
+binary_sensor:
+  - platform: gpio
+    name: Open Nomadic Awning Button
+    id: button1
+    pin:
+      number: 4
+      inverted: true
+      mode:
+        input: true
+        pullup: true
+    filters:
+      - delayed_on: 10ms
+      - delayed_off: 10ms
+    on_press:
+       then:
+         - cover.open: nomadic_awning_cover
 
-#    - platform: gpio
-#      name: Close Nomadic Awning
-#      id: button2
-#      pin:
-#        number: GPIO5
-#        mode: INPUT
-#      on_press:
-#        then:
-#          - cover.close: nomadic_awning_cover
+  - platform: gpio
+    name: Close Nomadic Awning Button
+    id: button2
+    pin:
+      number: 5
+      inverted: true
+      mode:
+        input: true
+        pullup: true
+    filters:
+      - delayed_on: 10ms
+      - delayed_off: 10ms
+    on_press:
+       then:
+         - cover.close: nomadic_awning_cover
 
 script:
   # Automatically close the solar awning when the sun sets.

@@ -2,39 +2,6 @@
 # interior and exterior lighting in the van. It features 15 individually controllable LED channels,
 # controlling various lights such as roof lights, capsule lights, and rear lights.
 
-# Channel       Description
-# ------        ----
-# 1             Cabin Can Lights (x4)
-# 2             Bed Can Lights (x4)
-# 3             Sliding Door Light Strip
-# 4             Dog Crate Light Strip (warm)
-# 5             Dog Crate Light Strip (cold)
-# 6             Garage Light Strip
-# 7             Capsule Light Strip (Warm)
-# 8             Capsule Light Strip (Cool)
-# 9             Awning Outside Light Strip
-# 10            Awning Inside Light Strip
-# 11            Exterior Capsule Driver Flood Light
-# 12            Exterior Capsule Passenger Flood Light
-# 13            Roof Passenger Flood Lights
-# 14            Roof Driver Flood Lights
-# 15            Roof Rear Flood Lights
-
-# Cabin Buttons - hooked in through the pcf8574 GPIO expander
-# Upper Driver Roof Lights      Turn upper and lower driver roof lights on while pressed
-# Lower Driver Capsule Lights   Turn lower driver capsule lights on while pressed
-# Rear Roof Lights              Toggle upper rear roof lights on tap, turn on all exterior lights 
-#                               on double tap, turn off all exterior lights on press and hold
-# Upper Passenger Roof Lights   Turn upper and lower passenger roof lights on while pressed
-# Lower Passenger Roof Lights   Turn lower passenger capsule lights on while pressed
-
-# Garage Pushbutton             Toggle garage lights on press
-# Cabin Pushbutton              Toggle cabin can lights on press, turn on interior lights to 
-#                               preset on double tap, turn off all interior lights on press and hold
-
-# Cabin Dial Controller         Connected to home assistant to control brightness of various light groups
-# Bed Dial Controller           Connected to home assistant to control brightness of various light groups
-
 substitutions:
   device_name: lightcontroller
   friendly_name: Light Controller
@@ -92,6 +59,23 @@ sensor:
       then:
         - script.execute: adjust_light_color_temperature
 
+# Channel       Description
+# ------        ----
+# 1             Cabin Can Lights (x4)
+# 2             Bed Can Lights (x4)
+# 3             Sliding Door Light Strip
+# 4             Dog Crate Light Strip (warm)
+# 5             Dog Crate Light Strip (cold)
+# 6             Garage Light Strip
+# 7             Capsule Light Strip (Warm)
+# 8             Capsule Light Strip (Cool)
+# 9             Awning Outside Light Strip
+# 10            Awning Inside Light Strip
+# 11            Exterior Capsule Driver Flood Light
+# 12            Exterior Capsule Passenger Flood Light
+# 13            Roof Passenger Flood Lights
+# 14            Roof Driver Flood Lights
+# 15            Roof Rear Flood Lights
 light:
   - platform: monochromatic
     id: main_can_lights
@@ -189,19 +173,6 @@ light:
     default_transition_length: 500ms
     output: led_channel_15
 
-# Button    Pin         Name                            Action
-# ------    ------      -----                           ------
-# 1         Button 1    Upper Roof Driver Lights        Turn on the upper and lower roof driver lights as long as the button is on
-# 2         Button 2    Upper Roof Passenger Lights     Turn on the upper and lower roof passenger lights
-# 3         Button 3    Lower Driver Capsule Lights     Turn on the lower roof driver capsule lights
-# 4         Button 4    Lower Passenger Capsule Lights  Turn on the lower roof passenger capsule lights
-# 5         Button 5    Rear Roof Lights                tap - Toggle upper rear roof lights
-#                                                       double tap - Turn on all exterior lights
-#                                                       press and hold - Turn off all exterior lights
-
-# PCF8574 Port Expansion Board which has 8 additional GPIO pins per board.
-# This allows us to connect multiple buttons to the QuinLED An-Penta-Deca.
-
 script:
   - id: update_color_temp_and_brightness
     mode: single
@@ -276,11 +247,21 @@ script:
           condition:
             lambda: 'return id(sun_elevation).state < 10;'
           then:
-            - light.turn_on: light_exterior_roof_rear
-            - light.turn_on: light_exterior_roof_driver
-            - light.turn_on: light_exterior_roof_passenger
-            - light.turn_on: light_exterior_passenger_capsule
-            - light.turn_on: light_exterior_driver_capsule
+#            - light.turn_on: 
+#                id: light_exterior_roof_rear
+#                brightness: 100%
+#            - light.turn_on:
+#                id: light_exterior_roof_driver
+#                brightness: 100%
+#            - light.turn_on:
+#                id: light_exterior_roof_passenger
+#                brightness: 100%
+            - light.turn_on:
+                id: light_exterior_passenger_capsule
+                brightness: 100%
+            - light.turn_on:
+                id: light_exterior_driver_capsule
+                brightness: 100%
           else:
             - logger.log: "Exterior lights not turned on - it's daytime"
 
@@ -362,6 +343,7 @@ script:
             - script.execute: turn_off_interior_lights
 
 binary_sensor:
+# Button 1    Garage Light Button             Toggle garage lights on press
   - id: !extend button_1
     name: "Garage LED Light Button"
     internal: true
@@ -382,6 +364,13 @@ binary_sensor:
                 } else {
                   id(garage_led_lights).turn_on().perform();
                 }
+
+# Button 2    Up Cabin Light Button           tap - Turn on cabin lights
+#                                             double tap - Turn on all cabin lights
+#                                             press and hold - increase brightness of cabin lights
+# Button 3    Down Cabin Light Button         tap - Turn off cabin lights
+#                                             double tap - Turn off all cabin lights
+#                                             press and hold - decrease brightness of cabin lights
 
   - id: !extend button_2
     name: "Cabin Interior Lights Button"
@@ -438,6 +427,15 @@ binary_sensor:
     internal: true
 
 # PFC8574 Buttons
+# Button    Pin         Name                            Action
+# ------    ------      -----                           ------
+# 0         Button 1    Upper Roof Driver Lights        Turn on the upper and lower roof driver lights as long as the button is on
+# 1         Button 2    Lower Driver Capsule Lights     Turn on the lower roof driver capsule lights
+# 2         Button 3    Rear Roof Lights                tap - Toggle upper rear roof lights
+#                                                       double tap - Turn on all exterior lights
+#                                                       press and hold - Turn off all exterior lights
+# 3         Button 4    Upper Roof Passenger Lights     Turn on the upper and lower roof passenger lights as long as the button is on
+# 4         Button 5    Lower Passenger Capsule Lights  Turn on the lower roof passenger capsule lights
   - id: !extend pcf8574_button_0
     name: "Upper Exterior Driver Light Switch"
     internal: true
@@ -528,7 +526,6 @@ binary_sensor:
   - id: !extend pcf8574_button_7
     internal: true
 
-
 # Wizmote Remote Control Buttons
   - id: !extend wizmote_on
     internal: true
@@ -562,8 +559,16 @@ binary_sensor:
 
   - id: !extend wizmote_3
     internal: true
+    on_press:
+      - light.turn_on:
+          id: light_exterior_driver_capsule
+          brightness: 100%
+
   - id: !extend wizmote_4
     internal: true
+      - light.turn_on:
+          id: light_exterior_passenger_capsule
+          brightness: 100%
 
   - id: !extend wizmote_up
     internal: true
