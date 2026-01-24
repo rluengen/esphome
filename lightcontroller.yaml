@@ -57,7 +57,13 @@ sensor:
     internal: true
     on_value:
       then:
-        - script.execute: adjust_light_color_temperature
+        - if:
+            condition:
+              lambda: 'return !isnan(x);'
+            then:
+              - script.execute: adjust_light_color_temperature
+            else:
+              - logger.log: "[Light Controller] Sun elevation is NaN - skipping color temp adjustment"
 
 # Channel       Description
 # ------        ----
@@ -439,6 +445,9 @@ binary_sensor:
   - id: !extend pcf8574_button_0
     name: "Upper Exterior Driver Light Switch"
     internal: true
+    filters:
+      - delayed_on: 50ms
+      - delayed_off: 50ms
     on_press:
       - light.turn_on:
           id: light_exterior_roof_driver
@@ -455,6 +464,9 @@ binary_sensor:
   - id: !extend pcf8574_button_1
     name: "Lower Exterior Driver Light Switch"
     internal: true
+    filters:
+      - delayed_on: 50ms
+      - delayed_off: 50ms
     on_press:
       - light.turn_on:
           id: light_exterior_driver_capsule
@@ -466,6 +478,9 @@ binary_sensor:
   - id: !extend pcf8574_button_2
     name: "Rear Exterior Light Switch"
     internal: true
+    filters:
+      - delayed_on: 50ms
+      - delayed_off: 50ms
     on_multi_click:
       # Single click
       - timing:
@@ -492,6 +507,9 @@ binary_sensor:
   - id: !extend pcf8574_button_3
     name: "Upper Exterior Passenger Light Switch"
     internal: true
+    filters:
+      - delayed_on: 50ms
+      - delayed_off: 50ms
     on_press:
       - light.turn_on:
           id: light_exterior_roof_passenger
@@ -509,6 +527,9 @@ binary_sensor:
   - id: !extend pcf8574_button_4
     name: "Lower Exterior Passenger Light Switch"
     internal: true
+    filters:
+      - delayed_on: 50ms
+      - delayed_off: 50ms
     on_press:
       - light.turn_on:
           id: light_exterior_passenger_capsule
