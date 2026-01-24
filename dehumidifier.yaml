@@ -1,7 +1,12 @@
 # https://github.com/patrickcollins12/esphome-fan-controller
 
 # enable ntc sensor gpio
-# enable dht temperature/humidity sensor
+
+# AHT20 Pin	ESP32 Pin
+# VCC	3.3V
+# GND	GND
+# SDA	GPIO21
+# SCL	GPIO22
 
 substitutions:
   device_name: dehumidifier
@@ -46,97 +51,132 @@ api:
             id: humidity_target
             value: !lambda 'return target;'
 
+i2c:
+  sda: GPIO21
+  scl: GPIO22
+  scan: true
+
 # https://esphome.io/components/sensor/ntc/
 sensor:
-  # - platform: ntc
-  #   sensor: resistance_sensor
-  #   calibration:
-  #     b_constant: 3950
-  #     reference_temperature: 25°C
-  #     reference_resistance: 10kOhm
-  #   name: "Defrost Temperature"
-  #   id: defrost_temp_c
-  #   unit_of_measurement: "°C"
+# GPIO25 ──┬── 5.6kΩ Resistor ──┬── NTC Thermistor ── GND
+#          │                    │
+#          │                  ADC Pin (GPIO33)
+#          │
+#       (GPIO25 VCC control to prevent self-heating)
+  - platform: ntc
+    sensor: resistance_sensor
+    calibration:
+      b_constant: 3950
+      reference_temperature: 25°C
+      reference_resistance: 10kOhm
+    name: "Defrost Temperature"
+    id: defrost_temp_c
+    unit_of_measurement: "°C"
 
-  # - platform: resistance
-  #   id: resistance_sensor
-  #   sensor: source_sensor
-  #   configuration: DOWNSTREAM
-  #   resistor: 5.6kOhm
-  #   name: Resistance Sensor
+  - platform: resistance
+    id: resistance_sensor
+    sensor: source_sensor
+    configuration: DOWNSTREAM
+    resistor: 5.6kOhm
+    name: Resistance Sensor
 
   # https://esphome.io/components/sensor/ntc/#self-heating
-  # - platform: adc
-  #   id: source_sensor
-  #   pin: GPIO1
+  - platform: adc
+    id: source_sensor
+    pin: GPIO33
+    attenuation: 11db  # For full 0-3.3V range
 
-  # - platform: dht
-  #   pin: GPIO2
-  #   temperature:
-  #     name: "Ambient Temperature"
-  #     id: ambient_temp
-  #     filters:
-  #        - exponential_moving_average:  
-  #            alpha: 0.1
-  #            send_every: 1
-
-  #   humidity:
-  #     name: "Ambient Humidity"
-  #     id: ambient_humidity
-  #     filters:
-  #        - exponential_moving_average:  
-  #            alpha: 0.1
-  #            send_every: 1
-  #   model: DHT22
-  #   update_interval: 10s
+  - platform: aht10
+    variant: AHT20
+    temperature:
+      name: "Ambient Temperature"
+      id: ambient_temp
+      filters:
+         - exponential_moving_average:  
+             alpha: 0.1
+             send_every: 1
+    humidity:
+      name: "Ambient Humidity"
+      id: ambient_humidity
+      filters:
+         - exponential_moving_average:  
+             alpha: 0.1
+             send_every: 1
+    update_interval: 10s
 
 interval:
   - interval: 30s
     then:
-      - switch.turn_on: ntc_vcc
-      - component.update: source_sensor
-      - switch.turn_off: ntc_vcc
- 
+      - logger.log:
+          format: "[Dehumidifier] Interval check - Humidity: %.1f%%, Target: %.1f%%, Power: %s, Defrost: %s"
+          args: 
+            - 'id(ambient_humidity).state'
+            - 'id(humidity_target).state'
+            - 'id(dehumidifier_power).state ? "ON" : "OFF"'
+            - 'id(defrost_mode).state ? "ON" : "OFF"'
       - if:
           condition:
-            and:
-              - switch.is_on: dehumidifier_power  # Only when enabled
-              - binary_sensor.is_off: defrost_mode  # Not in defrost
+            lambda: 'return isnan(id(ambient_humidity).state);'
           then:
-            - if:
-                condition:
-                  lambda: 'return id(ambient_humidity).state > (id(humidity_target).state + 2.0);'
-                then:
-                  - if:
-                      condition:
-                        switch.is_off: compressor_relay_switch
-                      then:
-                        - logger.log: "Starting dehumidifier - humidity too high"
-                        - switch.turn_on: fan_relay_switch
-                        - delay: 2s  # Start fan first
-                        - switch.turn_on: compressor_relay_switch
-                else:
-                  - if:
-                      condition:
-                        lambda: 'return id(ambient_humidity).state < (id(humidity_target).state - 2.0);'
-                      then:
-                        - if:
-                            condition:
-                              switch.is_on: compressor_relay_switch
-                            then:
-                              - logger.log: "Stopping dehumidifier - target humidity reached"
-                              - switch.turn_off: compressor_relay_switch
-                              - delay: 30s  # Let fan run for 30s after compressor stops
-                              - switch.turn_off: fan_relay_switch
+            - logger.log: "[Dehumidifier] Humidity sensor reading NaN - turning off for safety"
+            - switch.turn_off: compressor_relay_switch
+            - switch.turn_off: fan_relay_switch
           else:
             - if:
                 condition:
-                  or:
-                    - switch.is_off: dehumidifier_power
-                    - binary_sensor.is_on: defrost_mode
+                  and:
+                    - switch.is_on: dehumidifier_power  # Only when enabled
+                    - binary_sensor.is_off: defrost_mode  # Not in defrost
                 then:
-                  - switch.turn_off: compressor_relay_switch
-                  - switch.turn_off: fan_relay_switch
+                  - if:
+                      condition:
+                        lambda: 'return id(ambient_humidity).state > (id(humidity_target).state + 2.0);'
+                      then:
+                        - if:
+                            condition:
+                              switch.is_off: compressor_relay_switch
+                            then:
+                              - logger.log:
+                                  format: "[Dehumidifier] Starting - humidity %.0f%% > target %.1f%%"
+                                  args: ['id(ambient_humidity).state', 'id(humidity_target).state']
+                              - logger.log: "[Dehumidifier] Turning on fan relay"
+                              - switch.turn_on: fan_relay_switch
+                              - delay: 2s  # Start fan first
+                              - logger.log: "[Dehumidifier] Turning on compressor relay"
+                              - switch.turn_on: compressor_relay_switch
+                      else:
+                        - if:
+                            condition:
+                              lambda: 'return id(ambient_humidity).state < (id(humidity_target).state - 2.0);'
+                            then:
+                              - if:
+                                  condition:
+                                    switch.is_on: compressor_relay_switch
+                                  then:
+                                    - logger.log:
+                                        format: "[Dehumidifier] Stopping - humidity %.1f%% below target %.1f%% - 2%%"
+                                        args: ['id(ambient_humidity).state', 'id(humidity_target).state']
+                                    - logger.log: "[Dehumidifier] Turning off compressor relay"
+                                    - switch.turn_off: compressor_relay_switch
+                                    - logger.log: "[Dehumidifier] Running fan for 30s cooldown"
+                                    - delay: 30s  # Let fan run for 30s after compressor stops
+                                    - logger.log: "[Dehumidifier] Turning off fan relay"
+                                    - switch.turn_off: fan_relay_switch
+                            else:
+                              - logger.log: "[Dehumidifier] Humidity within target range - no action needed"
+                else:
+                  - if:
+                      condition:
+                        switch.is_off: dehumidifier_power
+                      then:
+                        - logger.log: "[Dehumidifier] Disabled - ensuring relays are off"
+                        - switch.turn_off: compressor_relay_switch
+                        - switch.turn_off: fan_relay_switch
+                      else:
+                        # Dehumidifier is on but in defrost mode
+                        - logger.log: "[Dehumidifier] Defrost mode - compressor off, fan running"
+                        - switch.turn_off: compressor_relay_switch
+                        - switch.turn_on: fan_relay_switch
 
 number:
   - platform: template
@@ -172,7 +212,9 @@ binary_sensor:
       //return id(defrost_temp_c).state < 2.0;
       return false;
     on_press:
-      - logger.log: "Defrost mode started"
+      - logger.log:
+          format: "[Defrost] Mode STARTED - coil temperature below threshold"
+          args: []
 #       - switch.turn_off: compressor_relay_switch  # Turn off compressor during defrost
 #       - switch.turn_on: fan_relay_switch  # Keep fan running to circulate air
 #       - logger.log: 
@@ -191,7 +233,9 @@ binary_sensor:
 #           else:
 #             - logger.log: "Defrost cycle timed out after 30 minutes"
     on_release:
-      - logger.log: "Defrost mode ended"
+      - logger.log:
+          format: "[Defrost] Mode ENDED - temperature recovered above %.1f°C"
+          args: ['id(defrost_exit_temp).state']
 
   - platform: template
     name: "Compressor"
@@ -217,7 +261,7 @@ switch:
     internal: true
 
   - platform: gpio
-    pin: GPIO21
+    pin: GPIO25
     id: ntc_vcc
     internal: true
 
@@ -230,17 +274,20 @@ switch:
       // Report ON if either relay is energized.
       return id(compressor_relay_switch).state || id(fan_relay_switch).state;
     turn_on_action:
+      - logger.log: "[Dehumidifier] Manual turn ON requested"
       - if:
           condition:
             and:
               - binary_sensor.is_off: defrost_mode
               # - lambda: 'return id(ambient_humidity).state > id(humidity_target).state;'
           then:
+            - logger.log: "[Dehumidifier] Manual start approved - activating relays"
             - switch.turn_on: fan_relay_switch
             - switch.turn_on: compressor_relay_switch
           else:
-            - logger.log: "Dehumidifier blocked (defrost mode active or target humidity reached)"
+            - logger.log: "[Dehumidifier] Manual start BLOCKED (defrost mode active)"
     turn_off_action:
+      - logger.log: "[Dehumidifier] Manual turn OFF - deactivating relays"
       - switch.turn_off: compressor_relay_switch
       - switch.turn_off: fan_relay_switch
     restore_mode: RESTORE_DEFAULT_OFF

@@ -5,6 +5,7 @@ wifi:
 #  fast_connect: true
   ssid: ${wifi_ssid}
   password: ${wifi_password}
+  min_auth_mode: WPA2
   on_connect: 
     then:
     - logger.log: "Connected to WiFi"
