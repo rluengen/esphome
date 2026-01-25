@@ -15,12 +15,22 @@ esphome:
   name: esp32p4-dsi-88
   friendly_name: ESP32-P4 DSI 8.8
   on_boot:
-    priority: -100
-    then:
-      - lambda: |-
-          // Set backlight to maximum brightness
-          id(display_backlight_i2c).write_byte(0xab, 0x00);  // 0x00 = max brightness
-          id(display_backlight_i2c).write_byte(0xaa, 0x01);  // Apply setting
+    - priority: 600  # Run early, after I2C is ready
+      then:
+        - lambda: |-
+            ESP_LOGI("backlight", "Enabling backlight via I2C 0x45");
+            // First ensure the chip is ready
+            id(display_backlight_i2c).write_byte(0xaa, 0x01);  // Enable
+            delay(50);
+            id(display_backlight_i2c).write_byte(0xab, 0x00);  // 0x00 = max brightness (inverted)
+            id(display_backlight_i2c).write_byte(0xaa, 0x01);  // Apply setting
+            ESP_LOGI("backlight", "Backlight enabled");
+    - priority: -100  # After display is ready
+      then:
+        - light.turn_on:
+            id: display_backlight
+            brightness: 100%
+        - logger.log: "Display boot complete"
 
 esp32:
   board: esp32-p4-evboard
@@ -60,7 +70,10 @@ psram:
   mode: hex
   speed: 200MHZ
 
+# LDO for MIPI-DSI PHY - required for display to initialize
 esp_ldo:
+  - voltage: 2.5V
+    channel: 3
 
 logger:
   level: DEBUG
@@ -79,6 +92,12 @@ i2c:
   scl: GPIO8
   frequency: 400kHz
   scan: true
+
+# Font for display test
+font:
+  - file: "gfonts://Roboto"
+    id: roboto
+    size: 48
 
 # I2C device for backlight control (address 0x45)
 i2c_device:
@@ -129,7 +148,7 @@ display:
   - platform: mipi_dsi
     id: dsi_display
     model: CUSTOM
-    rotation: 90
+    rotation: 0  # Start with no rotation for testing
     dimensions:
       width: 480
       height: 1920
@@ -144,7 +163,8 @@ display:
     vsync_pulse_width: 20
     vsync_back_porch: 20
     pclk_frequency: 83MHz
-    lane_bit_rate: 1Gbps
+    # Try lower lane bit rate - Waveshare FAQ suggests 840, 933, 960, 1000, 1200, 1500
+    lane_bit_rate: 500Mbps
     # OTA7290B initialization sequence
     init_sequence:
       # Exit sleep mode
@@ -153,6 +173,14 @@ display:
       # Set display on
       - [0x29]
       - delay 20ms
+    # Simple test pattern - bypasses LVGL
+    lambda: |-
+      // Fill entire screen with red
+      it.fill(Color(255, 0, 0));
+      // Draw some test text
+      it.print(240, 100, id(roboto), Color(255, 255, 255), TextAlign::CENTER, "DISPLAY TEST");
+      it.print(240, 200, id(roboto), Color(255, 255, 0), TextAlign::CENTER, "If you see this");
+      it.print(240, 300, id(roboto), Color(0, 255, 0), TextAlign::CENTER, "it works!");
 
 # ============================================================
 # GT911 Touchscreen
@@ -171,28 +199,35 @@ touchscreen:
           args: [touch.x, touch.y]
 
 # ============================================================
-# LVGL Graphics
+# LVGL Graphics - DISABLED FOR TESTING
 # ============================================================
+# Uncomment below once display is confirmed working
 
-lvgl:
-  displays:
-    - dsi_display
-  touchscreens:
-    - dsi_touchscreen
-  color_depth: 16
-  buffer_size: 100%
-  byte_order: little_endian
-  on_idle:
-    - timeout: 30s
-      then:
-        - logger.log: "Display idle timeout"
-  pages:
-    - id: main_page
-      skip: false
-      bg_color: 0x000000
-      bg_opa: cover
-      widgets:
-        - label:
-            text: "Hello World"
-            align: CENTER
-            text_color: 0xFFFFFF
+# lvgl:
+#   displays:
+#     - dsi_display
+#   touchscreens:
+#     - dsi_touchscreen
+#   color_depth: 16
+#   buffer_size: 100%
+#   byte_order: little_endian
+#   on_idle:
+#     - timeout: 30s
+#       then:
+#         - logger.log: "Display idle timeout"
+#   pages:
+#     - id: main_page
+#       skip: false
+#       bg_color: 0xFF0000  # Bright RED background - very visible
+#       bg_opa: cover
+#       widgets:
+#         - label:
+#             text: "ESP32-P4 DISPLAY TEST"
+#             align: CENTER
+#             text_color: 0xFFFFFF  # White text
+#             text_font: montserrat_48  # Larger font
+#         - label:
+#             text: "If you see this, it works!"
+#             align: CENTER
+#             y: 80
+#             text_color: 0xFFFF00  # Yellow text
