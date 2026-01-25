@@ -1,5 +1,12 @@
 # https://wiki.seeedstudio.com/XIAO_ESP32S3_esphome/
 
+substitutions:
+  device_name: camera
+  friendly_name: Seeed Studio XIAO ESP32S3 Sense Camera
+  project_name: Van Camera
+  project_version: "1.0.0"
+  log_level: VERBOSE
+
 esphome:
   name: camera
   friendly_name: Seeed Studio XIAO ESP32S3 Sense Camera
@@ -26,6 +33,18 @@ packages:
 
 esp32:
   board: esp32-s3-devkitc-1
+  framework:
+    type: esp-idf
+
+psram:
+  mode: octal
+  speed: 80MHz
+
+# I2C for camera sensor (SCCB interface)
+i2c:
+  id: camera_i2c
+  sda: GPIO40
+  scl: GPIO39
 
 # Configuration for the ESP32 Camera
 esp32_camera:
@@ -34,9 +53,7 @@ esp32_camera:
   external_clock:
     pin: GPIO10
     frequency: 20MHz
-  i2c_pins:
-    sda: GPIO40
-    scl: GPIO39
+  i2c_id: camera_i2c
   data_pins: [GPIO15, GPIO17, GPIO18, GPIO16, GPIO14, GPIO12, GPIO11, GPIO48]
   vsync_pin: GPIO38
   href_pin: GPIO47
