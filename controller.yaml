@@ -15,18 +15,51 @@ esphome:
   name: esp32p4-dsi-88
   friendly_name: ESP32-P4 DSI 8.8
   on_boot:
-    - priority: 600  # Run early, after I2C is ready
+    # VERY EARLY (priority 900) - Full panel init sequence BEFORE DSI bus init
+    # Following EXACT order from Waveshare esp_lcd_dsi component
+    - priority: 900
       then:
         - lambda: |-
-            ESP_LOGI("backlight", "Enabling backlight via I2C 0x45");
-            // First ensure the chip is ready
-            id(display_backlight_i2c).write_byte(0xaa, 0x01);  // Enable
-            delay(50);
-            id(display_backlight_i2c).write_byte(0xab, 0x00);  // 0x00 = max brightness (inverted)
-            id(display_backlight_i2c).write_byte(0xaa, 0x01);  // Apply setting
-            ESP_LOGI("backlight", "Backlight enabled");
-    - priority: -100  # After display is ready
+            ESP_LOGI("panel", "=== PANEL INIT (priority 900) - Waveshare sequence ===");
+            
+            // EXACT sequence from Waveshare esp_lcd_dsi.c
+            bool ack;
+            
+            // 1. MCU reset
+            ack = id(display_backlight_i2c).write_byte(0xc0, 0x01);
+            ESP_LOGI("panel", "1. MCU reset (0xc0=0x01) ACK: %s", ack ? "YES" : "NO");
+            
+            // 2. TP reset
+            ack = id(display_backlight_i2c).write_byte(0xc2, 0x01);
+            ESP_LOGI("panel", "2. TP reset (0xc2=0x01) ACK: %s", ack ? "YES" : "NO");
+            
+            // 3. Init/probe
+            ack = id(display_backlight_i2c).write_byte(0xac, 0x01);
+            ESP_LOGI("panel", "3. Init (0xac=0x01) ACK: %s", ack ? "YES" : "NO");
+            
+            // 4. Brightness max (0x00 = max, inverted)
+            ack = id(display_backlight_i2c).write_byte(0xab, 0x00);
+            ESP_LOGI("panel", "4. Brightness (0xab=0x00) ACK: %s", ack ? "YES" : "NO");
+            
+            // 5. Apply brightness
+            ack = id(display_backlight_i2c).write_byte(0xaa, 0x01);
+            ESP_LOGI("panel", "5. Apply brightness (0xaa=0x01) ACK: %s", ack ? "YES" : "NO");
+            
+            // 6. Enable MIPI power - LAST in the sequence
+            ack = id(display_backlight_i2c).write_byte(0xad, 0x01);
+            ESP_LOGI("panel", "6. MIPI enable (0xad=0x01) ACK: %s", ack ? "YES" : "NO");
+            
+            // 7. CRITICAL: 1000ms delay before DSI init (from Waveshare code)
+            ESP_LOGI("panel", "Waiting 1000ms for panel to initialize...");
+            delay(1000);
+            
+            ESP_LOGI("panel", "Panel init sequence complete");
+    # Late - after display is initialized
+    - priority: -100
       then:
+        - lambda: |-
+            ESP_LOGI("panel", "=== POST-DSI INIT (priority -100) ===");
+            ESP_LOGI("panel", "Display should now be active");
         - light.turn_on:
             id: display_backlight
             brightness: 100%
@@ -39,31 +72,31 @@ esp32:
   framework:
     type: esp-idf
 
-esp32_hosted:
-  active_high: true
-  variant: ESP32C6
-  reset_pin: GPIO54
-  cmd_pin: GPIO19
-  clk_pin: GPIO18
-  d0_pin: GPIO14
-  d1_pin: GPIO15
-  d2_pin: GPIO16
-  d3_pin: GPIO17
+# esp32_hosted:
+#  active_high: true
+#  variant: ESP32C6
+#  reset_pin: GPIO54
+#  cmd_pin: GPIO19
+#  clk_pin: GPIO18
+#  d0_pin: GPIO14
+#  d1_pin: GPIO15
+#  d2_pin: GPIO16
+#  d3_pin: GPIO17
 
-packages:
-  remote_packages:
-    url: https://github.com/rluengen/esphome
-    ref: main
-    refresh: always
-    files:
-      - path: packages/common.yaml
-        vars:
-          api_encryption_key: !secret encryption_key
-      - path: packages/network/wifi.yaml
-        vars:
-          wifi_ssid: !secret wifi_ssid
-          wifi_password: !secret wifi_password
-      - path: packages/time/homeassistant.yaml
+#packages:
+#  remote_packages:
+#    url: https://github.com/rluengen/esphome
+#    ref: main
+#    refresh: always
+#    files:
+#      - path: packages/common.yaml
+#        vars:
+#          api_encryption_key: !secret encryption_key
+#      - path: packages/network/wifi.yaml
+#        vars:
+#          wifi_ssid: !secret wifi_ssid
+#          wifi_password: !secret wifi_password
+#      - path: packages/time/homeassistant.yaml
 
 # Required for MIPI-DSI display
 psram:
@@ -76,8 +109,15 @@ esp_ldo:
     channel: 3
 
 logger:
-  level: DEBUG
+  level: VERY_VERBOSE
   hardware_uart: UART0
+  logs:
+    # Quiet the noisy ones to see DSI output
+    touchscreen: WARN
+    gt911: WARN
+    i2c.idf: WARN
+    component: INFO
+    sensor: INFO
 
 # ============================================================
 # I2C for GT911 Touchscreen
@@ -119,8 +159,15 @@ output:
     type: float
     write_action:
       - lambda: |-
-          uint8_t brightness = 255 - (uint8_t)(state * 255);
-          id(display_backlight_i2c).write_byte(0xab, brightness);
+          // Write to BOTH brightness registers to cover all panel variants
+          uint8_t brightness = (uint8_t)(state * 255);
+          uint8_t inverted = 255 - brightness;  // 0xab uses inverted brightness
+          
+          // ESP32-P4 style (register 0x96, direct 0-255)
+          id(display_backlight_i2c).write_byte(0x96, brightness);
+          
+          // RPi style (register 0xab inverted + 0xaa latch)
+          id(display_backlight_i2c).write_byte(0xab, inverted);
           id(display_backlight_i2c).write_byte(0xaa, 0x01);
 
 light:
@@ -154,25 +201,28 @@ display:
       height: 1920
     lanes: 2
     color_order: rgb
-    # Timing from official Raspberry Pi kernel driver (ws_panel_8_8_mode)
-    # clock = 83333 kHz = ~83.3 MHz
+    # Timing from Raspberry Pi kernel driver panel-waveshare-dsi.c
+    # ws_panel_8_8_mode: .clock = 83333 (83.333 MHz)
+    # Total H = 480 + 50 + 50 + 50 = 630
+    # Total V = 1920 + 20 + 20 + 20 = 1980
+    # Refresh rate = 83.333M / (630 * 1980) = ~66.7 Hz
     hsync_front_porch: 50
     hsync_pulse_width: 50
     hsync_back_porch: 50
     vsync_front_porch: 20
     vsync_pulse_width: 20
     vsync_back_porch: 20
-    pclk_frequency: 83MHz
-    # Try lower lane bit rate - Waveshare FAQ suggests 840, 933, 960, 1000, 1200, 1500
-    lane_bit_rate: 500Mbps
-    # OTA7290B initialization sequence
+    # Try higher pixel clock - 100 MHz
+    pclk_frequency: 100000000
+    # Lane bit rate: 100MHz * 16bpp / 2 lanes = 800Mbps minimum, use 1200 for margin
+    lane_bit_rate: 1200Mbps
+    # Keep RGB565 (16-bit)
+    color_depth: 16
+    pixel_mode: 16bit
+    # Minimal DCS init - just Sleep Out and Display On (from Waveshare driver)
     init_sequence:
-      # Exit sleep mode
-      - [0x11]
-      - delay 120ms
-      # Set display on
-      - [0x29]
-      - delay 20ms
+      - [0x11, 120]  # Sleep out, 120ms delay
+      - [0x29, 20]   # Display on, 20ms delay
     # Simple test pattern - bypasses LVGL
     lambda: |-
       // Fill entire screen with red
@@ -183,20 +233,43 @@ display:
       it.print(240, 300, id(roboto), Color(0, 255, 0), TextAlign::CENTER, "it works!");
 
 # ============================================================
-# GT911 Touchscreen
+# GT911 Touchscreen - POLLING MODE for debugging
 # ============================================================
 
 touchscreen:
   - platform: gt911
     id: dsi_touchscreen
-    transform:
-      swap_xy: true
-      mirror_x: true
-      mirror_y: false
+    # NO interrupt_pin - use polling mode to bypass potential interrupt issues
+    update_interval: 50ms
     on_touch:
       - logger.log:
           format: "Touch at (%d, %d)"
           args: [touch.x, touch.y]
+
+# Diagnostic: Read GT911 product ID and firmware to verify it's alive
+interval:
+  - interval: 5s
+    then:
+      - lambda: |-
+          // Read GT911 Product ID (registers 0x8140-0x8143)
+          uint8_t product_id[5] = {0};
+          uint8_t reg[2] = {0x81, 0x40};  // Big-endian register address
+          
+          if (id(dsi_touchscreen).write(reg, 2, false) == i2c::ERROR_OK) {
+            if (id(dsi_touchscreen).read(product_id, 4) == i2c::ERROR_OK) {
+              product_id[4] = 0;
+              ESP_LOGI("gt911_diag", "Product ID: %s", product_id);
+            } else {
+              ESP_LOGE("gt911_diag", "Failed to read product ID");
+            }
+          } else {
+            ESP_LOGE("gt911_diag", "Failed to write register address");
+          }
+          
+          // Also check panel MCU status
+          uint8_t status = 0;
+          id(display_backlight_i2c).read_byte(0x80, &status);
+          ESP_LOGI("panel_diag", "Panel MCU status (0x80): 0x%02X", status);
 
 # ============================================================
 # LVGL Graphics - DISABLED FOR TESTING

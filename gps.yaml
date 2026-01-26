@@ -28,6 +28,7 @@ packages:
 
 # GPS sensors need to reference the component's internal sensors
 # Configurable thresholds for stationary lock (adjustable from Home Assistant)
+# Values are stored internally in metric, but HA will auto-convert display based on your unit system
 number:
   - platform: template
     name: "Speed Unlock Threshold"
@@ -35,36 +36,45 @@ number:
     icon: mdi:speedometer
     entity_category: config
     unit_of_measurement: "km/h"
+    device_class: speed
     min_value: 1.0
     max_value: 10.0
     step: 0.5
     initial_value: 3.0
     restore_value: true
     optimistic: true
+    on_value:
+      - lambda: 'id(speed_unlock_val) = x;'
   - platform: template
     name: "Distance Unlock Threshold"
     id: distance_unlock_threshold
     icon: mdi:map-marker-distance
     entity_category: config
     unit_of_measurement: "m"
+    device_class: distance
     min_value: 5.0
     max_value: 50.0
     step: 1.0
     initial_value: 15.0
     restore_value: true
     optimistic: true
+    on_value:
+      - lambda: 'id(distance_unlock_val) = x;'
   - platform: template
     name: "Speed Lock Threshold"
     id: speed_lock_threshold
     icon: mdi:lock
     entity_category: config
     unit_of_measurement: "km/h"
+    device_class: speed
     min_value: 0.5
     max_value: 5.0
     step: 0.5
     initial_value: 1.0
     restore_value: true
     optimistic: true
+    on_value:
+      - lambda: 'id(speed_lock_val) = x;'
 
 # The gps component exposes satellites through globals, so we use a workaround
 globals:
@@ -81,8 +91,21 @@ globals:
   - id: is_position_locked
     type: bool
     initial_value: 'false'
+  - id: raw_longitude
+    type: float
+    initial_value: '0.0'
+  # Threshold globals (updated by number entities)
+  - id: speed_unlock_val
+    type: float
+    initial_value: '3.0'
+  - id: distance_unlock_val
+    type: float
+    initial_value: '15.0'
+  - id: speed_lock_val
+    type: float
+    initial_value: '1.0'
 
-# Override the GPS satellites sensor from package to update our global
+# Override the GPS component from package
 gps:
   satellites:
     id: gps_satellites
@@ -91,49 +114,70 @@ gps:
   speed:
     id: gps_speed
     name: "Speed"
-  latitude:
-    id: gps_latitude
-    name: "Latitude"
-    filters:
-      - lambda: |-
-          // Calculate distance from locked position (in meters)
-          float dist = 0;
-          if (id(is_position_locked)) {
-            float dlat = (x - id(locked_lat)) * 111320.0;  // degrees to meters
-            float dlon = (id(gps_longitude).state - id(locked_lon)) * 111320.0 * cos(x * 0.0174533);
-            dist = sqrt(dlat*dlat + dlon*dlon);
-          }
-          
-          // Unlock conditions: speed > threshold OR moved > distance threshold from locked position
-          bool should_unlock = (id(gps_speed).state > id(speed_unlock_threshold).state) || (dist > id(distance_unlock_threshold).state);
-          
-          // Lock conditions: speed < threshold and have valid fix
-          bool should_lock = (id(gps_speed).state < id(speed_lock_threshold).state) && (id(gps_satellites).state >= 4);
-          
-          if (id(is_position_locked)) {
-            if (should_unlock) {
-              id(is_position_locked) = false;
-              ESP_LOGI("gps", "Position UNLOCKED (speed=%.1f, dist=%.1fm)", id(gps_speed).state, dist);
-            } else {
-              return id(locked_lat);  // Return locked position
-            }
-          } else if (should_lock) {
-            id(is_position_locked) = true;
-            id(locked_lat) = x;
-            id(locked_lon) = id(gps_longitude).state;
-            ESP_LOGI("gps", "Position LOCKED at %.6f, %.6f", x, id(gps_longitude).state);
-          }
-          return x;
   longitude:
     id: gps_longitude
+    internal: true
+    on_value:
+      - lambda: 'id(raw_longitude) = x;'
+      - component.update: stabilized_longitude
+  latitude:
+    id: gps_latitude
+    internal: true
+    on_value:
+      - component.update: stabilized_latitude
+
+sensor:
+  - platform: template
+    name: "Latitude"
+    id: stabilized_latitude
+    accuracy_decimals: 6
+    update_interval: never
+    lambda: |-
+      float raw_lat = id(gps_latitude).state;
+      float raw_lon = id(raw_longitude);
+      float speed = id(gps_speed).state;
+      int sats = id(satellite_count);
+      
+      // Calculate distance from locked position (in meters)
+      float dist = 0;
+      if (id(is_position_locked)) {
+        float dlat = (raw_lat - id(locked_lat)) * 111320.0;
+        float dlon = (raw_lon - id(locked_lon)) * 111320.0 * cos(raw_lat * 0.0174533);
+        dist = sqrt(dlat*dlat + dlon*dlon);
+      }
+      
+      // Unlock conditions (using globals to avoid circular dependency)
+      bool should_unlock = (speed > id(speed_unlock_val)) || 
+                           (id(is_position_locked) && dist > id(distance_unlock_val));
+      
+      // Lock conditions
+      bool should_lock = (speed < id(speed_lock_val)) && (sats >= 4);
+      
+      if (id(is_position_locked)) {
+        if (should_unlock) {
+          id(is_position_locked) = false;
+          ESP_LOGI("gps", "Position UNLOCKED (speed=%.1f, dist=%.1fm)", speed, dist);
+        } else {
+          return id(locked_lat);
+        }
+      } else if (should_lock) {
+        id(is_position_locked) = true;
+        id(locked_lat) = raw_lat;
+        id(locked_lon) = raw_lon;
+        ESP_LOGI("gps", "Position LOCKED at %.6f, %.6f", raw_lat, raw_lon);
+      }
+      return raw_lat;
+  
+  - platform: template
     name: "Longitude"
-    filters:
-      - lambda: |-
-          // If locked, return locked longitude
-          if (id(is_position_locked)) {
-            return id(locked_lon);
-          }
-          return x;
+    id: stabilized_longitude
+    accuracy_decimals: 6
+    update_interval: never
+    lambda: |-
+      if (id(is_position_locked)) {
+        return id(locked_lon);
+      }
+      return id(raw_longitude);
 
 binary_sensor:
   - platform: template
@@ -179,7 +223,7 @@ esphome:
       - delay: 100ms
       - lambda: |-
           // Set the speed according to selected rate
-          std::string rate = id(gps_rate_select).state;
+          std::string rate = id(gps_rate_select).current_option();
           if (rate == "1Hz (Low Power)") {
             id(gps_uart).write_str("$$PCAS04,3*1A\r\n");  // GPS+GLONASS+Galileo
             id(gps_uart).write_str("$$PCAS02,1000*2E\r\n");

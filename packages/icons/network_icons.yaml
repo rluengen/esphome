@@ -7,8 +7,10 @@ font:
     bpp: 4
     glyphs: [
       "\U000F05A9", # mdi-wifi
+      "\U000F16BD", # wifi-check
       "\U000F16BF", # wifi-lock
       "\U000F16C0", # wifi-lock-open
+      "\U000F16C5", # wifi-remove
 
       "\U000F05AA", # wifi-off
       "\U000F091F", # wifi-strength-1
