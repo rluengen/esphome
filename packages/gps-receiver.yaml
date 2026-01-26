@@ -24,6 +24,7 @@ gps:
       - delta: 1.0 # one meter
   satellites:
     name: "Satellites"
+    id: gps_satellites
     filters:
       - delta: 1
   hdop:
@@ -54,17 +55,17 @@ select:
     set_action:
       - lambda: |-
           if (x == "1Hz (Low Power)") {
-            id(gps_uart).write_str("$PCAS04,3*1A\r\n");  // Multi-GNSS
+            id(gps_uart).write_str("$$PCAS04,3*1A\r\n");  // Multi-GNSS
             delay(50);
-            id(gps_uart).write_str("$PCAS02,1000*2E\r\n");
+            id(gps_uart).write_str("$$PCAS02,1000*2E\r\n");
           } else if (x == "5Hz (Normal)") {
-            id(gps_uart).write_str("$PCAS04,1*18\r\n");  // GPS only
+            id(gps_uart).write_str("$$PCAS04,1*18\r\n");  // GPS only
             delay(50);
-            id(gps_uart).write_str("$PCAS02,200*18\r\n");
+            id(gps_uart).write_str("$$PCAS02,200*18\r\n");
           } else if (x == "10Hz (High Speed)") {
-            id(gps_uart).write_str("$PCAS04,1*18\r\n");  // GPS only
+            id(gps_uart).write_str("$$PCAS04,1*18\r\n");  // GPS only
             delay(50);
-            id(gps_uart).write_str("$PCAS02,100*1F\r\n");
+            id(gps_uart).write_str("$$PCAS02,100*1F\r\n");
           }
 
 text_sensor:
