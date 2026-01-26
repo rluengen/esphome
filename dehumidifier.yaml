@@ -84,7 +84,7 @@ sensor:
   - platform: adc
     id: source_sensor
     pin: GPIO33
-    attenuation: 11db  # For full 0-3.3V range
+    attenuation: 12db  # For full 0-3.3V range
 
   - platform: aht10
     variant: AHT20
