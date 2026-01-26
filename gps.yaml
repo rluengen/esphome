@@ -26,6 +26,143 @@ packages:
           rx_pin: GPIO20
       - path: devices/xiao-esp32c3.yaml
 
+# GPS sensors need to reference the component's internal sensors
+# Configurable thresholds for stationary lock (adjustable from Home Assistant)
+number:
+  - platform: template
+    name: "Speed Unlock Threshold"
+    id: speed_unlock_threshold
+    icon: mdi:speedometer
+    entity_category: config
+    unit_of_measurement: "km/h"
+    min_value: 1.0
+    max_value: 10.0
+    step: 0.5
+    initial_value: 3.0
+    restore_value: true
+    optimistic: true
+  - platform: template
+    name: "Distance Unlock Threshold"
+    id: distance_unlock_threshold
+    icon: mdi:map-marker-distance
+    entity_category: config
+    unit_of_measurement: "m"
+    min_value: 5.0
+    max_value: 50.0
+    step: 1.0
+    initial_value: 15.0
+    restore_value: true
+    optimistic: true
+  - platform: template
+    name: "Speed Lock Threshold"
+    id: speed_lock_threshold
+    icon: mdi:lock
+    entity_category: config
+    unit_of_measurement: "km/h"
+    min_value: 0.5
+    max_value: 5.0
+    step: 0.5
+    initial_value: 1.0
+    restore_value: true
+    optimistic: true
+
+# The gps component exposes satellites through globals, so we use a workaround
+globals:
+  - id: satellite_count
+    type: int
+    initial_value: '0'
+  # Stationary lock globals
+  - id: locked_lat
+    type: float
+    initial_value: '0.0'
+  - id: locked_lon
+    type: float
+    initial_value: '0.0'
+  - id: is_position_locked
+    type: bool
+    initial_value: 'false'
+
+# Override the GPS satellites sensor from package to update our global
+gps:
+  satellites:
+    id: gps_satellites
+    on_value:
+      - lambda: 'id(satellite_count) = (int)x;'
+  speed:
+    id: gps_speed
+    name: "Speed"
+  latitude:
+    id: gps_latitude
+    name: "Latitude"
+    filters:
+      - lambda: |-
+          // Calculate distance from locked position (in meters)
+          float dist = 0;
+          if (id(is_position_locked)) {
+            float dlat = (x - id(locked_lat)) * 111320.0;  // degrees to meters
+            float dlon = (id(gps_longitude).state - id(locked_lon)) * 111320.0 * cos(x * 0.0174533);
+            dist = sqrt(dlat*dlat + dlon*dlon);
+          }
+          
+          // Unlock conditions: speed > threshold OR moved > distance threshold from locked position
+          bool should_unlock = (id(gps_speed).state > id(speed_unlock_threshold).state) || (dist > id(distance_unlock_threshold).state);
+          
+          // Lock conditions: speed < threshold and have valid fix
+          bool should_lock = (id(gps_speed).state < id(speed_lock_threshold).state) && (id(gps_satellites).state >= 4);
+          
+          if (id(is_position_locked)) {
+            if (should_unlock) {
+              id(is_position_locked) = false;
+              ESP_LOGI("gps", "Position UNLOCKED (speed=%.1f, dist=%.1fm)", id(gps_speed).state, dist);
+            } else {
+              return id(locked_lat);  // Return locked position
+            }
+          } else if (should_lock) {
+            id(is_position_locked) = true;
+            id(locked_lat) = x;
+            id(locked_lon) = id(gps_longitude).state;
+            ESP_LOGI("gps", "Position LOCKED at %.6f, %.6f", x, id(gps_longitude).state);
+          }
+          return x;
+  longitude:
+    id: gps_longitude
+    name: "Longitude"
+    filters:
+      - lambda: |-
+          // If locked, return locked longitude
+          if (id(is_position_locked)) {
+            return id(locked_lon);
+          }
+          return x;
+
+binary_sensor:
+  - platform: template
+    name: "GPS Fix"
+    lambda: return id(gps_satellites).state >= 4;
+  - platform: template
+    name: "Position Locked"
+    id: position_locked_sensor
+    icon: mdi:lock
+    lambda: return id(is_position_locked);
+  - platform: template
+    name: "Movement Detected"
+    id: movement_detected
+    icon: mdi:motion-sensor
+    lambda: return id(gps_speed).state > 2.0;  // > 2 km/h
+    filters:
+      - delayed_on: 3s   # Must be moving for 3s to trigger
+      - delayed_off: 10s # Must be stopped for 10s to clear
+
+text_sensor:
+  - platform: template
+    name: "GPS Signal Quality"
+    lambda: |-
+      int sats = id(satellite_count);
+      if (sats >= 8) return {"Excellent"};
+      if (sats >= 6) return {"Good"};
+      if (sats >= 4) return {"Fair"};
+      return {"Poor/No Fix"};
+
 esphome:
   name: ${device_name}
   friendly_name: ${friendly_name}
@@ -38,19 +175,21 @@ esphome:
       - delay: 500ms  # Let GPS stabilize
       - lambda: |-
           // First set baud rate to 115200
-          id(gps_uart).write_str("$PCAS01,7*18\r\n");
+          id(gps_uart).write_str("$$PCAS01,7*18\r\n");
       - delay: 100ms
       - lambda: |-
-          // Set the speedse according to selected rate
+          // Set the speed according to selected rate
           std::string rate = id(gps_rate_select).state;
           if (rate == "1Hz (Low Power)") {
-            id(gps_uart).write_str("$PCAS04,3*1A\r\n");  // GPS+GLONASS+Galileo
-            id(gps_uart).write_str("$PCAS02,1000*2E\r\n");
+            id(gps_uart).write_str("$$PCAS04,3*1A\r\n");  // GPS+GLONASS+Galileo
+            id(gps_uart).write_str("$$PCAS02,1000*2E\r\n");
           } else if (rate == "5Hz (Normal)") {
-            id(gps_uart).write_str("$PCAS04,1*18\r\n");  // GPS only (faster)
-            id(gps_uart).write_str("$PCAS02,200*18\r\n");
+            id(gps_uart).write_str("$$PCAS04,1*18\r\n");  // GPS only (faster)
+            id(gps_uart).write_str("$$PCAS02,200*18\r\n");
           } else if (rate == "10Hz (High Speed)") {
-            id(gps_uart).write_str("$PCAS04,1*18\r\n");  // GPS only (faster)
-            id(gps_uart).write_str("$PCAS02,100*1F\r\n");
+            id(gps_uart).write_str("$$PCAS04,1*18\r\n");  // GPS only (faster)
+            id(gps_uart).write_str("$$PCAS02,100*1F\r\n");
           }
           ESP_LOGI("gps", "Applied GPS rate: %s", rate.c_str());
+      - lambda: |-
+          id(gps_uart).write_str("$$PCAS06,1*1D\r\n");  // Enable SBAS
