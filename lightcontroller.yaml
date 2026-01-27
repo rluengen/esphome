@@ -34,6 +34,26 @@ esphome:
   project:
     name: smartvan.${project_name}
     version: ${project_version}
+  on_boot:
+    priority: 600
+    then:
+      - lambda: |-
+          int reason = esp_reset_reason();
+          const char* reason_str;
+          switch(reason) {
+            case 1: reason_str = "POWERON (normal boot)"; break;
+            case 2: reason_str = "EXTERNAL RESET"; break;
+            case 3: reason_str = "SOFTWARE RESET"; break;
+            case 4: reason_str = "PANIC/EXCEPTION - CRASH!"; break;
+            case 5: reason_str = "INTERRUPT WATCHDOG - CRASH!"; break;
+            case 6: reason_str = "TASK WATCHDOG - CRASH!"; break;
+            case 7: reason_str = "WATCHDOG - CRASH!"; break;
+            case 8: reason_str = "DEEPSLEEP RESET"; break;
+            case 9: reason_str = "BROWNOUT - POWER ISSUE!"; break;
+            case 10: reason_str = "SDIO RESET"; break;
+            default: reason_str = "UNKNOWN"; break;
+          }
+          ESP_LOGW("boot", "ESP32 boot reason: %s (code %d)", reason_str, reason);
 
 globals:
   - id: current_color_temp
@@ -45,6 +65,11 @@ globals:
     type: float
     restore_value: no
     initial_value: '1.0'
+    
+  - id: brightness_step
+    type: float
+    restore_value: yes
+    initial_value: '0.1'
 
 sensor:
   - platform: homeassistant
@@ -89,6 +114,24 @@ light:
     icon: "mdi:light-recessed"
     default_transition_length: 500ms
     output: led_channel_1
+    on_turn_off: 
+      then:
+        - logger.log:
+            format: "Main Can Lights turned off"
+            level: INFO
+    on_turn_on: 
+      then:
+        - logger.log:
+            format: "Main Can Lights turned on"
+            level: INFO
+    on_state:
+      then:
+        - lambda: |-
+            if (id(main_can_lights).current_values.is_on()) {
+              ESP_LOGI("light", "Main Can Lights brightness: %.0f%%", 
+                       id(main_can_lights).current_values.get_brightness() * 100);
+            }
+
 
   - platform: monochromatic
     id: bed_can_lights
@@ -96,6 +139,23 @@ light:
     icon: "mdi:light-recessed"
     default_transition_length: 500ms
     output: led_channel_2
+    on_turn_off: 
+      then:
+        - logger.log:
+            format: "Bed Can Lights turned off"
+            level: INFO
+    on_turn_on: 
+      then:
+        - logger.log:
+            format: "Bed Can Lights turned on"
+            level: INFO
+    on_state:
+      then:
+        - lambda: |-
+            if (id(bed_can_lights).current_values.is_on()) {
+              ESP_LOGI("light", "Bed Can Lights brightness: %.0f%%", 
+                       id(bed_can_lights).current_values.get_brightness() * 100);
+            }
 
   - platform: monochromatic
     id: door_light
@@ -103,6 +163,23 @@ light:
     icon: "mdi:door_light"
     default_transition_length: 500ms
     output: led_channel_3
+    on_turn_off: 
+      then:
+        - logger.log:
+            format: "Door Light turned off"
+            level: INFO
+    on_turn_on: 
+      then:
+        - logger.log:
+            format: "Door Light turned on"
+            level: INFO
+    on_state:
+      then:
+        - lambda: |-
+            if (id(door_light).current_values.is_on()) {
+              ESP_LOGI("light", "Door Light brightness: %.0f%%", 
+                       id(door_light).current_values.get_brightness() * 100);
+            }
 
   - platform: cwww
     cold_white: led_channel_4
@@ -113,12 +190,47 @@ light:
     default_transition_length: 500ms
     cold_white_color_temperature: 6500 K
     warm_white_color_temperature: 2700 K
+    on_turn_off: 
+      then:
+        - logger.log:
+            format: "Dog Crate Lights turned off"
+            level: INFO
+    on_turn_on: 
+      then:
+        - logger.log:
+            format: "Dog Crate Lights turned on"
+            level: INFO
+    on_state:
+      then:
+        - lambda: |-
+            if (id(cwww_led_dog_crate_lights).current_values.is_on()) {
+              ESP_LOGI("light", "Dog Crate Lights - Brightness: %.0f%%, Color Temp: %.0fK", 
+                       id(cwww_led_dog_crate_lights).current_values.get_brightness() * 100,
+                       id(cwww_led_dog_crate_lights).current_values.get_color_temperature());
+            }
 
   - platform: monochromatic
     id: garage_led_lights
     name: "Garage LED Light"
     default_transition_length: 500ms
     output: led_channel_6
+    on_turn_off: 
+      then:
+        - logger.log:
+            format: "Garage LED Light turned off"
+            level: INFO
+    on_turn_on: 
+      then:
+        - logger.log:
+            format: "Garage LED Light turned on"
+            level: INFO
+    on_state:
+      then:
+        - lambda: |-
+            if (id(garage_led_lights).current_values.is_on()) {
+              ESP_LOGI("light", "Garage LED Light brightness: %.0f%%", 
+                       id(garage_led_lights).current_values.get_brightness() * 100);
+            }
 
   - platform: cwww
     cold_white: led_channel_7
@@ -129,6 +241,24 @@ light:
     default_transition_length: 500ms
     cold_white_color_temperature: 6500 K
     warm_white_color_temperature: 2700 K
+    on_turn_off: 
+      then:
+        - logger.log:
+            format: "Bed Capsule Lights turned off"
+            level: INFO
+    on_turn_on: 
+      then:
+        - logger.log:
+            format: "Bed Capsule Lights turned on"
+            level: INFO
+    on_state:
+      then:
+        - lambda: |-
+            if (id(cwww_led_capsule_lights).current_values.is_on()) {
+              ESP_LOGI("light", "Bed Capsule Lights - Brightness: %.0f%%, Color Temp: %.0fK", 
+                       id(cwww_led_capsule_lights).current_values.get_brightness() * 100,
+                       id(cwww_led_capsule_lights).current_values.get_color_temperature());
+            }
 
   - platform: monochromatic
     id: light_awning_outside_light
@@ -136,6 +266,23 @@ light:
     icon: "mdi:light-flood-down"
     default_transition_length: 500ms
     output: led_channel_9
+    on_turn_off: 
+      then:
+        - logger.log:
+            format: "Awning Outside Light Strip turned off"
+            level: INFO
+    on_turn_on: 
+      then:
+        - logger.log:
+            format: "Awning Outside Light Strip turned on"
+            level: INFO
+    on_state:
+      then:
+        - lambda: |-
+            if (id(light_awning_outside_light).current_values.is_on()) {
+              ESP_LOGI("light", "Awning Outside Light Strip brightness: %.0f%%", 
+                       id(light_awning_outside_light).current_values.get_brightness() * 100);
+            }
 
   - platform: monochromatic
     id: light_awning_inside_light
@@ -143,6 +290,23 @@ light:
     icon: "mdi:light-flood-down"
     default_transition_length: 500ms
     output: led_channel_10
+    on_turn_off: 
+      then:
+        - logger.log:
+            format: "Awning Inside Light Strip turned off"
+            level: INFO
+    on_turn_on: 
+      then:
+        - logger.log:
+            format: "Awning Inside Light Strip turned on"
+            level: INFO
+    on_state:
+      then:
+        - lambda: |-
+            if (id(light_awning_inside_light).current_values.is_on()) {
+              ESP_LOGI("light", "Awning Inside Light Strip brightness: %.0f%%", 
+                       id(light_awning_inside_light).current_values.get_brightness() * 100);
+            }
 
   - platform: monochromatic
     id: light_exterior_passenger_capsule
@@ -150,6 +314,23 @@ light:
     icon: "mdi:wall-sconce-flat"
     default_transition_length: 500ms
     output: led_channel_11
+    on_turn_off: 
+      then:
+        - logger.log:
+            format: "Exterior Capsule Passenger Flood Light turned off"
+            level: INFO
+    on_turn_on: 
+      then:
+        - logger.log:
+            format: "Exterior Capsule Passenger Flood Light turned on"
+            level: INFO
+    on_state:
+      then:
+        - lambda: |-
+            if (id(light_exterior_passenger_capsule).current_values.is_on()) {
+              ESP_LOGI("light", "Exterior Capsule Passenger Flood Light brightness: %.0f%%", 
+                       id(light_exterior_passenger_capsule).current_values.get_brightness() * 100);
+            }
 
   - platform: monochromatic
     id: light_exterior_driver_capsule
@@ -157,6 +338,23 @@ light:
     icon: "mdi:wall-sconce-flat"
     default_transition_length: 500ms
     output: led_channel_12
+    on_turn_off: 
+      then:
+        - logger.log:
+            format: "Exterior Capsule Driver Flood Light turned off"
+            level: INFO
+    on_turn_on: 
+      then:
+        - logger.log:
+            format: "Exterior Capsule Driver Flood Light turned on"
+            level: INFO
+    on_state:
+      then:
+        - lambda: |-
+            if (id(light_exterior_driver_capsule).current_values.is_on()) {
+              ESP_LOGI("light", "Exterior Capsule Driver Flood Light brightness: %.0f%%", 
+                       id(light_exterior_driver_capsule).current_values.get_brightness() * 100);
+            }
 
   - platform: monochromatic
     id: light_exterior_roof_passenger
@@ -164,6 +362,23 @@ light:
     icon: "mdi:light-flood-down"
     default_transition_length: 500ms
     output: led_channel_13
+    on_turn_off: 
+      then:
+        - logger.log:
+            format: "Exterior Roof Passenger Flood Light turned off"
+            level: INFO
+    on_turn_on: 
+      then:
+        - logger.log:
+            format: "Exterior Roof Passenger Flood Light turned on"
+            level: INFO
+    on_state:
+      then:
+        - lambda: |-
+            if (id(light_exterior_roof_passenger).current_values.is_on()) {
+              ESP_LOGI("light", "Exterior Roof Passenger Flood Light brightness: %.0f%%", 
+                       id(light_exterior_roof_passenger).current_values.get_brightness() * 100);
+            }
 
   - platform: monochromatic
     id: light_exterior_roof_driver
@@ -171,6 +386,23 @@ light:
     icon: "mdi:light-flood-down"
     default_transition_length: 500ms
     output: led_channel_14
+    on_turn_off: 
+      then:
+        - logger.log:
+            format: "Exterior Roof Driver Flood Light turned off"
+            level: INFO
+    on_turn_on: 
+      then:
+        - logger.log:
+            format: "Exterior Roof Driver Flood Light turned on"
+            level: INFO
+    on_state:
+      then:
+        - lambda: |-
+            if (id(light_exterior_roof_driver).current_values.is_on()) {
+              ESP_LOGI("light", "Exterior Roof Driver Flood Light brightness: %.0f%%", 
+                       id(light_exterior_roof_driver).current_values.get_brightness() * 100);
+            }
 
   - platform: monochromatic
     id: light_exterior_roof_rear
@@ -178,6 +410,23 @@ light:
     icon: "mdi:light-flood-down"
     default_transition_length: 500ms
     output: led_channel_15
+    on_turn_off: 
+      then:
+        - logger.log:
+            format: "Exterior Roof Rear Flood Light turned off"
+            level: INFO
+    on_turn_on: 
+      then:
+        - logger.log:
+            format: "Exterior Roof Rear Flood Light turned on"
+            level: INFO
+    on_state:
+      then:
+        - lambda: |-
+            if (id(light_exterior_roof_rear).current_values.is_on()) {
+              ESP_LOGI("light", "Exterior Roof Rear Flood Light brightness: %.0f%%", 
+                       id(light_exterior_roof_rear).current_values.get_brightness() * 100);
+            }
 
 script:
   - id: update_color_temp_and_brightness
@@ -241,6 +490,9 @@ script:
          
   - id: turn_off_exterior_flood_lights
     then:
+      - logger.log:
+          format: "Script: turn_off_exterior_flood_lights called"
+          level: INFO
       - light.turn_off: light_exterior_roof_rear
       - light.turn_off: light_exterior_roof_driver
       - light.turn_off: light_exterior_roof_passenger
@@ -249,6 +501,9 @@ script:
   
   - id: turn_on_exterior_flood_lights
     then:
+      - logger.log:
+          format: "Script: turn_on_exterior_flood_lights called"
+          level: INFO
       - if:
           condition:
             lambda: 'return id(sun_elevation).state < 10;'
@@ -300,6 +555,9 @@ script:
 
   - id: turn_on_interior_lights
     then:
+      - logger.log:
+          format: "Script: turn_on_interior_lights called"
+          level: INFO
       - light.turn_on:
           id: main_can_lights
           brightness: 100%
@@ -327,6 +585,9 @@ script:
 
   - id: turn_off_interior_lights
     then:
+      - logger.log:
+          format: "Script: turn_off_interior_lights called"
+          level: INFO
       - light.turn_off: main_can_lights
       - light.turn_off: bed_can_lights
       - light.turn_off: door_light
@@ -344,7 +605,9 @@ script:
               - light.is_off: cwww_led_dog_crate_lights
               - light.is_off: cwww_led_capsule_lights
           then:
-            - light.turn_on: main_can_lights
+            - light.turn_on:
+                id: main_can_lights
+                brightness: 100%
           else:
             - script.execute: turn_off_interior_lights
 
@@ -354,6 +617,9 @@ binary_sensor:
     name: "Garage LED Light Button"
     internal: true
     on_press:
+      - logger.log:
+          format: "Button 1 pressed - Garage light toggle"
+          level: INFO
       - if:
           condition:
             light.is_on: garage_led_lights
@@ -387,6 +653,9 @@ binary_sensor:
           - ON for at most 500ms
           - OFF for at least 100ms
         then:
+          - logger.log:
+              format: "Button 2 single click - Toggle interior lights"
+              level: INFO
           - script.execute: toggle_interior_lights
 
       # Double click
@@ -396,12 +665,18 @@ binary_sensor:
           - ON for at most 500ms
           - OFF for at least 100ms
         then:
+          - logger.log:
+              format: "Button 2 double click - Turn on all interior lights"
+              level: INFO
           - script.execute: turn_on_interior_lights
   
       # Long press
       - timing:
           - ON for at least 1000ms
         then:
+          - logger.log:
+              format: "Button 2 long press - Turn off interior lights"
+              level: INFO
           - script.execute: turn_off_interior_lights
 
   - id: !extend button_3
@@ -520,9 +795,8 @@ binary_sensor:
     on_release:
       - light.turn_off:
           id: light_exterior_roof_passenger
-      - light.turn_on:
+      - light.turn_off:
           id: light_exterior_passenger_capsule
-          brightness: 100%
 
   - id: !extend pcf8574_button_4
     name: "Lower Exterior Passenger Light Switch"
@@ -551,16 +825,25 @@ binary_sensor:
   - id: !extend wizmote_on
     internal: true
     on_press:
+      - logger.log:
+          format: "Wizmote ON button pressed"
+          level: INFO
       - script.execute: turn_on_lights
   
   - id: !extend wizmote_off
     internal: true
     on_press:
+      - logger.log:
+          format: "Wizmote OFF button pressed"
+          level: INFO
       - script.execute: turn_off_lights
 
   - id: !extend wizmote_sleep
     internal: true
     on_press:
+      - logger.log:
+          format: "Wizmote SLEEP button pressed"
+          level: INFO
       - script.execute: turn_off_exterior_flood_lights
       - light.turn_off: main_can_lights
       - light.turn_off: door_light
@@ -571,22 +854,35 @@ binary_sensor:
   - id: !extend wizmote_1
     internal: true
     on_press:
+      - logger.log:
+          format: "Wizmote 1 button pressed"
+          level: INFO
       - script.execute: toggle_interior_lights
 
   - id: !extend wizmote_2
     internal: true
     on_press:
+      - logger.log:
+          format: "Wizmote 2 button pressed"
+          level: INFO
       - script.execute: toggle_exterior_flood_lights
 
   - id: !extend wizmote_3
     internal: true
     on_press:
+      - logger.log:
+          format: "Wizmote 3 button pressed"
+          level: INFO
       - light.turn_on:
           id: light_exterior_driver_capsule
           brightness: 100%
 
   - id: !extend wizmote_4
     internal: true
+    on_press:
+      - logger.log:
+          format: "Wizmote 4 button pressed"
+          level: INFO
       - light.turn_on:
           id: light_exterior_passenger_capsule
           brightness: 100%
@@ -594,71 +890,75 @@ binary_sensor:
   - id: !extend wizmote_up
     internal: true
     on_press:
+      - logger.log:
+          format: "Wizmote UP button pressed"
+          level: INFO
       - lambda: |-
           // Increase brightness for all lights that are currently on
+          float step = id(brightness_step);
           if (id(main_can_lights).current_values.is_on()) {
             auto call = id(main_can_lights).make_call();
-            call.set_brightness(min(1.0f, id(main_can_lights).current_values.get_brightness() + 0.1f));
+            call.set_brightness(min(1.0f, id(main_can_lights).current_values.get_brightness() + step));
             call.perform();
           }
           if (id(bed_can_lights).current_values.is_on()) {
             auto call = id(bed_can_lights).make_call();
-            call.set_brightness(min(1.0f, id(bed_can_lights).current_values.get_brightness() + 0.1f));
+            call.set_brightness(min(1.0f, id(bed_can_lights).current_values.get_brightness() + step));
             call.perform();
           }
           if (id(door_light).current_values.is_on()) {
             auto call = id(door_light).make_call();
-            call.set_brightness(min(1.0f, id(door_light).current_values.get_brightness() + 0.1f));
+            call.set_brightness(min(1.0f, id(door_light).current_values.get_brightness() + step));
             call.perform();
           }
           if (id(cwww_led_dog_crate_lights).current_values.is_on()) {
             auto call = id(cwww_led_dog_crate_lights).make_call();
-            call.set_brightness(min(1.0f, id(cwww_led_dog_crate_lights).current_values.get_brightness() + 0.1f));
+            call.set_brightness(min(1.0f, id(cwww_led_dog_crate_lights).current_values.get_brightness() + step));
             call.perform();
           }
           if (id(garage_led_lights).current_values.is_on()) {
             auto call = id(garage_led_lights).make_call();
-            call.set_brightness(min(1.0f, id(garage_led_lights).current_values.get_brightness() + 0.1f));
+            call.set_brightness(min(1.0f, id(garage_led_lights).current_values.get_brightness() + step));
             call.perform();
           }
           if (id(cwww_led_capsule_lights).current_values.is_on()) {
             auto call = id(cwww_led_capsule_lights).make_call();
-            call.set_brightness(min(1.0f, id(cwww_led_capsule_lights).current_values.get_brightness() + 0.1f));
+            call.set_brightness(min(1.0f, id(cwww_led_capsule_lights).current_values.get_brightness() + step));
             call.perform();
           }
           if (id(light_awning_outside_light).current_values.is_on()) {
             auto call = id(light_awning_outside_light).make_call();
-            call.set_brightness(min(1.0f, id(light_awning_outside_light).current_values.get_brightness() + 0.1f));
+            call.set_brightness(min(1.0f, id(light_awning_outside_light).current_values.get_brightness() + step));
             call.perform();
           }
           if (id(light_awning_inside_light).current_values.is_on()) {
             auto call = id(light_awning_inside_light).make_call();
-            call.set_brightness(min(1.0f, id(light_awning_inside_light).current_values.get_brightness() + 0.1f));
+            call.set_brightness(min(1.0f, id(light_awning_inside_light).current_values.get_brightness() + step));
             call.perform();
           }
           if (id(light_exterior_passenger_capsule).current_values.is_on()) {
             auto call = id(light_exterior_passenger_capsule).make_call();
-            call.set_brightness(min(1.0f, id(light_exterior_passenger_capsule).current_values.get_brightness() + 0.1f));
+            call.set_brightness(min(1.0f, id(light_exterior_passenger_capsule).current_values.get_brightness() + step));
             call.perform();
           }
           if (id(light_exterior_driver_capsule).current_values.is_on()) {
             auto call = id(light_exterior_driver_capsule).make_call();
-            call.set_brightness(min(1.0f, id(light_exterior_driver_capsule).current_values.get_brightness() + 0.1f));
+            call.set_brightness(min(1.0f, id(light_exterior_driver_capsule).current_values.get_brightness() + step));
             call.perform();
           }
           if (id(light_exterior_roof_passenger).current_values.is_on()) {
             auto call = id(light_exterior_roof_passenger).make_call();
-            call.set_brightness(min(1.0f, id(light_exterior_roof_passenger).current_values.get_brightness() + 0.1f));
+            call.set_brightness(min(1.0f, id(light_exterior_roof_passenger).current_values.get_brightness() + step));
             call.perform();
           }
           if (id(light_exterior_roof_driver).current_values.is_on()) {
             auto call = id(light_exterior_roof_driver).make_call();
-            call.set_brightness(min(1.0f, id(light_exterior_roof_driver).current_values.get_brightness() + 0.1f));
+            call.set_brightness(min(1.0f, id(light_exterior_roof_driver).current_values.get_brightness() + step));
             call.perform();
           }
           if (id(light_exterior_roof_rear).current_values.is_on()) {
             auto call = id(light_exterior_roof_rear).make_call();
-            call.set_brightness(min(1.0f, id(light_exterior_roof_rear).current_values.get_brightness() + 0.1f));
+            call.set_brightness(min(1.0f, id(light_exterior_roof_rear).current_values.get_brightness() + step));
             call.perform();
           }
           ESP_LOGD("wizmote", "Increased brightness for all active lights");
@@ -666,71 +966,75 @@ binary_sensor:
   - id: !extend wizmote_down
     internal: true
     on_press:
+      - logger.log:
+          format: "Wizmote DOWN button pressed"
+          level: INFO
       - lambda: |-
           // Decrease brightness for all lights that are currently on
+          float step = id(brightness_step);
           if (id(main_can_lights).current_values.is_on()) {
             auto call = id(main_can_lights).make_call();
-            call.set_brightness(max(0.01f, id(main_can_lights).current_values.get_brightness() - 0.1f));
+            call.set_brightness(max(0.01f, id(main_can_lights).current_values.get_brightness() - step));
             call.perform();
           }
           if (id(bed_can_lights).current_values.is_on()) {
             auto call = id(bed_can_lights).make_call();
-            call.set_brightness(max(0.01f, id(bed_can_lights).current_values.get_brightness() - 0.1f));
+            call.set_brightness(max(0.01f, id(bed_can_lights).current_values.get_brightness() - step));
             call.perform();
           }
           if (id(door_light).current_values.is_on()) {
             auto call = id(door_light).make_call();
-            call.set_brightness(max(0.01f, id(door_light).current_values.get_brightness() - 0.1f));
+            call.set_brightness(max(0.01f, id(door_light).current_values.get_brightness() - step));
             call.perform();
           }
           if (id(cwww_led_dog_crate_lights).current_values.is_on()) {
             auto call = id(cwww_led_dog_crate_lights).make_call();
-            call.set_brightness(max(0.01f, id(cwww_led_dog_crate_lights).current_values.get_brightness() - 0.1f));
+            call.set_brightness(max(0.01f, id(cwww_led_dog_crate_lights).current_values.get_brightness() - step));
             call.perform();
           }
           if (id(garage_led_lights).current_values.is_on()) {
             auto call = id(garage_led_lights).make_call();
-            call.set_brightness(max(0.01f, id(garage_led_lights).current_values.get_brightness() - 0.1f));
+            call.set_brightness(max(0.01f, id(garage_led_lights).current_values.get_brightness() - step));
             call.perform();
           }
           if (id(cwww_led_capsule_lights).current_values.is_on()) {
             auto call = id(cwww_led_capsule_lights).make_call();
-            call.set_brightness(max(0.01f, id(cwww_led_capsule_lights).current_values.get_brightness() - 0.1f));
+            call.set_brightness(max(0.01f, id(cwww_led_capsule_lights).current_values.get_brightness() - step));
             call.perform();
           }
           if (id(light_awning_outside_light).current_values.is_on()) {
             auto call = id(light_awning_outside_light).make_call();
-            call.set_brightness(max(0.01f, id(light_awning_outside_light).current_values.get_brightness() - 0.1f));
+            call.set_brightness(max(0.01f, id(light_awning_outside_light).current_values.get_brightness() - step));
             call.perform();
           }
           if (id(light_awning_inside_light).current_values.is_on()) {
             auto call = id(light_awning_inside_light).make_call();
-            call.set_brightness(max(0.01f, id(light_awning_inside_light).current_values.get_brightness() - 0.1f));
+            call.set_brightness(max(0.01f, id(light_awning_inside_light).current_values.get_brightness() - step));
             call.perform();
           }
           if (id(light_exterior_passenger_capsule).current_values.is_on()) {
             auto call = id(light_exterior_passenger_capsule).make_call();
-            call.set_brightness(max(0.01f, id(light_exterior_passenger_capsule).current_values.get_brightness() - 0.1f));
+            call.set_brightness(max(0.01f, id(light_exterior_passenger_capsule).current_values.get_brightness() - step));
             call.perform();
           }
           if (id(light_exterior_driver_capsule).current_values.is_on()) {
             auto call = id(light_exterior_driver_capsule).make_call();
-            call.set_brightness(max(0.01f, id(light_exterior_driver_capsule).current_values.get_brightness() - 0.1f));
+            call.set_brightness(max(0.01f, id(light_exterior_driver_capsule).current_values.get_brightness() - step));
             call.perform();
           }
           if (id(light_exterior_roof_passenger).current_values.is_on()) {
             auto call = id(light_exterior_roof_passenger).make_call();
-            call.set_brightness(max(0.01f, id(light_exterior_roof_passenger).current_values.get_brightness() - 0.1f));
+            call.set_brightness(max(0.01f, id(light_exterior_roof_passenger).current_values.get_brightness() - step));
             call.perform();
           }
           if (id(light_exterior_roof_driver).current_values.is_on()) {
             auto call = id(light_exterior_roof_driver).make_call();
-            call.set_brightness(max(0.01f, id(light_exterior_roof_driver).current_values.get_brightness() - 0.1f));
+            call.set_brightness(max(0.01f, id(light_exterior_roof_driver).current_values.get_brightness() - step));
             call.perform();
           }
           if (id(light_exterior_roof_rear).current_values.is_on()) {
             auto call = id(light_exterior_roof_rear).make_call();
-            call.set_brightness(max(0.01f, id(light_exterior_roof_rear).current_values.get_brightness() - 0.1f));
+            call.set_brightness(max(0.01f, id(light_exterior_roof_rear).current_values.get_brightness() - step));
             call.perform();
           }
           ESP_LOGD("wizmote", "Decreased brightness for all active lights");
@@ -740,12 +1044,33 @@ switch:
     name: "Auto Color Temperature"
     id: auto_color_temp_enabled
     optimistic: true
-    restore_mode: RESTORE_DEFAULT_ON
+    restore_mode: RESTORE_DEFAULT_OFF
     entity_category: config
     on_turn_on:
       - script.execute: adjust_light_color_temperature
     on_turn_off:
       - logger.log: "Auto color temperature disabled"
+      - lambda: |-
+          // Reset brightness to default (100%) for lights that are currently on
+          if (id(cwww_led_dog_crate_lights).current_values.is_on()) {
+            auto call = id(cwww_led_dog_crate_lights).turn_on();
+            call.set_brightness(1.0);
+            call.perform();
+          }
+          
+          if (id(cwww_led_capsule_lights).current_values.is_on()) {
+            auto call = id(cwww_led_capsule_lights).turn_on();
+            call.set_brightness(1.0);
+            call.perform();
+          }
+          
+          if (id(garage_led_lights).current_values.is_on()) {
+            auto call = id(garage_led_lights).turn_on();
+            call.set_brightness(1.0);
+            call.perform();
+          }
+          
+          ESP_LOGD("color_temp", "Reset brightness to 100%% for all active lights")
 
 interval:
   - interval: 5min
