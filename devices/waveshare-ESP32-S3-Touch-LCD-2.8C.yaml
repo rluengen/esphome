@@ -103,13 +103,8 @@ display:
     dimensions:
       width: 480
       height: 480
-    pclk_frequency: 12MHz
-    hsync_back_porch: 10
-    hsync_front_porch: 10
-    hsync_pulse_width: 8
-    vsync_back_porch: 10
-    vsync_front_porch: 10
-    vsync_pulse_width: 8
+      offset_width: 2
+      offset_height: 2
     cs_pin:
       pca9554: p_c_a
       number: 2
