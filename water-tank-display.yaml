@@ -209,6 +209,19 @@ number:
     unit_of_measurement: "Ohms"
     icon: "mdi:omega"
 
+  - platform: template
+    id: screen_timeout_minutes
+    name: "Screen Timeout"
+    min_value: 1
+    max_value: 60
+    step: 1
+    initial_value: 5
+    entity_category: config
+    optimistic: true
+    mode: box
+    unit_of_measurement: "minutes"
+    icon: "mdi:timer-outline"
+
 wifi:
   on_connect:
     - lvgl.label.update:
@@ -230,6 +243,12 @@ pcf8574:
     i2c_id: i2c_bus
     address: 0x21       # The I2C address of the driver. 0x20 is the default, bridge A0 to get 0x21 not to conflict with the board.
     pcf8575: false      # Whether this is a 16-pin PCF8575
+
+# Extend touchscreen to wake screen on touch
+touchscreen:
+  - id: !extend touch_id
+    on_touch:
+      - script.execute: wake_screen
 
 binary_sensor:
   - platform: template
@@ -404,10 +423,9 @@ sensor:
         - lvgl.label.update:
             id: lbl_tank_status
             text: !lambda |-
-              // check to see if there are any error conditions, place them here first?
-              // id(water_tank_full).state
-              // id(water_leak_detected)
-
+              // Check for water leak first - highest priority
+              if (id(water_leak_detected).state) return "Water Leak";
+              
               if (isnan(x)) return "Unknown";
               else if (x >= 95.0) return "Full";
               else if (x >= 75.0) return "High";
@@ -503,6 +521,7 @@ valve:
     lambda: |-
       return {};
     open_action:
+      - script.execute: wake_screen
       - if:
           condition:
             binary_sensor.is_on: water_tank_full
@@ -524,6 +543,7 @@ valve:
                 text: "\U000F1068"
             - logger.log: "Input Selection Valve Opened"
     close_action:
+      - script.execute: wake_screen
       - logger.log: "Input Selection Valve Closing"
       - switch.turn_off: relay_hydrant_valve
       - valve.template.publish:
@@ -554,6 +574,7 @@ valve:
     lambda: |-
       return {};
     open_action:
+      - script.execute: wake_screen
       - if:
           condition:
             binary_sensor.is_on: water_tank_low
@@ -576,6 +597,7 @@ valve:
                 text: "\U000F1068"
             - logger.log: "Water Pump Source Valve Opened"
     close_action:
+      - script.execute: wake_screen
       - logger.log: "Water Pump Source Valve Closing"
       - switch.turn_off: relay_source_valve
       - valve.template.publish:
@@ -606,6 +628,7 @@ valve:
     lambda: |-
       return {};
     open_action:
+      - script.execute: wake_screen
       - if:
           condition:
             binary_sensor.is_on: water_tank_full
@@ -627,6 +650,7 @@ valve:
                 text: "\U000F1068"
             - logger.log: "Tank Fill Valve Opened"
     close_action:
+      - script.execute: wake_screen
       - logger.log: "Tank Fill Valve Closing"
       - switch.turn_off: relay_fill_valve
       - valve.template.publish:
@@ -652,6 +676,7 @@ switch:
     lambda: |-
       return id(relay_water_pump).state;
     turn_on_action:
+      - script.execute: wake_screen
       - if:
           condition:
             and:
@@ -668,16 +693,17 @@ switch:
             - switch.turn_on: relay_water_pump
             - lvgl.label.update:
                 id: lbl_pump_status
-                text: "\U000F1036"  # pump-on icon
+                text: "\U000F058E"  # water-pump icon (on)
                 text_color: 0x00BFFF  # Deep sky blue for running
     turn_off_action:
+      - script.execute: wake_screen
       - switch.turn_off: relay_water_pump
       - delay: 250ms  # Wait for pump to stop before closing valves
       - valve.close: valve_water_pump_source
       - valve.close: valve_input_output_hydrant
       - lvgl.label.update:
           id: lbl_pump_status
-          text: "\U000F1037"  # pump-off icon
+          text: "\U000F0F93"  # water-pump-off icon
           text_color: 0x888888  # Gray for off
 
   - platform: template
@@ -688,9 +714,17 @@ switch:
       return id(hot_water_heater_relay).state;
     turn_on_action:
       - switch.turn_on: hot_water_heater_relay
+      - lvgl.label.update:
+          id: lbl_hot_water_status
+          text: "\U000F0F92"  # water-boiler icon (on)
+          text_color: 0xFF6600  # Orange for heating
       - script.execute: hot_water_heater_timer_countdown
     turn_off_action:
       - switch.turn_off: hot_water_heater_relay
+      - lvgl.label.update:
+          id: lbl_hot_water_status
+          text: "\U000F0F91"  # water-boiler-off icon
+          text_color: 0x888888  # Gray for off
       - script.stop: hot_water_heater_timer_countdown
 
   # XL9535 relay outputs
@@ -779,8 +813,10 @@ font:
       "\U000F1066", # valve
       "\U000F1067", # valve-closed
       "\U000F1068", # valve-open
-      "\U000F1036", # pump
-      "\U000F1037", # pump-off
+      "\U000F058E", # water-pump
+      "\U000F0F93", # water-pump-off  
+      "\U000F0F92", # water-boiler
+      "\U000F0F91", # water-boiler-off
     ]
 
 color:
@@ -808,9 +844,12 @@ lvgl:
   bg_color: 0x000000
   buffer_size: 100%
   on_idle:
-    timeout: 300s
+    timeout: !lambda 'return (uint32_t)(id(screen_timeout_minutes).state * 60 * 1000);'
     then:
-      - logger.log: "LVGL is idle"
+      - logger.log: "Screen timeout - turning off backlight"
+      - light.turn_off:
+          id: display_backlight_id
+          transition_length: 1s
 
   on_boot:
     then:
@@ -826,106 +865,6 @@ lvgl:
       long_press_time: 400ms
       long_press_repeat_time: 100ms
 
-  top_layer:
-    bg_color: 0x000000
-    bg_opa: COVER
-    widgets:
-      - arc:
-          id: tank_arc
-          height: 460
-          width: 460
-          align: CENTER
-          arc_width: 25
-          arc_color: 0x0080FF
-          arc_rounded: true
-          value: 0
-          min_value: 0
-          max_value: 100
-          start_angle: 135
-          x: 3
-          end_angle: 45  # 270 degree arc
-          bg_opa: TRANSP
-          adjustable: false
-          arc_opa: COVER
-          clickable: false
-
-      # Tank status label at bottom
-      - label:
-          id: lbl_tank_status
-          text: ""
-          align: BOTTOM_MID
-          y: -15
-          text_font: f_text_32
-          text_color: 0x888888
-          text_align: CENTER
-
-      # Status icons row above tank status
-      - label:
-          id: lbl_connection_status
-          align: BOTTOM_LEFT
-          x: 20
-          y: -60
-          text_align: LEFT
-          text_font: homeassistant_icons
-          text: "\U000F07D0"
-          text_color: 0x03A9F4 # Blue color for Home Assistant icon
-          clickable: false
-
-      - label:
-          id: lbl_wifi_status
-          text: "\U000F05AA"  # wifi-off icon by default
-          align: BOTTOM_LEFT
-          x: 80
-          y: -60
-          text_font: wifi_icons
-          text_color: 0x888888  # Gray for disconnected
-          text_align: LEFT
-          clickable: false
-
-      - label:
-          id: lbl_valve_hydrant
-          text: "\U000F1066"
-          align: BOTTOM_LEFT
-          x: 130
-          y: -60
-          text_font: valve_icon_40
-          text_color: 0x00CED1  # Turquoise for hydrant
-          text_align: LEFT
-          clickable: false
-
-      - label:
-          id: lbl_valve_source
-          text: "\U000F1066"
-          align: BOTTOM_LEFT
-          x: 190
-          y: -60
-          text_font: valve_icon_40
-          text_color: 0x888888  # Gray for source
-          text_align: LEFT
-          clickable: false
-
-      - label:
-          id: lbl_valve_fill
-          text: "\U000F1066"
-          align: BOTTOM_LEFT
-          x: 250
-          y: -60
-          text_font: valve_icon_40
-          text_color: 0x00FF00  # Green for fill
-          text_align: LEFT
-          clickable: false
-
-      - label:
-          id: lbl_pump_status
-          text: "\U000F1037"  # pump-off icon by default
-          align: BOTTOM_LEFT
-          x: 310
-          y: -60
-          text_font: valve_icon_40
-          text_color: 0x888888  # Gray for off
-          text_align: LEFT
-          clickable: false
-
   widgets:
     - obj:
         align: CENTER
@@ -934,7 +873,7 @@ lvgl:
         bg_color: 0x000000
         on_click:
           then:
-            - logger.log: "Pump switch clicked"
+            - logger.log: "Pump UI on_click"
             - switch.toggle: water_pump_switch
 
         widgets:
@@ -1013,8 +952,132 @@ lvgl:
             text_align: CENTER
             clickable: false
             hidden: true  # Hide by default, show only during countdown
+
+        # Tank level arc (rendered on top, non-clickable)
+        - arc:
+            id: tank_arc
+            height: 460
+            width: 460
+            align: CENTER
+            arc_width: 25
+            arc_color: 0x0080FF
+            arc_rounded: true
+            value: 0
+            min_value: 0
+            max_value: 100
+            start_angle: 135
+            x: 3
+            end_angle: 45  # 270 degree arc
+            bg_opa: TRANSP
+            adjustable: false
+            arc_opa: COVER
+            clickable: false
+
+        # Tank status label at bottom
+        - label:
+            id: lbl_tank_status
+            text: ""
+            align: BOTTOM_MID
+            y: -15
+            text_font: f_text_32
+            text_color: 0x888888
+            text_align: CENTER
+            clickable: false
+
+        # Status icons row above tank status
+        - label:
+            id: lbl_connection_status
+            align: BOTTOM_LEFT
+            x: 20
+            y: -60
+            text_align: LEFT
+            text_font: homeassistant_icons
+            text: "\U000F07D0"
+            text_color: 0x03A9F4 # Blue color for Home Assistant icon
+            clickable: false
+
+        - label:
+            id: lbl_wifi_status
+            text: "\U000F05AA"  # wifi-off icon by default
+            align: BOTTOM_LEFT
+            x: 80
+            y: -60
+            text_font: wifi_icons
+            text_color: 0x888888  # Gray for disconnected
+            text_align: LEFT
+            clickable: false
+
+        - label:
+            id: lbl_valve_hydrant
+            text: "\U000F1066"
+            align: BOTTOM_LEFT
+            x: 130
+            y: -60
+            text_font: valve_icon_40
+            text_color: 0x00CED1  # Turquoise for hydrant
+            text_align: LEFT
+            clickable: false
+
+        - label:
+            id: lbl_valve_source
+            text: "\U000F1066"
+            align: BOTTOM_LEFT
+            x: 190
+            y: -60
+            text_font: valve_icon_40
+            text_color: 0x888888  # Gray for source
+            text_align: LEFT
+            clickable: false
+
+        - label:
+            id: lbl_valve_fill
+            text: "\U000F1066"
+            align: BOTTOM_LEFT
+            x: 250
+            y: -60
+            text_font: valve_icon_40
+            text_color: 0x00FF00  # Green for fill
+            text_align: LEFT
+            clickable: false
+
+        # Water pump indicator
+        - label:
+            id: lbl_pump_status
+            text: "\U000F0F93"  # water-pump-off icon
+            align: BOTTOM_LEFT
+            x: 310
+            y: -60
+            text_font: valve_icon_40
+            text_color: 0x888888  # Gray for off
+            text_align: LEFT
+            clickable: false
+
+        # Hot water heater indicator  
+        - label:
+            id: lbl_hot_water_status
+            text: "\U000F0F91"  # water-boiler-off icon
+            align: BOTTOM_LEFT
+            x: 370
+            y: -60
+            text_font: valve_icon_40
+            text_color: 0x888888  # Gray for off
+            text_align: LEFT
+            clickable: false
             
 script:
+  - id: wake_screen
+    mode: restart
+    then:
+      - if:
+          condition:
+            light.is_off: display_backlight_id
+          then:
+            - logger.log: "Waking screen"
+            - light.turn_on:
+                id: display_backlight_id
+                brightness: 100%
+                transition_length: 500ms
+
   - id: dirty_water_fill
     then:
       - if:
@@ -1045,7 +1108,7 @@ script:
             - switch.turn_on: relay_water_pump
             - lvgl.label.update:
                 id: lbl_pump_status
-                text: "\U000F1036"  # pump-on icon
+                text: "\U000F058E"  # water-pump icon (on)
                 text_color: 0x00BFFF  # Deep sky blue for running
             
             # Monitor fill progress
