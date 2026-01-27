@@ -843,6 +843,7 @@ api:
 lvgl:
   bg_color: 0x000000
   buffer_size: 100%
+  bg_opa: COVER
   on_idle:
     timeout: !lambda 'return (uint32_t)(id(screen_timeout_minutes).state * 60 * 1000);'
     then:
