@@ -636,6 +636,10 @@ binary_sensor:
                 } else {
                   id(garage_led_lights).turn_on().perform();
                 }
+    on_release:
+      - logger.log:
+          format: "Button 1 released - no action"
+          level: INFO
 
 # Button 2    Up Cabin Light Button           tap - Turn on cabin lights
 #                                             double tap - Turn on all cabin lights
@@ -683,26 +687,33 @@ binary_sensor:
     internal: true
     name: "Button 3"
     on_press:
+      - if:
+          condition:
+            light.is_off: door_light
+          then:
+            - logger.log:
+               format: "Button 3 pressed - door light is off, turning on"
+               level: INFO
       - light.turn_on:
           id: door_light
-          brightness: 0%
+                brightness: 100%
+          else:
       - while:
           condition:
             binary_sensor.is_on: button_3
           then:
+                  - logger.log:
+                     format: "Button 3 pressed - door light is on, increasing brightness 5%"
+                     level: INFO
             - light.dim_relative:
                 id: door_light
                 relative_brightness: 5%
                 transition_length: 100ms
             - delay: 200ms
     on_release:
-      - if:
-          condition:
-            lambda: 'return id(door_light).current_values.get_brightness() < 0.1;'
-          then:
-            - light.turn_on:
-                id: door_light
-                brightness: 100%
+      - logger.log:
+          format: "Button 3 released"
+          level: INFO
 
   - id: !extend button_4
     internal: true
@@ -724,6 +735,9 @@ binary_sensor:
       - delayed_on: 50ms
       - delayed_off: 50ms
     on_press:
+      - logger.log:
+          format: "PCF8574 Button 0 pressed - Upper+Lower Exterior Driver"
+          level: INFO
       - light.turn_on:
           id: light_exterior_roof_driver
           brightness: 100%
@@ -731,6 +745,9 @@ binary_sensor:
           id: light_exterior_driver_capsule
           brightness: 100%
     on_release:
+      - logger.log:
+          format: "PCF8574 Button 0 released - Turn off exterior driver lights"
+          level: INFO
       - light.turn_off:
           id: light_exterior_roof_driver
       - light.turn_off:
@@ -743,10 +760,16 @@ binary_sensor:
       - delayed_on: 50ms
       - delayed_off: 50ms
     on_press:
+      - logger.log:
+          format: "PCF8574 Button 1 pressed - Lower Exterior Driver"
+          level: INFO
       - light.turn_on:
           id: light_exterior_driver_capsule
           brightness: 100%
     on_release:
+      - logger.log:
+          format: "PCF8574 Button 1 released - Turn off exterior passenger capsule light"
+          level: INFO
       - light.turn_off:
           id: light_exterior_driver_capsule
 
@@ -762,6 +785,9 @@ binary_sensor:
           - ON for at most 500ms
           - OFF for at least 100ms
         then:
+          - logger.log:
+              format: "PCF8574 Button 2 single click - Toggle exterior floods"
+              level: INFO
           - script.execute: toggle_exterior_flood_lights
 
       # Double click
@@ -771,12 +797,18 @@ binary_sensor:
           - ON for at most 500ms
           - OFF for at least 100ms
         then:
+          - logger.log:
+              format: "PCF8574 Button 2 double click - Turn on all exterior"
+              level: INFO
           - script.execute: turn_on_exterior_flood_lights
   
       # Long press
       - timing:
           - ON for at least 1000ms
         then:
+          - logger.log:
+              format: "PCF8574 Button 2 long press - Turn off all exterior"
+              level: INFO
           - script.execute: turn_off_exterior_flood_lights
 
   - id: !extend pcf8574_button_3
@@ -786,6 +818,9 @@ binary_sensor:
       - delayed_on: 50ms
       - delayed_off: 50ms
     on_press:
+      - logger.log:
+          format: "PCF8574 Button 3 pressed - Exterior Passenger Lights On 100%"
+          level: INFO
       - light.turn_on:
           id: light_exterior_roof_passenger
           brightness: 100%
@@ -793,6 +828,9 @@ binary_sensor:
           id: light_exterior_passenger_capsule
           brightness: 100%
     on_release:
+      - logger.log:
+          format: "PCF8574 Button 3 released - Exterior Passenger Lights Off"
+          level: INFO
       - light.turn_off:
           id: light_exterior_roof_passenger
       - light.turn_off:
@@ -805,10 +843,16 @@ binary_sensor:
       - delayed_on: 50ms
       - delayed_off: 50ms
     on_press:
+      - logger.log:
+          format: "PCF8574 Button 4 pressed - Lower Exterior Passenger Capsule On 100%"
+          level: INFO
       - light.turn_on:
           id: light_exterior_passenger_capsule
           brightness: 100%
     on_release:
+      - logger.log:
+          format: "PCF8574 Button 4 released - Lower Exterior Passenger Capsule Off"
+          level: INFO
       - light.turn_off:
           id: light_exterior_passenger_capsule
 
