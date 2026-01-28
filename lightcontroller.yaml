@@ -432,6 +432,9 @@ script:
   - id: update_color_temp_and_brightness
     mode: single
     then:
+      - logger.log:
+          format: "Script: update_color_temp_and_brightness called"
+          level: INFO
       - lambda: |-
           // Calculate color temperature based on sun elevation
           // Elevation ranges roughly from -90° (midnight) to +90° (noon)
@@ -466,6 +469,9 @@ script:
   - id: adjust_light_color_temperature
     mode: restart
     then:
+      - logger.log:
+          format: "Script: adjust_light_color_temperature called"
+          level: INFO
       - script.execute: update_color_temp_and_brightness
       - lambda: |-
           // Only adjust lights that are currently on and auto mode is enabled
@@ -528,6 +534,9 @@ script:
 
   - id: toggle_exterior_flood_lights
     then:
+      - logger.log:
+          format: "Script: toggle_exterior_flood_lights called"
+          level: INFO
       - if:
           condition:
             and:
@@ -543,10 +552,16 @@ script:
   
   - id: turn_on_lights
     then:
+      - logger.log:
+          format: "Script: turn_on_lights called"
+          level: INFO
       - script.execute: turn_on_interior_lights
 
   - id: turn_off_lights
     then:
+      - logger.log:
+          format: "Script: turn_off_lights called"
+          level: INFO
       - script.execute: turn_off_exterior_flood_lights
       - script.execute: turn_off_interior_lights
       - light.turn_off: garage_led_lights
@@ -596,6 +611,9 @@ script:
 
   - id: toggle_interior_lights
     then:
+      - logger.log:
+          format: "Script: toggle_interior_lights called"
+          level: INFO
       - if:
           condition:
             and:
@@ -605,6 +623,9 @@ script:
               - light.is_off: cwww_led_dog_crate_lights
               - light.is_off: cwww_led_capsule_lights
           then:
+            - logger.log:
+                format: "Toggling on interior lights (main can lights)"
+                level: INFO
             - light.turn_on:
                 id: main_can_lights
                 brightness: 100%
@@ -612,6 +633,10 @@ script:
             - script.execute: turn_off_interior_lights
 
 binary_sensor:
+
+# TODO: button 1/2 should be interior light up/down, 3/4 should be exterior lights up/down
+# then move the garage LED button to one of the extended buttons?
+
 # Button 1    Garage Light Button             Toggle garage lights on press
   - id: !extend button_1
     name: "Garage LED Light Button"
@@ -1091,6 +1116,7 @@ switch:
     restore_mode: RESTORE_DEFAULT_OFF
     entity_category: config
     on_turn_on:
+      - logger.log: "Auto color temperature enabled"
       - script.execute: adjust_light_color_temperature
     on_turn_off:
       - logger.log: "Auto color temperature disabled"
