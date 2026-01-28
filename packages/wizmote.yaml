@@ -50,49 +50,59 @@ wizmote:
 
 wifi:
   power_save_mode: none
+  fast_connect: true
 
 binary_sensor:
     # Wizmote Pin 1
   - platform: template
     id: wizmote_on
     name: "Wizmote On"
+    lambda: 'return false;'
 
     # Wizmote Pin 2
   - platform: template
     id: wizmote_off
     name: "Wizmote Off"
+    lambda: 'return false;'
 
     # Wizmote Pin 3
   - platform: template
     id: wizmote_sleep
     name: "Wizmote Sleep"
+    lambda: 'return false;'
 
     # Wizmote Pin 16
   - platform: template
     id: wizmote_1
     name: "Wizmote 1"
+    lambda: 'return false;'
 
     # Wizmote Pin 17
   - platform: template
     id: wizmote_2
     name: "Wizmote 2"
+    lambda: 'return false;'
 
     # Wizmote Pin 18
   - platform: template
     id: wizmote_3
     name: "Wizmote 3"
+    lambda: 'return false;'
 
     # Wizmote Pin 19
   - platform: template
     id: wizmote_4
     name: "Wizmote 4"
+    lambda: 'return false;'
 
     # Wizmote Pin 8
   - platform: template
     id: wizmote_down
     name: "Wizmote -"
+    lambda: 'return false;'
 
     # Wizmote Pin 9
   - platform: template
     id: wizmote_up
     name: "Wizmote +"
+    lambda: 'return false;'
