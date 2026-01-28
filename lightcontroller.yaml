@@ -694,22 +694,22 @@ binary_sensor:
             - logger.log:
                format: "Button 3 pressed - door light is off, turning on"
                level: INFO
-      - light.turn_on:
-          id: door_light
+            - light.turn_on:
+                id: door_light
                 brightness: 100%
           else:
-      - while:
-          condition:
-            binary_sensor.is_on: button_3
-          then:
+            - while:
+                condition:
+                  binary_sensor.is_on: button_3
+                then:
                   - logger.log:
                      format: "Button 3 pressed - door light is on, increasing brightness 5%"
                      level: INFO
-            - light.dim_relative:
-                id: door_light
-                relative_brightness: 5%
-                transition_length: 100ms
-            - delay: 200ms
+                  - light.dim_relative:
+                      id: door_light
+                      relative_brightness: 5%
+                      transition_length: 100ms
+                  - delay: 200ms
     on_release:
       - logger.log:
           format: "Button 3 released"
