@@ -70,6 +70,26 @@ globals:
     type: float
     restore_value: yes
     initial_value: '0.1'
+  
+  - id: button_2_loop_count
+    type: int
+    restore_value: no
+    initial_value: '0'
+  
+  - id: button_4_loop_count
+    type: int
+    restore_value: no
+    initial_value: '0'
+  
+  - id: button_3_loop_count
+    type: int
+    restore_value: no
+    initial_value: '0'
+  
+  - id: button_1_loop_count
+    type: int
+    restore_value: no
+    initial_value: '0'
 
 sensor:
   - platform: homeassistant
@@ -514,15 +534,15 @@ script:
           condition:
             lambda: 'return id(sun_elevation).state < 10;'
           then:
-#            - light.turn_on: 
-#                id: light_exterior_roof_rear
-#                brightness: 100%
-#            - light.turn_on:
-#                id: light_exterior_roof_driver
-#                brightness: 100%
-#            - light.turn_on:
-#                id: light_exterior_roof_passenger
-#                brightness: 100%
+            - light.turn_on: 
+                id: light_exterior_roof_rear
+                brightness: 100%
+            - light.turn_on:
+                id: light_exterior_roof_driver
+                brightness: 100%
+            - light.turn_on:
+                id: light_exterior_roof_passenger
+                brightness: 100%
             - light.turn_on:
                 id: light_exterior_passenger_capsule
                 brightness: 100%
@@ -633,115 +653,443 @@ script:
             - script.execute: turn_off_interior_lights
 
 binary_sensor:
-
-# TODO: button 1/2 should be interior light up/down, 3/4 should be exterior lights up/down
-# then move the garage LED button to one of the extended buttons?
-
-# Button 1    Garage Light Button             Toggle garage lights on press
+# Button 1    Up Interior Light Button        tap - Turn on interior lights
+#                                             double tap - Turn on all interior lights
+#                                             press and hold - increase brightness of interior lights
   - id: !extend button_1
-    name: "Garage LED Light Button"
     internal: true
+    name: "Button 1 - Cabin Interior Lights Up"
     on_press:
-      - logger.log:
-          format: "Button 1 pressed - Garage light toggle"
-          level: INFO
+      - lambda: 'id(button_1_loop_count) = 0;'
       - if:
           condition:
-            light.is_on: garage_led_lights
-          then:
-            - logger.log: "Garage LED Light Button pressed, turning off light"
-            - light.turn_off: garage_led_lights
-          else:
-            - logger.log: "Garage LED Light Button pressed, turning on light"
-            - lambda: |-
-                if (id(auto_color_temp_enabled).state) {
-                  auto call = id(garage_led_lights).turn_on();
-                  call.set_brightness(id(current_brightness));
-                  call.perform();
-                } else {
-                  id(garage_led_lights).turn_on().perform();
-                }
-    on_release:
-      - logger.log:
-          format: "Button 1 released - no action"
-          level: INFO
-
-# Button 2    Up Cabin Light Button           tap - Turn on cabin lights
-#                                             double tap - Turn on all cabin lights
-#                                             press and hold - increase brightness of cabin lights
-# Button 3    Down Cabin Light Button         tap - Turn off cabin lights
-#                                             double tap - Turn off all cabin lights
-#                                             press and hold - decrease brightness of cabin lights
-
-  - id: !extend button_2
-    name: "Cabin Interior Lights Button"
-    internal: true
-    on_multi_click:
-      # Single click
-      - timing:
-          - ON for at most 500ms
-          - OFF for at least 100ms
-        then:
-          - logger.log:
-              format: "Button 2 single click - Toggle interior lights"
-              level: INFO
-          - script.execute: toggle_interior_lights
-
-      # Double click
-      - timing:
-          - ON for at most 500ms
-          - OFF for at most 500ms
-          - ON for at most 500ms
-          - OFF for at least 100ms
-        then:
-          - logger.log:
-              format: "Button 2 double click - Turn on all interior lights"
-              level: INFO
-          - script.execute: turn_on_interior_lights
-  
-      # Long press
-      - timing:
-          - ON for at least 1000ms
-        then:
-          - logger.log:
-              format: "Button 2 long press - Turn off interior lights"
-              level: INFO
-          - script.execute: turn_off_interior_lights
-
-  - id: !extend button_3
-    internal: true
-    name: "Button 3"
-    on_press:
-      - if:
-          condition:
-            light.is_off: door_light
+            and:
+              - light.is_off: main_can_lights
+              - light.is_off: bed_can_lights
           then:
             - logger.log:
-               format: "Button 3 pressed - door light is off, turning on"
+               format: "Button 1 pressed - main/bed lights are off, turning on to 20%"
                level: INFO
             - light.turn_on:
-                id: door_light
-                brightness: 100%
-          else:
-            - while:
+                id: main_can_lights
+                brightness: 20%
+            - light.turn_on:
+                id: bed_can_lights
+                brightness: 20%
+      - while:
+          condition:
+            binary_sensor.is_on: button_1
+          then:
+            - lambda: 'id(button_1_loop_count)++;'
+            # First, bring main_can_lights and bed_can_lights to 100%
+            - if:
                 condition:
-                  binary_sensor.is_on: button_3
+                  lambda: |-
+                    return id(main_can_lights).current_values.get_brightness() < 0.99 ||
+                           id(bed_can_lights).current_values.get_brightness() < 0.99;
                 then:
                   - logger.log:
-                     format: "Button 3 pressed - door light is on, increasing brightness 5%"
-                     level: INFO
+                      format: "Button 1 held - increasing main/bed lights brightness 5%"
+                      level: INFO
+                  - light.dim_relative:
+                      id: main_can_lights
+                      relative_brightness: 5%
+                      transition_length: 100ms
+                  - light.dim_relative:
+                      id: bed_can_lights
+                      relative_brightness: 5%
+                      transition_length: 100ms
+                else:
+                  - if:
+                      condition:
+                        and:
+                          - light.is_off: cwww_led_dog_crate_lights
+                          - light.is_off: door_light
+                          - light.is_off: cwww_led_capsule_lights
+                      then:
+                        - logger.log:
+                            format: "Button 1 pressed - dog crate/door/capsule lights are off, turning on to 20%"
+                            level: INFO
+                        - light.turn_on:
+                            id: cwww_led_dog_crate_lights
+                            brightness: 20%
+                        - light.turn_on:
+                            id: door_light
+                            brightness: 20%
+                        - light.turn_on:
+                            id: cwww_led_capsule_lights
+                            brightness: 20%
+                  # Main/bed lights at 100%, now work on dog crate/door/capsule lights
+                  - logger.log:
+                      format: "Button 1 held - main/bed at 100%, increasing dog crate/door/capsule lights brightness 5%"
+                      level: INFO
+                  - light.dim_relative:
+                      id: cwww_led_dog_crate_lights
+                      relative_brightness: 5%
+                      transition_length: 100ms
                   - light.dim_relative:
                       id: door_light
                       relative_brightness: 5%
                       transition_length: 100ms
+                  - light.dim_relative:
+                      id: cwww_led_capsule_lights
+                      relative_brightness: 5%
+                      transition_length: 100ms
+            - delay: 200ms
+    on_release:
+      - logger.log:
+          format: "Button 1 released"
+          level: INFO
+      - lambda: |-
+          // Short press = 0-1 loop iterations (< ~400ms) -> jump main/bed to 100% (only dog/door/capsule if already on)
+          // Long press = 2+ loop iterations (> ~400ms) -> stop at current brightness
+          ESP_LOGI("button", "Button 1 loop count: %d", id(button_1_loop_count));
+          if (id(button_1_loop_count) <= 1) {
+            ESP_LOGI("button", "Button 1 short press - setting main/bed lights to 100%");
+            // Always set main_can_lights and bed_can_lights to 100%
+            auto call1 = id(main_can_lights).turn_on();
+            call1.set_brightness(1.0);
+            call1.perform();
+            auto call2 = id(bed_can_lights).turn_on();
+            call2.set_brightness(1.0);
+            call2.perform();
+            
+            // Only set dog crate/door/capsule lights to 100% if they're already on
+            if (id(cwww_led_dog_crate_lights).current_values.is_on() || 
+                id(door_light).current_values.is_on() || 
+                id(cwww_led_capsule_lights).current_values.is_on()) {
+              ESP_LOGI("button", "Button 1 short press - dog crate/door/capsule lights already on, setting to 100%");
+              auto call3 = id(cwww_led_dog_crate_lights).turn_on();
+              call3.set_brightness(1.0);
+              call3.perform();
+              auto call4 = id(door_light).turn_on();
+              call4.set_brightness(1.0);
+              call4.perform();
+              auto call5 = id(cwww_led_capsule_lights).turn_on();
+              call5.set_brightness(1.0);
+              call5.perform();
+            }
+          } else {
+            ESP_LOGI("button", "Button 1 long press - stopping interior lights at current brightness");
+          }
+          id(button_1_loop_count) = 0;
+
+# Button 2    Down Cabin Light Button         tap - Turn off cabin lights
+#                                             press and hold - decrease brightness of cabin lights
+  - id: !extend button_2
+    name: "Button 2 - Cabin Interior Lights Down Button"
+    internal: true
+    on_press:
+      - lambda: 'id(button_2_loop_count) = 0;'
+      - if:
+          condition:
+            or:
+              - light.is_on: main_can_lights
+              - light.is_on: bed_can_lights
+              - light.is_on: door_light
+              - light.is_on: cwww_led_dog_crate_lights
+              - light.is_on: cwww_led_capsule_lights
+          then:
+            - logger.log:
+                format: "Button 2 pressed - starting to dim interior lights immediately"
+                level: INFO
+            - while:
+                condition:
+                  and:
+                    - binary_sensor.is_on: button_2
+                    - lambda: |-
+                        return id(main_can_lights).current_values.get_brightness() > 0.1 ||
+                               id(bed_can_lights).current_values.get_brightness() > 0.1 ||
+                               id(door_light).current_values.get_brightness() > 0.1 ||
+                               id(cwww_led_dog_crate_lights).current_values.get_brightness() > 0.1 ||
+                               id(cwww_led_capsule_lights).current_values.get_brightness() > 0.1;
+                then:
+                  - lambda: 'id(button_2_loop_count)++;'
+                  # First, dim main_can_lights and bed_can_lights to 10% threshold
+                  - if:
+                      condition:
+                        lambda: |-
+                          return id(main_can_lights).current_values.get_brightness() > 0.11 ||
+                                 id(bed_can_lights).current_values.get_brightness() > 0.11;
+                      then:
+                        - logger.log:
+                            format: "Button 2 held - dimming main/bed lights 5%"
+                            level: INFO
+                        - light.dim_relative:
+                            id: main_can_lights
+                            relative_brightness: -5%
+                            transition_length: 100ms
+                        - light.dim_relative:
+                            id: bed_can_lights
+                            relative_brightness: -5%
+                            transition_length: 100ms
+                      else:
+                        # Main/bed lights at threshold, now work on dog crate/door/capsule lights
+                        - logger.log:
+                            format: "Button 2 held - main/bed at threshold, dimming dog crate/door/capsule lights 5%"
+                            level: INFO
+                        - light.dim_relative:
+                            id: cwww_led_dog_crate_lights
+                            relative_brightness: -5%
+                            transition_length: 100ms
+                        - light.dim_relative:
+                            id: door_light
+                            relative_brightness: -5%
+                            transition_length: 100ms
+                        - light.dim_relative:
+                            id: cwww_led_capsule_lights
+                            relative_brightness: -5%
+                            transition_length: 100ms
                   - delay: 200ms
+            # Only turn off if we exited loop because of threshold, not because button was released
+            - if:
+                condition:
+                  binary_sensor.is_on: button_2
+                then:
+                  - logger.log:
+                      format: "Button 2 dimming reached threshold - turning off all interior lights"
+                      level: INFO
+                  - light.turn_off: main_can_lights
+                  - light.turn_off: bed_can_lights
+                  - light.turn_off: cwww_led_dog_crate_lights
+                  - light.turn_off: door_light
+                  - light.turn_off: cwww_led_capsule_lights
+    on_release:
+      - logger.log:
+          format: "Button 2 released"
+          level: INFO
+      - lambda: |-
+          // Short press = 0-1 loop iterations (< ~400ms)
+          // Long press = 2+ loop iterations (> ~400ms)
+          ESP_LOGI("button", "Button 2 loop count: %d", id(button_2_loop_count));
+          if (id(button_2_loop_count) <= 1) {
+            ESP_LOGI("button", "Button 2 short press - turning all interior lights off");
+            id(main_can_lights).turn_off().perform();
+            id(bed_can_lights).turn_off().perform();
+            id(cwww_led_dog_crate_lights).turn_off().perform();
+            id(door_light).turn_off().perform();
+            id(cwww_led_capsule_lights).turn_off().perform();
+          } else {
+            ESP_LOGI("button", "Button 2 long press - stopping at current brightness");
+          }
+          id(button_2_loop_count) = 0;
+
+  - id: !extend button_3
+    internal: true
+    name: "Button 3 - Exterior Lights Up Button"
+    on_press:
+      - lambda: 'id(button_3_loop_count) = 0;'
+      - if:
+          condition:
+            and:
+              - light.is_off: light_exterior_driver_capsule
+              - light.is_off: light_exterior_passenger_capsule
+          then:
+            - logger.log:
+                format: "Button 3 pressed - capsule lights are off, turning on to 20%"
+                level: INFO
+            - light.turn_on:
+                id: light_exterior_driver_capsule
+                brightness: 20%
+            - light.turn_on:
+                id: light_exterior_passenger_capsule
+                brightness: 20%
+      - while:
+          condition:
+            binary_sensor.is_on: button_3
+          then:
+            - lambda: 'id(button_3_loop_count)++;'
+            # First, bring capsule lights to 100%
+            - if:
+                condition:
+                  lambda: |-
+                    return id(light_exterior_driver_capsule).current_values.get_brightness() < 0.99 ||
+                           id(light_exterior_passenger_capsule).current_values.get_brightness() < 0.99;
+                then:
+                  - logger.log:
+                      format: "Button 3 held - increasing capsule lights brightness 5%"
+                      level: INFO
+                  - light.dim_relative:
+                      id: light_exterior_driver_capsule
+                      relative_brightness: 5%
+                      transition_length: 100ms
+                  - light.dim_relative:
+                      id: light_exterior_passenger_capsule
+                      relative_brightness: 5%
+                      transition_length: 100ms
+                else:
+                  - if:
+                      condition:
+                        and:
+                          - light.is_off: light_exterior_roof_rear
+                          - light.is_off: light_exterior_roof_driver
+                          - light.is_off: light_exterior_roof_passenger
+                      then:
+                        - logger.log:
+                            format: "Button 3 pressed - roof lights are off, turning on to 20%"
+                            level: INFO
+                        - light.turn_on:
+                            id: light_exterior_roof_rear
+                            brightness: 20%
+                        - light.turn_on:
+                            id: light_exterior_roof_driver
+                            brightness: 20%
+                        - light.turn_on:
+                            id: light_exterior_roof_passenger
+                            brightness: 20%
+                  # Capsule lights at 100%, now work on roof lights
+                  - logger.log:
+                      format: "Button 3 held - capsule lights at 100%, increasing roof lights brightness 5%"
+                      level: INFO
+                  - light.dim_relative:
+                      id: light_exterior_roof_rear
+                      relative_brightness: 5%
+                      transition_length: 100ms
+                  - light.dim_relative:
+                      id: light_exterior_roof_driver
+                      relative_brightness: 5%
+                      transition_length: 100ms
+                  - light.dim_relative:
+                      id: light_exterior_roof_passenger
+                      relative_brightness: 5%
+                      transition_length: 100ms
+            - delay: 200ms
     on_release:
       - logger.log:
           format: "Button 3 released"
           level: INFO
+      - lambda: |-
+          // Short press = 0-1 loop iterations (< ~400ms) -> jump capsule to 100% (only if roof lights already on)
+          // Long press = 2+ loop iterations (> ~400ms) -> stop at current brightness
+          ESP_LOGI("button", "Button 3 loop count: %d", id(button_3_loop_count));
+          if (id(button_3_loop_count) <= 1) {
+            ESP_LOGI("button", "Button 3 short press - setting capsule lights to 100%");
+            // Always set capsule lights to 100%
+            auto call1 = id(light_exterior_driver_capsule).turn_on();
+            call1.set_brightness(1.0);
+            call1.perform();
+            auto call2 = id(light_exterior_passenger_capsule).turn_on();
+            call2.set_brightness(1.0);
+            call2.perform();
+            
+            // Only set roof lights to 100% if they're already on
+            if (id(light_exterior_roof_rear).current_values.is_on() || 
+                id(light_exterior_roof_driver).current_values.is_on() || 
+                id(light_exterior_roof_passenger).current_values.is_on()) {
+              ESP_LOGI("button", "Button 3 short press - roof lights already on, setting to 100%");
+              auto call3 = id(light_exterior_roof_rear).turn_on();
+              call3.set_brightness(1.0);
+              call3.perform();
+              auto call4 = id(light_exterior_roof_driver).turn_on();
+              call4.set_brightness(1.0);
+              call4.perform();
+              auto call5 = id(light_exterior_roof_passenger).turn_on();
+              call5.set_brightness(1.0);
+              call5.perform();
+            }
+          } else {
+            ESP_LOGI("button", "Button 3 long press - stopping exterior lights at current brightness");
+          }
+          id(button_3_loop_count) = 0;
 
   - id: !extend button_4
     internal: true
+    name: "Button 4 - Exterior Lights Down Button"
+    on_press:
+      - lambda: 'id(button_4_loop_count) = 0;'
+      - if:
+          condition:
+            or:
+              - light.is_on: light_exterior_roof_rear
+              - light.is_on: light_exterior_roof_driver
+              - light.is_on: light_exterior_roof_passenger
+              - light.is_on: light_exterior_driver_capsule
+              - light.is_on: light_exterior_passenger_capsule
+          then:
+            - logger.log:
+                format: "Button 4 pressed - starting to dim exterior lights immediately"
+                level: INFO
+            - while:
+                condition:
+                  and:
+                    - binary_sensor.is_on: button_4
+                    - lambda: |-
+                        return id(light_exterior_roof_rear).current_values.get_brightness() > 0.1 ||
+                               id(light_exterior_roof_driver).current_values.get_brightness() > 0.1 ||
+                               id(light_exterior_roof_passenger).current_values.get_brightness() > 0.1 ||
+                               id(light_exterior_driver_capsule).current_values.get_brightness() > 0.1 ||
+                               id(light_exterior_passenger_capsule).current_values.get_brightness() > 0.1;
+                then:
+                  - lambda: 'id(button_4_loop_count)++;'
+                  # First, dim roof lights to 10% threshold
+                  - if:
+                      condition:
+                        lambda: |-
+                          return id(light_exterior_roof_rear).current_values.get_brightness() > 0.11 ||
+                                 id(light_exterior_roof_driver).current_values.get_brightness() > 0.11 ||
+                                 id(light_exterior_roof_passenger).current_values.get_brightness() > 0.11;
+                      then:
+                        - logger.log:
+                            format: "Button 4 held - dimming roof lights 5%"
+                            level: INFO
+                        - light.dim_relative:
+                            id: light_exterior_roof_rear
+                            relative_brightness: -5%
+                            transition_length: 100ms
+                        - light.dim_relative:
+                            id: light_exterior_roof_driver
+                            relative_brightness: -5%
+                            transition_length: 100ms
+                        - light.dim_relative:
+                            id: light_exterior_roof_passenger
+                            relative_brightness: -5%
+                            transition_length: 100ms
+                      else:
+                        # Roof lights at threshold, now work on capsule lights
+                        - logger.log:
+                            format: "Button 4 held - roof lights at threshold, dimming capsule lights 5%"
+                            level: INFO
+                        - light.dim_relative:
+                            id: light_exterior_driver_capsule
+                            relative_brightness: -5%
+                            transition_length: 100ms
+                        - light.dim_relative:
+                            id: light_exterior_passenger_capsule
+                            relative_brightness: -5%
+                            transition_length: 100ms
+                  - delay: 200ms
+            # Only turn off if we exited loop because of threshold, not because button was released
+            - if:
+                condition:
+                  binary_sensor.is_on: button_4
+                then:
+                  - logger.log:
+                      format: "Button 4 dimming reached threshold - turning off all exterior lights"
+                      level: INFO
+                  - light.turn_off: light_exterior_roof_rear
+                  - light.turn_off: light_exterior_roof_driver
+                  - light.turn_off: light_exterior_roof_passenger
+                  - light.turn_off: light_exterior_driver_capsule
+                  - light.turn_off: light_exterior_passenger_capsule
+    on_release:
+      - logger.log:
+          format: "Button 4 released"
+          level: INFO
+      - lambda: |-
+          // Short press = 0-1 loop iterations (< ~400ms)
+          // Long press = 2+ loop iterations (> ~400ms)
+          ESP_LOGI("button", "Button 4 loop count: %d", id(button_4_loop_count));
+          if (id(button_4_loop_count) <= 1) {
+            ESP_LOGI("button", "Button 4 short press - turning exterior lights off");
+            id(light_exterior_roof_rear).turn_off().perform();
+            id(light_exterior_roof_driver).turn_off().perform();
+            id(light_exterior_roof_passenger).turn_off().perform();
+            id(light_exterior_driver_capsule).turn_off().perform();
+            id(light_exterior_passenger_capsule).turn_off().perform();
+          } else {
+            ESP_LOGI("button", "Button 4 long press - stopping exterior lights at current brightness");
+          }
+          id(button_4_loop_count) = 0;
 
 # PFC8574 Buttons
 # Button    Pin         Name                            Action
@@ -882,7 +1230,32 @@ binary_sensor:
           id: light_exterior_passenger_capsule
 
   - id: !extend pcf8574_button_5
+    name: "Garage LED Light Button"
     internal: true
+    on_press:
+      - logger.log:
+          format: "PCF8574 Button 5 pressed - Garage light toggle"
+          level: INFO
+      - if:
+          condition:
+            light.is_on: garage_led_lights
+          then:
+            - logger.log: "Garage LED Light Button pressed, turning off light"
+            - light.turn_off: garage_led_lights
+          else:
+            - logger.log: "Garage LED Light Button pressed, turning on light"
+            - lambda: |-
+                if (id(auto_color_temp_enabled).state) {
+                  auto call = id(garage_led_lights).turn_on();
+                  call.set_brightness(id(current_brightness));
+                  call.perform();
+                } else {
+                  id(garage_led_lights).turn_on().perform();
+                }
+    on_release:
+      - logger.log:
+          format: "PCF8574 Button 5 released - no action"
+          level: INFO
 
   - id: !extend pcf8574_button_6
     internal: true
