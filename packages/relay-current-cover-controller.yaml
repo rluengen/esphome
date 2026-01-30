@@ -17,6 +17,8 @@ substitutions:
   relay_1_id: relay_1
   relay_2_id: relay_2
   current_update_interval_ms: "100"  # How often to update current sensor during operation (milliseconds)
+  open_duration_value: 100s
+  close_duration_value: 100s
 
 cover:
   - platform: current_based
@@ -40,7 +42,7 @@ cover:
     # Note: open_duration, close_duration, and max_duration are not templatable.
     # Using the maximum configurable value (300s). The current-based sensing
     # will stop the motor when it reaches the end position.
-    open_duration: 300s
+    open_duration: ${open_duration_value}
 
     open_moving_current_threshold: 0.5
     open_obstacle_current_threshold: 3.5
@@ -59,7 +61,7 @@ cover:
             - component.update: ${current_sensor_parent_id}
             - delay: ${current_update_interval_ms}ms
 
-    close_duration: 300s
+    close_duration: ${close_duration_value}
 
     stop_action:
       - logger.log: "Stop cover ${cover_name}, turn off ${relay_2_id}, ${relay_1_id}"
