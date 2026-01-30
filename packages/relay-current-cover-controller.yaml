@@ -11,11 +11,12 @@
 
 substitutions:
   cover_name: "Default Cover"
-  cover_id: default_cover
+  cover_id: default_cover_id
   current_sensor_id: 
   current_sensor_parent_id: 
   relay_1_id: relay_1
   relay_2_id: relay_2
+  current_update_interval_ms: "100"  # How often to update current sensor during operation (milliseconds)
 
 number:
   - platform: template
@@ -23,7 +24,7 @@ number:
     id: ${cover_id}_open_duration_number
     min_value: 5
     max_value: 300
-    step: 1
+    step: 0.5
     unit_of_measurement: "s"
     icon: "mdi:timer-sand"
     optimistic: true
@@ -36,7 +37,7 @@ number:
     id: ${cover_id}_close_duration_number
     min_value: 5
     max_value: 300
-    step: 1
+    step: 0.5
     unit_of_measurement: "s"
     icon: "mdi:timer-sand"
     optimistic: true
@@ -56,7 +57,7 @@ cover:
       - switch.turn_off: ${relay_2_id}
       - switch.turn_on: ${relay_1_id}
 
-    # open_duration: 15s
+    open_duration: !lambda "return id(${cover_id}_open_duration_number).state * 1000;"
 
     open_moving_current_threshold: 0.5
     open_obstacle_current_threshold: 3.5
@@ -68,7 +69,7 @@ cover:
       - switch.turn_off: ${relay_1_id}
       - switch.turn_on: ${relay_2_id}
 
-    # close_duration: 15s
+    close_duration: !lambda "return id(${cover_id}_close_duration_number).state * 1000;"
 
     stop_action:
       - logger.log: "Stop cover ${cover_name}, turn off ${relay_2_id}, ${relay_1_id}"
@@ -83,14 +84,19 @@ cover:
     malfunction_action:
       - logger.log: "Cover ${cover_name} malfunction detected"
 
-    # max_duration: 30s
+    max_duration: !lambda "return (id(${cover_id}_open_duration_number).state > id(${cover_id}_close_duration_number).state ? id(${cover_id}_open_duration_number).state : id(${cover_id}_close_duration_number).state) * 1000;"
 
 script:
   - id: ${cover_id}_update_current_sensor_script
     mode: restart
     then:
       - repeat:
-          count: 600  # 60 seconds max (600 * 100ms)
+          count: !lambda |-
+            // Calculate max duration in iterations (each iteration is ${current_update_interval_ms}ms)
+            float max_duration = id(${cover_id}_open_duration_number).state > id(${cover_id}_close_duration_number).state 
+              ? id(${cover_id}_open_duration_number).state 
+              : id(${cover_id}_close_duration_number).state;
+            return (int)(max_duration * 1000 / ${current_update_interval_ms});  // iterations = seconds * 1000ms / interval_ms
           then:
             - if:
                 condition:
@@ -99,6 +105,6 @@ script:
                     return state == COVER_OPERATION_OPENING || state == COVER_OPERATION_CLOSING;
                 then:
                   - component.update: ${current_sensor_parent_id}
-                  - delay: 100ms
+                  - delay: ${current_update_interval_ms}ms
                 else:
                   - script.stop: ${cover_id}_update_current_sensor_script

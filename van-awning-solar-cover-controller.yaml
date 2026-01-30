@@ -4,24 +4,18 @@
 # TODO: hook up in/out switches for awning controller to GPIO pins.
 
 substitutions:
-  device_name: van_cover_relay_controller
+  device_name: awningcontroller
   friendly_name: Cover Controller
   project_name: Van Cover Controller
   project_version: "1.0.0"
   log_level: DEBUG
 
 esphome:
-  name: van_cover_relay_controller
+  name: awningcontroller
   friendly_name: ${friendly_name}
   project:
     name: smartvan.${project_name}
     version: ${project_version}
-  on_boot:
-    priority: -100  # Run after all components are initialized
-    then:
-      - logger.log: "Boot: Closing awnings"
-      - cover.open: nomadic_awning_cover
-      - cover.open: solar_panel_cover
 
 packages:
   remote_packages:
@@ -74,13 +68,9 @@ packages:
           relay_1_id: relay3
           relay_2_id: relay4
 
+# added for debugging
 web_server:
   port: 80
-  
-wifi:
-  ap:
-    ssid: "${device_name}"
-    password: "your_ap_password"
 
 switch:
   - id: !extend relay1
@@ -91,19 +81,6 @@ switch:
     internal: true
   - id: !extend relay4
     internal: true
-
-sensor:
-  - platform: homeassistant
-    name: "Sun Elevation"
-    id: sun_elevation
-    entity_id: sun.sun
-    attribute: elevation
-    unit_of_measurement: "°"
-    accuracy_decimals: 2
-    internal: true
-    on_value:
-      then:
-        - script.execute: adjust_solar_awning_based_on_sun
 
 # GPIO buttons to control the awning covers.
 binary_sensor:
@@ -138,15 +115,3 @@ binary_sensor:
     on_press:
        then:
          - cover.close: nomadic_awning_cover
-
-script:
-  # Automatically close the solar awning when the sun sets.
-  - id: adjust_solar_awning_based_on_sun
-    then:
-      - if:
-          condition:
-            lambda: 'return id(sun_elevation).state < 0.0;'
-          then:
-            - logger.log: "Sun is low - retracting solar awning"
-            - cover.close: solar_panel_cover
-
