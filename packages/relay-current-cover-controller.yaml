@@ -26,9 +26,16 @@ cover:
 
     open_action:
       - logger.log: "Opening cover ${cover_name}, turn off ${relay_2_id}, turn on ${relay_1_id}"
-      - script.execute: ${cover_id}_update_current_sensor_script
       - switch.turn_off: ${relay_2_id}
       - switch.turn_on: ${relay_1_id}
+      - while:
+          condition:
+            lambda: |-
+              auto state = id(${cover_id}).current_operation;
+              return state == COVER_OPERATION_OPENING || state == COVER_OPERATION_CLOSING;
+          then:
+            - component.update: ${current_sensor_parent_id}
+            - delay: ${current_update_interval_ms}ms
 
     # Note: open_duration, close_duration, and max_duration are not templatable.
     # Using the maximum configurable value (300s). The current-based sensing
@@ -41,9 +48,16 @@ cover:
 
     close_action:
       - logger.log: "Closing cover ${cover_name}, turn off ${relay_2_id}, turn on ${relay_1_id}"
-      - script.execute: ${cover_id}_update_current_sensor_script
       - switch.turn_off: ${relay_1_id}
       - switch.turn_on: ${relay_2_id}
+      - while:
+          condition:
+            lambda: |-
+              auto state = id(${cover_id}).current_operation;
+              return state == COVER_OPERATION_OPENING || state == COVER_OPERATION_CLOSING;
+          then:
+            - component.update: ${current_sensor_parent_id}
+            - delay: ${current_update_interval_ms}ms
 
     close_duration: 300s
 
@@ -61,23 +75,3 @@ cover:
       - logger.log: "Cover ${cover_name} malfunction detected"
 
     max_duration: 300s
-
-script:
-  - id: ${cover_id}_update_current_sensor_script
-    mode: restart
-    then:
-      - repeat:
-          # max_duration is 300s, interval is ${current_update_interval_ms}ms
-          # iterations = 300 * 1000 / ${current_update_interval_ms}
-          count: !lambda "return (int)(300 * 1000 / ${current_update_interval_ms});"
-          then:
-            - if:
-                condition:
-                  lambda: |-
-                    auto state = id(${cover_id}).current_operation;
-                    return state == COVER_OPERATION_OPENING || state == COVER_OPERATION_CLOSING;
-                then:
-                  - component.update: ${current_sensor_parent_id}
-                  - delay: ${current_update_interval_ms}ms
-                else:
-                  - script.stop: ${cover_id}_update_current_sensor_script
