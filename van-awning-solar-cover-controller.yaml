@@ -16,6 +16,12 @@ esphome:
   project:
     name: smartvan.${project_name}
     version: ${project_version}
+  on_boot:
+    priority: -100  # Run after all components are initialized
+    then:
+      - logger.log: "Boot: Closing awnings"
+      - cover.close: nomadic_awning_cover
+      - cover.close: solar_panel_cover
 
 packages:
   remote_packages:

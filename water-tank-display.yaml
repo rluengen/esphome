@@ -690,11 +690,17 @@ switch:
                 condition:
                   lambda: 'return id(valve_water_pump_source).position == VALVE_OPEN;'
                 timeout: 15s
-            - switch.turn_on: relay_water_pump
-            - lvgl.label.update:
-                id: lbl_pump_status
-                text: "\U000F058E"  # water-pump icon (on)
-                text_color: 0x00BFFF  # Deep sky blue for running
+            - if:
+                condition:
+                  lambda: 'return id(valve_water_pump_source).position == VALVE_OPEN;'
+                then:
+                  - switch.turn_on: relay_water_pump
+                  - lvgl.label.update:
+                      id: lbl_pump_status
+                      text: "\U000F058E"  # water-pump icon (on)
+                      text_color: 0x00BFFF  # Deep sky blue for running
+                else:
+                  - logger.log: "ERROR: Valve failed to open - pump not started"
     turn_off_action:
       - script.execute: wake_screen
       - switch.turn_off: relay_water_pump
@@ -872,53 +878,100 @@ lvgl:
         height: 100%
         width: 100%
         bg_color: 0x000000
+        scrollbar_mode: "OFF"
+        scrollable: false
         on_click:
           then:
             - logger.log: "Pump UI on_click"
             - switch.toggle: water_pump_switch
 
         widgets:
-        - roller:
-            align: CENTER
-            id: roller_id
-            options:
-                - Run
-                - Fresh Fill
-                - Dirty Fill
-            bg_color: 0x000000
-            text_color: 0xFFFFFF
-            border_width: 0
-
-            on_change:
-                then:
-                # Stop any running scripts first
-                - script.stop: fresh_water_fill
-                - script.stop: pump_timer_countdown
-                
-                # Mode 0: Run - Normal pump operation with timer
+        # Fresh Fill toggle button (left side)
+        - button:
+            id: btn_fresh_fill
+            align: LEFT_MID
+            x: 30
+            width: 80
+            height: 60
+            checkable: true
+            bg_color: 0x333333
+            on_click:
+              then:
                 - if:
                     condition:
-                      lambda: 'return id(roller_id).get_selected_index() == 0;'
+                      lambda: 'return lv_obj_has_state(id(btn_fresh_fill), LV_STATE_CHECKED);'
                     then:
-                      - logger.log: "Mode: Run - Starting pump with timer"
-                      - switch.turn_on: water_pump_switch
-                      - script.execute: pump_timer_countdown
-                
-                # Mode 1: Fresh Fill - Fill tank from external hydrant
-                - if:
-                    condition:
-                      lambda: 'return id(roller_id).get_selected_index() == 1;'
-                    then:
-                      - logger.log: "Mode: Fresh Fill - Starting fresh water fill"
+                      # Turning ON - stop dirty fill if running
+                      - logger.log: "Fresh Fill button ON"
+                      - script.stop: dirty_water_fill
+                      - if:
+                          condition:
+                            lambda: 'return lv_obj_has_state(id(btn_dirty_fill), LV_STATE_CHECKED);'
+                          then:
+                            - lvgl.button.update:
+                                id: btn_dirty_fill
+                                state:
+                                  checked: false
                       - script.execute: fresh_water_fill
-                
-                # Mode 2: Dirty Fill - Pump from dirty water source
+                    else:
+                      # Turning OFF
+                      - logger.log: "Fresh Fill button OFF"
+                      - script.stop: fresh_water_fill
+                      - valve.close: valve_input_output_hydrant
+                      - lvgl.widget.hide: lbl_timer
+            widgets:
+              - label:
+                  id: lbl_fresh_fill_btn
+                  align: CENTER
+                  text: "Fresh"
+                  text_color: 0xFFFFFF
+                  text_font: f_text_24
+
+        # Dirty Fill toggle button (right side)
+        - button:
+            id: btn_dirty_fill
+            align: RIGHT_MID
+            x: -30
+            width: 80
+            height: 60
+            checkable: true
+            bg_color: 0x333333
+            on_click:
+              then:
                 - if:
                     condition:
-                      lambda: 'return id(roller_id).get_selected_index() == 2;'
+                      lambda: 'return lv_obj_has_state(id(btn_dirty_fill), LV_STATE_CHECKED);'
                     then:
-                      - logger.log: "Mode: Dirty Fill - Pumping from dirty water source"
+                      # Turning ON - stop fresh fill if running
+                      - logger.log: "Dirty Fill button ON"
+                      - script.stop: fresh_water_fill
+                      - if:
+                          condition:
+                            lambda: 'return lv_obj_has_state(id(btn_fresh_fill), LV_STATE_CHECKED);'
+                          then:
+                            - lvgl.button.update:
+                                id: btn_fresh_fill
+                                state:
+                                  checked: false
+                      - valve.close: valve_input_output_hydrant
                       - script.execute: dirty_water_fill
+                    else:
+                      # Turning OFF
+                      - logger.log: "Dirty Fill button OFF"
+                      - script.stop: dirty_water_fill
+                      - switch.turn_off: relay_water_pump
+                      - valve.close: valve_fill
+                      - lvgl.label.update:
+                          id: lbl_pump_status
+                          text: "\U000F0F93"
+                          text_color: 0x888888
+            widgets:
+              - label:
+                  id: lbl_dirty_fill_btn
+                  align: CENTER
+                  text: "Dirty"
+                  text_color: 0xFFFFFF
+                  text_font: f_text_24
 
         # Center gallons display
         - label:
@@ -1124,11 +1177,16 @@ script:
                         binary_sensor.is_on: water_tank_full
                       then:
                         - logger.log: "Dirty Fill: Tank full - auto-stopping"
-                        # TODO: roller doesn't have set_selected
-                        # - lambda: |-
-                        #     auto roller = id(roller_id);
-                        #     roller->set_selected(0, LV_ANIM_OFF);
-                        - switch.turn_off: water_pump_switch
+                        - switch.turn_off: relay_water_pump
+                        - valve.close: valve_fill
+                        - lvgl.label.update:
+                            id: lbl_pump_status
+                            text: "\U000F0F93"
+                            text_color: 0x888888
+                        - lvgl.button.update:
+                            id: btn_dirty_fill
+                            state:
+                              checked: false
                         - script.stop: dirty_water_fill
 
                   # Check if level is increasing after 30 seconds
@@ -1173,10 +1231,13 @@ script:
                       condition:
                         binary_sensor.is_on: water_tank_full
                       then:
-                        - logger.log: "Tank full - auto-stopping pump"
-                        - lvgl.widget.hide: lbl_timer  # Hide the timer label which should have been showing the fill ETA
-                        - switch.turn_off: water_pump_switch
-                        - script.stop: pump_timer_countdown
+                        - logger.log: "Tank full - auto-stopping fresh fill"
+                        - lvgl.widget.hide: lbl_timer
+                        - valve.close: valve_input_output_hydrant
+                        - lvgl.button.update:
+                            id: btn_fresh_fill
+                            state:
+                              checked: false
                         - script.stop: fresh_water_fill
 
                   - lambda: |-
