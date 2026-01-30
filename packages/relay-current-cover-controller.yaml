@@ -61,3 +61,23 @@ cover:
       - logger.log: "Cover ${cover_name} malfunction detected"
 
     max_duration: 300s
+
+script:
+  - id: ${cover_id}_update_current_sensor_script
+    mode: restart
+    then:
+      - repeat:
+          # max_duration is 300s, interval is ${current_update_interval_ms}ms
+          # iterations = 300 * 1000 / ${current_update_interval_ms}
+          count: !lambda "return (int)(300 * 1000 / ${current_update_interval_ms});"
+          then:
+            - if:
+                condition:
+                  lambda: |-
+                    auto state = id(${cover_id}).current_operation;
+                    return state == COVER_OPERATION_OPENING || state == COVER_OPERATION_CLOSING;
+                then:
+                  - component.update: ${current_sensor_parent_id}
+                  - delay: ${current_update_interval_ms}ms
+                else:
+                  - script.stop: ${cover_id}_update_current_sensor_script
