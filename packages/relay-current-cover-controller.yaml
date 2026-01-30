@@ -21,8 +21,8 @@ number:
   - platform: template
     name: ${cover_name} Open Duration
     id: ${cover_id}_open_duration_number
-    min_value: 10
-    max_value: 60
+    min_value: 5
+    max_value: 300
     step: 1
     unit_of_measurement: "s"
     icon: "mdi:timer-sand"
@@ -34,8 +34,8 @@ number:
   - platform: template
     name: ${cover_name} Close Duration
     id: ${cover_id}_close_duration_number
-    min_value: 10
-    max_value: 60
+    min_value: 5
+    max_value: 300
     step: 1
     unit_of_measurement: "s"
     icon: "mdi:timer-sand"
@@ -56,7 +56,7 @@ cover:
       - switch.turn_off: ${relay_2_id}
       - switch.turn_on: ${relay_1_id}
 
-    open_duration: 15s
+    # open_duration: 15s
 
     open_moving_current_threshold: 0.5
     open_obstacle_current_threshold: 3.5
@@ -68,7 +68,7 @@ cover:
       - switch.turn_off: ${relay_1_id}
       - switch.turn_on: ${relay_2_id}
 
-    close_duration: 15s
+    # close_duration: 15s
 
     stop_action:
       - logger.log: "Stop cover ${cover_name}, turn off ${relay_2_id}, ${relay_1_id}"
@@ -83,7 +83,7 @@ cover:
     malfunction_action:
       - logger.log: "Cover ${cover_name} malfunction detected"
 
-    max_duration: 30s
+    # max_duration: 30s
 
 script:
   - id: ${cover_id}_update_current_sensor_script
