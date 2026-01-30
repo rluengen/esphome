@@ -20,8 +20,8 @@ esphome:
     priority: -100  # Run after all components are initialized
     then:
       - logger.log: "Boot: Closing awnings"
-      - cover.close: nomadic_awning_cover
-      - cover.close: solar_panel_cover
+      - cover.open: nomadic_awning_cover
+      - cover.open: solar_panel_cover
 
 packages:
   remote_packages:
@@ -73,6 +73,14 @@ packages:
           current_sensor_parent_id: solar_panel_cover_motor_current
           relay_1_id: relay3
           relay_2_id: relay4
+
+web_server:
+  port: 80
+  
+wifi:
+  ap:
+    ssid: "${device_name}"
+    password: "your_ap_password"
 
 switch:
   - id: !extend relay1

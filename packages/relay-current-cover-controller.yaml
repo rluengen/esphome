@@ -79,6 +79,10 @@ cover:
     close_moving_current_threshold: 0.5
     close_obstacle_current_threshold: 0.8
 
+    malfunction_detection: false
+    malfunction_action:
+      - logger.log: "Cover ${cover_name} malfunction detected"
+
     max_duration: 30s
 
 script:
