@@ -1,4 +1,4 @@
-# The QuinLED Van Light Controller leverages the QuinLED An-Penta-Deca hardware platform to provide
+# The Van Light Controller leverages the QuinLED An-Penta-Deca hardware platform to provide
 # interior and exterior lighting in the van. It features 15 individually controllable LED channels,
 # controlling various lights such as roof lights, capsule lights, and rear lights.
 
@@ -65,18 +65,13 @@ globals:
     type: float
     restore_value: no
     initial_value: '1.0'
-    
-  - id: brightness_step
-    type: float
-    restore_value: yes
-    initial_value: '0.1'
   
-  - id: button_2_loop_count
+  - id: button_1_loop_count
     type: int
     restore_value: no
     initial_value: '0'
-  
-  - id: button_4_loop_count
+
+  - id: button_2_loop_count
     type: int
     restore_value: no
     initial_value: '0'
@@ -85,11 +80,21 @@ globals:
     type: int
     restore_value: no
     initial_value: '0'
-  
-  - id: button_1_loop_count
+
+  - id: button_4_loop_count
     type: int
     restore_value: no
     initial_value: '0'
+  
+  - id: pcf8574_button_5_loop_count
+    type: int
+    restore_value: no
+    initial_value: '0'
+  
+  - id: pcf8574_button_5_initial_brightness
+    type: float
+    restore_value: no
+    initial_value: '0.0'
 
 sensor:
   - platform: homeassistant
@@ -693,11 +698,11 @@ binary_sensor:
                       level: INFO
                   - light.dim_relative:
                       id: main_can_lights
-                      relative_brightness: 5%
+                      relative_brightness: !lambda 'return id(brightness_step);'
                       transition_length: 100ms
                   - light.dim_relative:
                       id: bed_can_lights
-                      relative_brightness: 5%
+                      relative_brightness: !lambda 'return id(brightness_step);'
                       transition_length: 100ms
                 else:
                   - if:
@@ -725,15 +730,15 @@ binary_sensor:
                       level: INFO
                   - light.dim_relative:
                       id: cwww_led_dog_crate_lights
-                      relative_brightness: 5%
+                      relative_brightness: !lambda 'return id(brightness_step);'
                       transition_length: 100ms
                   - light.dim_relative:
                       id: door_light
-                      relative_brightness: 5%
+                      relative_brightness: !lambda 'return id(brightness_step);'
                       transition_length: 100ms
                   - light.dim_relative:
                       id: cwww_led_capsule_lights
-                      relative_brightness: 5%
+                      relative_brightness: !lambda 'return id(brightness_step);'
                       transition_length: 100ms
             - delay: 200ms
     on_release:
@@ -817,11 +822,11 @@ binary_sensor:
                             level: INFO
                         - light.dim_relative:
                             id: main_can_lights
-                            relative_brightness: -5%
+                            relative_brightness: !lambda 'return -id(brightness_step);'
                             transition_length: 100ms
                         - light.dim_relative:
                             id: bed_can_lights
-                            relative_brightness: -5%
+                            relative_brightness: !lambda 'return -id(brightness_step);'
                             transition_length: 100ms
                       else:
                         # Main/bed lights at threshold, now work on dog crate/door/capsule lights
@@ -830,15 +835,15 @@ binary_sensor:
                             level: INFO
                         - light.dim_relative:
                             id: cwww_led_dog_crate_lights
-                            relative_brightness: -5%
+                            relative_brightness: !lambda 'return -id(brightness_step);'
                             transition_length: 100ms
                         - light.dim_relative:
                             id: door_light
-                            relative_brightness: -5%
+                            relative_brightness: !lambda 'return -id(brightness_step);'
                             transition_length: 100ms
                         - light.dim_relative:
                             id: cwww_led_capsule_lights
-                            relative_brightness: -5%
+                            relative_brightness: !lambda 'return -id(brightness_step);'
                             transition_length: 100ms
                   - delay: 200ms
             # Only turn off if we exited loop because of threshold, not because button was released
@@ -911,11 +916,11 @@ binary_sensor:
                       level: INFO
                   - light.dim_relative:
                       id: light_exterior_driver_capsule
-                      relative_brightness: 5%
+                      relative_brightness: !lambda 'return id(brightness_step);'
                       transition_length: 100ms
                   - light.dim_relative:
                       id: light_exterior_passenger_capsule
-                      relative_brightness: 5%
+                      relative_brightness: !lambda 'return id(brightness_step);'
                       transition_length: 100ms
                 else:
                   - if:
@@ -943,15 +948,15 @@ binary_sensor:
                       level: INFO
                   - light.dim_relative:
                       id: light_exterior_roof_rear
-                      relative_brightness: 5%
+                      relative_brightness: !lambda 'return id(brightness_step);'
                       transition_length: 100ms
                   - light.dim_relative:
                       id: light_exterior_roof_driver
-                      relative_brightness: 5%
+                      relative_brightness: !lambda 'return id(brightness_step);'
                       transition_length: 100ms
                   - light.dim_relative:
                       id: light_exterior_roof_passenger
-                      relative_brightness: 5%
+                      relative_brightness: !lambda 'return id(brightness_step);'
                       transition_length: 100ms
             - delay: 200ms
     on_release:
@@ -1034,15 +1039,15 @@ binary_sensor:
                             level: INFO
                         - light.dim_relative:
                             id: light_exterior_roof_rear
-                            relative_brightness: -5%
+                            relative_brightness: !lambda 'return -id(brightness_step);'
                             transition_length: 100ms
                         - light.dim_relative:
                             id: light_exterior_roof_driver
-                            relative_brightness: -5%
+                            relative_brightness: !lambda 'return -id(brightness_step);'
                             transition_length: 100ms
                         - light.dim_relative:
                             id: light_exterior_roof_passenger
-                            relative_brightness: -5%
+                            relative_brightness: !lambda 'return -id(brightness_step);'
                             transition_length: 100ms
                       else:
                         # Roof lights at threshold, now work on capsule lights
@@ -1051,11 +1056,11 @@ binary_sensor:
                             level: INFO
                         - light.dim_relative:
                             id: light_exterior_driver_capsule
-                            relative_brightness: -5%
+                            relative_brightness: !lambda 'return -id(brightness_step);'
                             transition_length: 100ms
                         - light.dim_relative:
                             id: light_exterior_passenger_capsule
-                            relative_brightness: -5%
+                            relative_brightness: !lambda 'return -id(brightness_step);'
                             transition_length: 100ms
                   - delay: 200ms
             # Only turn off if we exited loop because of threshold, not because button was released
@@ -1233,29 +1238,88 @@ binary_sensor:
     name: "Garage LED Light Button"
     internal: true
     on_press:
-      - logger.log:
-          format: "PCF8574 Button 5 pressed - Garage light toggle"
-          level: INFO
-      - if:
+      - lambda: 'id(pcf8574_button_5_loop_count) = 0;'
+      - lambda: |-
+          // Store initial brightness to determine dimming vs brightening
+          if (id(garage_led_lights).current_values.is_on()) {
+            id(pcf8574_button_5_initial_brightness) = id(garage_led_lights).current_values.get_brightness();
+            ESP_LOGI("button", "PCF8574 Button 5 pressed - garage light on at %.0f%%", 
+                     id(pcf8574_button_5_initial_brightness) * 100);
+          } else {
+            id(pcf8574_button_5_initial_brightness) = 0.0;
+            ESP_LOGI("button", "PCF8574 Button 5 pressed - garage light off");
+          }
+      - while:
           condition:
-            light.is_on: garage_led_lights
+            binary_sensor.is_on: pcf8574_button_5
           then:
-            - logger.log: "Garage LED Light Button pressed, turning off light"
-            - light.turn_off: garage_led_lights
-          else:
-            - logger.log: "Garage LED Light Button pressed, turning on light"
-            - lambda: |-
-                if (id(auto_color_temp_enabled).state) {
-                  auto call = id(garage_led_lights).turn_on();
-                  call.set_brightness(id(current_brightness));
-                  call.perform();
-                } else {
-                  id(garage_led_lights).turn_on().perform();
-                }
+            - lambda: 'id(pcf8574_button_5_loop_count)++;'
+            - if:
+                condition:
+                  lambda: 'return id(pcf8574_button_5_initial_brightness) >= 0.99;'
+                then:
+                  # Started at 100%, dim down
+                  - logger.log:
+                      format: "PCF8574 Button 5 held - dimming garage light 5%"
+                      level: INFO
+                  - light.dim_relative:
+                      id: garage_led_lights
+                      relative_brightness: !lambda 'return -id(brightness_step);'
+                      transition_length: 100ms
+                else:
+                  # Started below 100% or was off, brighten up
+                  - if:
+                      condition:
+                        light.is_off: garage_led_lights
+                      then:
+                        # Turn on to starting brightness if off
+                        - logger.log:
+                            format: "PCF8574 Button 5 held - turning on garage light"
+                            level: INFO
+                        - lambda: |-
+                            if (id(auto_color_temp_enabled).state) {
+                              auto call = id(garage_led_lights).turn_on();
+                              call.set_brightness(0.2);
+                              call.perform();
+                            } else {
+                              auto call = id(garage_led_lights).turn_on();
+                              call.set_brightness(0.2);
+                              call.perform();
+                            }
+                  - logger.log:
+                      format: "PCF8574 Button 5 held - increasing garage light brightness 5%"
+                      level: INFO
+                  - light.dim_relative:
+                      id: garage_led_lights
+                      relative_brightness: !lambda 'return id(brightness_step);'
+                      transition_length: 100ms
+            - delay: 200ms
     on_release:
       - logger.log:
-          format: "PCF8574 Button 5 released - no action"
+          format: "PCF8574 Button 5 released"
           level: INFO
+      - lambda: |-
+          // Short press = 0-1 loop iterations (< ~400ms) -> toggle
+          // Long press = 2+ loop iterations (> ~400ms) -> stop at current brightness
+          ESP_LOGI("button", "PCF8574 Button 5 loop count: %d", id(pcf8574_button_5_loop_count));
+          if (id(pcf8574_button_5_loop_count) <= 1) {
+            ESP_LOGI("button", "PCF8574 Button 5 short press - toggling garage light");
+            if (id(garage_led_lights).current_values.is_on()) {
+              id(garage_led_lights).turn_off().perform();
+            } else {
+              if (id(auto_color_temp_enabled).state) {
+                auto call = id(garage_led_lights).turn_on();
+                call.set_brightness(id(current_brightness));
+                call.perform();
+              } else {
+                id(garage_led_lights).turn_on().perform();
+              }
+            }
+          } else {
+            ESP_LOGI("button", "PCF8574 Button 5 long press - stopping at current brightness");
+          }
+          id(pcf8574_button_5_loop_count) = 0;
+          id(pcf8574_button_5_initial_brightness) = 0.0;
 
   - id: !extend pcf8574_button_6
     internal: true
@@ -1514,6 +1578,21 @@ switch:
           }
           
           ESP_LOGD("color_temp", "Reset brightness to 100%% for all active lights")
+
+number:
+  - platform: template
+    name: "Brightness Step"
+    id: brightness_step
+    optimistic: true
+    min_value: 0.01
+    max_value: 0.5
+    step: 0.01
+    initial_value: 0.1
+    restore_value: true
+    entity_category: config
+    icon: "mdi:brightness-percent"
+    unit_of_measurement: "%"
+    mode: slider
 
 interval:
   - interval: 5min
