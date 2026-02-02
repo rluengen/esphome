@@ -15,12 +15,36 @@ substitutions:
   project_version: "1.0.0"
   log_level: VERBOSE
 
+# added for debugging
+web_server:
+  port: 80
+
 esphome:
   name: dehumidifier
   friendly_name: ${friendly_name}
   project:
     name: smartvan.${project_name}
     version: ${project_version}
+  on_boot:
+    priority: 600
+    then:
+      - lambda: |-
+          int reason = esp_reset_reason();
+          const char* reason_str;
+          switch(reason) {
+            case 1: reason_str = "POWERON (normal boot)"; break;
+            case 2: reason_str = "EXTERNAL RESET"; break;
+            case 3: reason_str = "SOFTWARE RESET"; break;
+            case 4: reason_str = "PANIC/EXCEPTION - CRASH!"; break;
+            case 5: reason_str = "INTERRUPT WATCHDOG - CRASH!"; break;
+            case 6: reason_str = "TASK WATCHDOG - CRASH!"; break;
+            case 7: reason_str = "WATCHDOG - CRASH!"; break;
+            case 8: reason_str = "DEEPSLEEP RESET"; break;
+            case 9: reason_str = "BROWNOUT - POWER ISSUE!"; break;
+            case 10: reason_str = "SDIO RESET"; break;
+            default: reason_str = "UNKNOWN"; break;
+          }
+          ESP_LOGW("boot", "ESP32 boot reason: %s (code %d)", reason_str, reason);
 
 packages:
   remote_packages:
@@ -66,9 +90,10 @@ sensor:
   - platform: ntc
     sensor: resistance_sensor
     calibration:
-      b_constant: 3950
-      reference_temperature: 25°C
-      reference_resistance: 10kOhm
+      # 3-point Steinhart-Hart calibration
+      - 23320.2Ohm -> 0°C      # Ice water
+      - 13791.4Ohm -> 21.7°C   # Room temp
+      - 7136.0Ohm -> 32.8°C    # Warm water (91°F)
     name: "Defrost Temperature"
     id: defrost_temp_c
     unit_of_measurement: "°C"
@@ -81,10 +106,12 @@ sensor:
     name: Resistance Sensor
 
   # https://esphome.io/components/sensor/ntc/#self-heating
+  # Manual updates only - controlled by interval to prevent self-heating
   - platform: adc
     id: source_sensor
     pin: GPIO33
     attenuation: 12db  # For full 0-3.3V range
+    update_interval: never
 
   - platform: aht10
     variant: AHT20
@@ -105,6 +132,15 @@ sensor:
     update_interval: 10s
 
 interval:
+  # NTC reading interval with self-heating prevention
+  - interval: 10s
+    then:
+      - switch.turn_on: ntc_vcc
+      - delay: 100ms  # Allow voltage to stabilize
+      - component.update: source_sensor
+      - delay: 50ms   # Allow reading to complete
+      - switch.turn_off: ntc_vcc
+
   - interval: 30s
     then:
       - logger.log:
@@ -122,12 +158,14 @@ interval:
             - switch.turn_off: compressor_relay_switch
             - switch.turn_off: fan_relay_switch
           else:
+            - logger.log: "[Dehumidifier] Valid humidity reading - proceeding with control logic"
             - if:
                 condition:
                   and:
                     - switch.is_on: dehumidifier_power  # Only when enabled
                     - binary_sensor.is_off: defrost_mode  # Not in defrost
                 then:
+                  - logger.log: "[Dehumidifier] Checking humidity against target values"
                   - if:
                       condition:
                         lambda: 'return id(ambient_humidity).state > (id(humidity_target).state + 2.0);'
@@ -139,9 +177,10 @@ interval:
                               - logger.log:
                                   format: "[Dehumidifier] Starting - humidity %.0f%% > target %.1f%%"
                                   args: ['id(ambient_humidity).state', 'id(humidity_target).state']
+                              - delay: 500ms  # Small delay before switching relay
                               - logger.log: "[Dehumidifier] Turning on fan relay"
                               - switch.turn_on: fan_relay_switch
-                              - delay: 2s  # Start fan first
+                              - delay: 5s  # Longer delay - let fan spin up and power stabilize
                               - logger.log: "[Dehumidifier] Turning on compressor relay"
                               - switch.turn_on: compressor_relay_switch
                       else:
@@ -176,6 +215,7 @@ interval:
                         # Dehumidifier is on but in defrost mode
                         - logger.log: "[Dehumidifier] Defrost mode - compressor off, fan running"
                         - switch.turn_off: compressor_relay_switch
+                        - delay: 500ms  # Delay before switching fan relay
                         - switch.turn_on: fan_relay_switch
 
 number:
@@ -188,6 +228,7 @@ number:
     unit_of_measurement: "%"
     initial_value: 60
     optimistic: true
+    restore_value: true
     entity_category: config
     mode: box
 
@@ -254,15 +295,17 @@ binary_sensor:
 switch:
   - id: !extend compressor_relay_switch
     name: "Compressor Relay"
-    internal: true
+    # internal: true
 
   - id: !extend fan_relay_switch
     name: "Fan Relay"
-    internal: true
+    # internal: true
 
   - platform: gpio
     pin: GPIO25
     id: ntc_vcc
+    name: "NTC Thermistor VCC Control"
+    restore_mode: ALWAYS_OFF  # Keep off to prevent self-heating
     internal: true
 
   - platform: template
@@ -270,25 +313,5 @@ switch:
     id: dehumidifier_power
     icon: "mdi:air-humidifier"
     optimistic: true
-    lambda: |-
-      // Report ON if either relay is energized.
-      return id(compressor_relay_switch).state || id(fan_relay_switch).state;
-    turn_on_action:
-      - logger.log: "[Dehumidifier] Manual turn ON requested"
-      - if:
-          condition:
-            and:
-              - binary_sensor.is_off: defrost_mode
-              # - lambda: 'return id(ambient_humidity).state > id(humidity_target).state;'
-          then:
-            - logger.log: "[Dehumidifier] Manual start approved - activating relays"
-            - switch.turn_on: fan_relay_switch
-            - switch.turn_on: compressor_relay_switch
-          else:
-            - logger.log: "[Dehumidifier] Manual start BLOCKED (defrost mode active)"
-    turn_off_action:
-      - logger.log: "[Dehumidifier] Manual turn OFF - deactivating relays"
-      - switch.turn_off: compressor_relay_switch
-      - switch.turn_off: fan_relay_switch
-    restore_mode: RESTORE_DEFAULT_OFF
+    restore_mode: RESTORE_DEFAULT_ON
 
