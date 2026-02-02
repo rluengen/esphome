@@ -1,9 +1,80 @@
+# ============================================================================
+# PWM TEC Dehumidifier Controller
+# ============================================================================
+# Board: Seeed XIAO ESP32-S3
+#
+# WIRING DIAGRAM
+# ==============
+#
+# XIAO ESP32-S3 Pinout:
+# ┌─────────────────────────────────────┐
+# │  Pin   │ GPIO  │ Function           │
+# ├────────┼───────┼────────────────────┤
+# │  D0    │ GPIO1 │ Fan PWM            │
+# │  D1    │ GPIO2 │ TEC1 MOSFET PWM    │
+# │  D3    │ GPIO4 │ DS18B20 One-Wire   │
+# │  D4    │ GPIO5 │ TEC2 MOSFET PWM    │
+# │  D5    │ GPIO6 │ I2C SDA (AHT20)    │
+# │  D6    │ GPIO7 │ I2C SCL (AHT20)    │
+# │  3V3   │       │ Sensor power       │
+# │  GND   │       │ Common ground      │
+# └────────┴───────┴────────────────────┘
+#
+# TEC MOSFET WIRING (x2):
+# ┌──────────────────────────────────────────────┐
+# │  XIAO GPIO ──── MOSFET Gate (via resistor)   │
+# │  12V+ ───────── TEC+ (red)                   │
+# │  MOSFET Drain ─ TEC- (black)                 │
+# │  MOSFET Source ─ GND                         │
+# │  (Add flyback diode across TEC terminals)    │
+# └──────────────────────────────────────────────┘
+#
+# FAN PWM WIRING (4-pin PWM fan):
+# ┌──────────────────────────────────────────────┐
+# │  12V+ ───────── Fan Pin 1 (Yellow/Red)       │
+# │  GND ────────── Fan Pin 2 (Black)            │
+# │  (not used) ─── Fan Pin 3 (Green) Tach       │
+# │  GPIO1 ──────── Fan Pin 4 (Blue) PWM         │
+# └──────────────────────────────────────────────┘
+#
+# AHT20 TEMP/HUMIDITY SENSOR (I2C):
+# ┌──────────────────────────────────────────────┐
+# │  3V3 ────────── VCC                          │
+# │  GND ────────── GND                          │
+# │  GPIO6 (D5) ─── SDA                          │
+# │  GPIO7 (D6) ─── SCL                          │
+# └──────────────────────────────────────────────┘
+#
+# DS18B20 TEMPERATURE SENSORS (One-Wire, 2 sensors):
+# ┌──────────────────────────────────────────────┐
+# │  3V3 ────────── VCC (red wire)               │
+# │  GND ────────── GND (black wire)             │
+# │  GPIO4 (D3) ─── DATA (yellow wire)           │
+# │  4.7kΩ resistor between DATA and VCC         │
+# │                                              │
+# │  Cold Side Sensor: Mount on TEC cold plate   │
+# │  Hot Side Sensor: Mount on heatsink          │
+# └──────────────────────────────────────────────┘
+#
+# POWER SUPPLY:
+# ┌──────────────────────────────────────────────┐
+# │  12V DC supply for TECs and fan              │
+# │  3.3V from XIAO for sensors                  │
+# │  Common GND between all components           │
+# └──────────────────────────────────────────────┘
+#
+# ============================================================================
+
 substitutions:
   device_name: pwmdehumidifier
   friendly_name: Dehumidifier
   project_name: Van Dehumidifier
   project_version: "1.0.0"
   log_level: VERBOSE
+
+# added for debugging
+web_server:
+  port: 80
 
 esphome:
   name: pwmdehumidifier
@@ -14,6 +85,8 @@ esphome:
 
 esp32:
   board: seeed_xiao_esp32s3
+  framework:
+    type: esp-idf
 
 packages:
   remote_packages:
@@ -34,19 +107,19 @@ output:
   # TEC1 MOSFET PWM
   - platform: ledc
     id: tec1_pwm
-    pin: D1
+    pin: GPIO2   # D1
     frequency: 20000 Hz
 
   # TEC2 MOSFET PWM
   - platform: ledc
     id: tec2_pwm
-    pin: D4
+    pin: GPIO5   # D4
     frequency: 20000 Hz
 
   # Fan PWM
   - platform: ledc
     id: fan_pwm
-    pin: D2
+    pin: GPIO1   # D0 (GPIO3/D2 is a strapping pin)
     frequency: 25000 Hz
 
   # Shared power level for both TECs (and fan)
@@ -57,21 +130,25 @@ output:
       - lambda: |-
           // state is 0.0 to 1.0 from PID
           float level = state;
+          // Clamp to configurable max power
+          float max_level = id(tec_max_power).state;
+          if (level > max_level) level = max_level;
           // Drive both TEC MOSFETs
           id(tec1_pwm).set_level(level);
           id(tec2_pwm).set_level(level);
 
 i2c:
-  sda: D5
-  scl: D6
+  sda: GPIO6   # D5
+  scl: GPIO7   # D6
   scan: true
 
 one_wire:
-  - pin: D3
+  - platform: gpio
+    pin: GPIO4   # D3
 
 sensor:
   - platform: aht10
-    type: AHT20
+    variant: AHT20
     temperature:
       name: "Temperature"
       id: box_air_temp
@@ -91,32 +168,33 @@ sensor:
   - platform: template
     id: dew_point
     name: "Dew Point"
-    unit_of_measurement: "�C"
+    unit_of_measurement: "°C"
     accuracy_decimals: 1
     lambda: |-
       if (!id(box_air_temp).has_state() || !id(box_humidity).has_state()) {
         return NAN;
       }
 
-      float T = id(box_air_temp).state;
-      float RH = id(box_humidity).state;
+      float temperature = id(box_air_temp).state;
+      float humidity = id(box_humidity).state;
 
-      const float a = 17.62;
-      const float b = 243.12;
+      // Magnus formula coefficients (valid for -45°C to +60°C)
+      const float magnus_coefficient = 17.62;
+      const float magnus_temperature_constant = 243.12;  // °C
 
-      float gamma = (a * T) / (b + T) + log(RH / 100.0f);
-      float dew = (b * gamma) / (a - gamma);
+      float gamma = (magnus_coefficient * temperature) / (magnus_temperature_constant + temperature) + log(humidity / 100.0f);
+      float dew = (magnus_temperature_constant * gamma) / (magnus_coefficient - gamma);
       return dew;
 
   # Cold side DS18B20 (controls both TECs)
-  - platform: ds18b20
+  - platform: dallas_temp
     # boot and replace with unique one wire address: address: 0x1111111111111111
     name: "Cold Side Temperature"
     id: cold_temp
     update_interval: 2s
 
   # Hot side DS18B20 (controls fan + safety)
-  - platform: ds18b20
+  - platform: dallas_temp
     # boot and replace with unique one wire address: address: 0x2222222222222222
     name: "Hot Side Temperature"
     id: hot_temp
@@ -135,7 +213,9 @@ binary_sensor:
       - logger.log: "HOT SIDE OVER TEMP, shutting down both TECs"
       - output.turn_off: tec1_pwm
       - output.turn_off: tec2_pwm
-      - climate.turn_off: tec_climate
+      - climate.control:
+          id: tec_climate
+          mode: "OFF"
 
 climate:
   - platform: pid
@@ -153,6 +233,19 @@ climate:
       kd: 0.0
 
 number:
+  - platform: template
+    name: "TEC Max Power"
+    id: tec_max_power
+    min_value: 0.1
+    max_value: 1.0
+    step: 0.05
+    initial_value: 0.8
+    optimistic: true
+    restore_value: true
+    entity_category: config
+    mode: slider
+    icon: "mdi:flash-outline"
+
   - platform: template
     name: "Humidity Target"
     id: humidity_target
@@ -190,8 +283,21 @@ interval:
   - interval: 30s
     then:
       - lambda: |-
-          if (!id(dew_point).has_state()) return;
+          if (!id(dew_point).has_state() || !id(box_humidity).has_state()) return;
 
+          float current_humidity = id(box_humidity).state;
+          float target_humidity = id(humidity_target).state;
+
+          // If humidity is below target, turn off TEC cooling
+          if (current_humidity < target_humidity) {
+            auto call = id(tec_climate).make_call();
+            call.set_mode(CLIMATE_MODE_OFF);
+            call.perform();
+            ESP_LOGD("dehumidifier", "Humidity %.1f%% below target %.1f%%, TEC off", current_humidity, target_humidity);
+            return;
+          }
+
+          // Humidity above target - calculate TEC target temp
           float dp = id(dew_point).state;
           float target = dp - 2.0f;  // 2C below dew point
 
@@ -199,5 +305,7 @@ interval:
           if (target < 0.0f) target = 0.0f;
 
           auto call = id(tec_climate).make_call();
+          call.set_mode(CLIMATE_MODE_COOL);
           call.set_target_temperature(target);
           call.perform();
+          ESP_LOGD("dehumidifier", "Humidity %.1f%% above target %.1f%%, TEC cooling to %.1fC", current_humidity, target_humidity, target);
