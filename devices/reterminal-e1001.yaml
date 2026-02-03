@@ -47,7 +47,9 @@ output:
     inverted: true
 
   - platform: ledc
-    pin: GPIO45
+    pin:
+      number: GPIO45
+      ignore_strapping_warning: true
     id: buzzer_pwm
     # The frequency determines the pitch of the buzzer's sound. 1000Hz is a mid-range tone.
     frequency: 1000Hz

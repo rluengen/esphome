@@ -38,15 +38,21 @@ esphome:
   friendly_name: ${friendly_name}
   comment: "Terminal Dashboard Display"
   on_boot:
+    priority: 600
     then:
       - logger.log: "esphome on_boot"
+      - lvgl.pause:
       - output.turn_on: bsp_battery_enable
       - delay: 150ms
       - component.update: battery_voltage
       - component.update: battery_level
+      - delay: 50ms
+      - logger.log: "Battery sensors updated, resuming LVGL"
       - lvgl.resume:
+      - component.update: epaper_display
+      - output.turn_off: bsp_battery_enable
       - lambda: |-
-          ESP_LOGI("esphome", "ESPHomme on_boot triggered");
+          ESP_LOGI("esphome", "ESPHome on_boot triggered");
 
 binary_sensor:
   - id: !extend button_left
@@ -95,9 +101,6 @@ interval:
       - component.update: epaper_display
 
 lvgl:
-  color_depth: 16
-  bg_color: 0xFFFFFF
-  text_color: 0x000000
   border_width: 0
   outline_width: 0
   shadow_width: 0
@@ -117,173 +120,139 @@ lvgl:
       - lambda: |-
           ESP_LOGI("display", "on_ready");
 
-#  on_draw_start:
-#    - logger.log: "LVGL on_draw_start"
-#    - lambda: |-
-#        ESP_LOGI("display", "on_draw_start");
-#
-#  on_draw_end:
-#    - logger.log: "LVGL on_draw_end"
-#    - lambda: |-
-#        ESP_LOGI("display", "on_draw_end");
-#    - component.update: epaper_display
-
   on_pause:
     - logger.log: "LVGL on_pause"
     - lambda: |-
         ESP_LOGI("display", "on_pause");
-    - deep_sleep.enter:
-        id: deep_sleep_id
-        sleep_duration: ${sleep_duration}
+    - if:
+        condition:
+          binary_sensor.is_off: battery_charging
+        then:
+          - logger.log: "Not charging, entering deep sleep"
+          - deep_sleep.enter:
+              id: deep_sleep_id
+              sleep_duration: ${sleep_duration}
+        else:
+          - logger.log: "Charging, skipping deep sleep"
 
   on_resume:
     - logger.log: "LVGL on_resume"
   on_boot:
     - logger.log: "LVGL on_boot"
 
-  theme:
-    arc:
-      width: 150
-      height: 150
-      bg_color: 0xCCCCCC
-      arc_color: 0x000000
-      arc_width: 25
-      arc_rounded: true
-      indicator:
-        arc_color: 0xFFFFFF
-        arc_width: 18
-
-  top_layer:
-    widgets:
-      # Status Bar - spans full width at top
-      - obj:
-          id: status_bar
-          width: 100%
-          height: 30
-          align: TOP_MID
-          x: 0
-          y: 0
-          bg_color: 0x000000
-          border_width: 0
-          pad_all: 3
-          widgets:
-            # Left side: Location
-            - label:
-                id: lbl_status_location
-                align: LEFT_MID
-                x: 5
-                text_font: segoeui_16
-                text_color: 0xFFFFFF
-                text: !lambda |-
-                  if (!id(location_city).state.empty()) {
-                    static char buf[32];
-                    snprintf(buf, sizeof(buf), "\U000F0341 %s", id(location_city).state.c_str());
-                    return buf;
-                  }
-                  return "\U000F0341 --";
-
-            # Center: Date
-            - label:
-                id: lbl_status_date
-                align: CENTER
-                text_font: segoeui_16
-                text_color: 0xFFFFFF
-                text: !lambda |-
-                  auto time = id(time_entity).now();
-                  if (time.is_valid()) {
-                    static char buf[24];
-                    snprintf(buf, sizeof(buf), "%s, %s %d", 
-                      time.strftime("%a").c_str(),
-                      time.strftime("%b").c_str(),
-                      time.day_of_month);
-                    return buf;
-                  }
-                  return "-- --, ----";
-
-            # Right side icons (right to left): Battery, Power, WiFi, HA
-            # Home Assistant status (rightmost after battery)
-            - label:
-                id: lbl_ha_status
-                align: RIGHT_MID
-                x: -5
-                text_font: homeassistant_icons
-                text_color: 0xFFFFFF
-                text: !lambda |-
-                  if (id(ha_connected).state) {
-                    return "\U000F07D0";  // home-assistant
-                  } else {
-                    return "\U000F0028";  // alert-circle (disconnected)
-                  }
-
-            # WiFi status
-            - label:
-                id: lbl_wifi_status
-                align: RIGHT_MID
-                x: -35
-                text_font: wifi_icons
-                text_color: 0xFFFFFF
-                text: !lambda |-
-                  if (WiFi.isConnected()) {
-                    if (!isnan(id(wifi_rssi).state)) {
-                      float r = id(wifi_rssi).state;
-                      if      (r > -55) return "\U000F0928";  // wifi-strength-4
-                      else if (r > -65) return "\U000F0925";  // wifi-strength-3
-                      else if (r > -72) return "\U000F0922";  // wifi-strength-2
-                      else              return "\U000F091F";  // wifi-strength-1
-                    }
-                    return "\U000F091F";
-                  }
-                  return "\U000F092E";  // wifi-off
-
-            # Power plug icon (charging indicator)
-            - label:
-                id: lbl_power_status
-                align: RIGHT_MID
-                x: -65
-                text_font: battery_icons
-                text_color: 0xFFFFFF
-                text: !lambda |-
-                  if (id(battery_charging).state) {
-                    return "\U000F0084";  // battery-charging
-                  }
-                  return "";  // Hidden when not charging
-
-            # Battery icon with level
-            - label:
-                id: lbl_battery_status
-                align: RIGHT_MID
-                x: -90
-                text_font: battery_icons
-                text_color: 0xFFFFFF
-                text: !lambda |-
-                  int x = id(battery_level).state;
-                  if (x >= 95) return "\U000F0079";       // battery (full)
-                  else if (x >= 85) return "\U000F0082"; // battery-90
-                  else if (x >= 75) return "\U000F0081"; // battery-80
-                  else if (x >= 65) return "\U000F0080"; // battery-70
-                  else if (x >= 55) return "\U000F007F"; // battery-60
-                  else if (x >= 45) return "\U000F007E"; // battery-50
-                  else if (x >= 35) return "\U000F007D"; // battery-40
-                  else if (x >= 25) return "\U000F007C"; // battery-30
-                  else if (x >= 15) return "\U000F007B"; // battery-20
-                  else if (x >= 5)  return "\U000F007A"; // battery-10
-                  else return "\U000F008E";              // battery-outline (empty)
-
-            # Battery percentage text
-            - label:
-                id: lbl_battery_percent
-                align: RIGHT_MID
-                x: -115
-                text_font: segoeui_16
-                text_color: 0xFFFFFF
-                text: !lambda |-
-                  static char buf[8];
-                  snprintf(buf, sizeof(buf), "%d%%", (int)id(battery_level).state);
-                  return buf;
-
   pages:
     - id: main_page
+      bg_color: 0x000000
       widgets:
+        # Status Bar - at top of main page
+        - obj:
+            id: status_bar
+            width: 100%
+            height: 30
+            align: TOP_MID
+            x: 0
+            y: 0
+            border_width: 0
+            radius: 0
+            pad_all: 3
+            widgets:
+              # Left side: Location (lat/long)
+              - label:
+                  id: lbl_status_location
+                  align: LEFT_MID
+                  x: 5
+                  text_font: segoeui_16
+                  text_color: 0xFFFFFF
+                  text: !lambda |-
+                    if (!isnan(id(location_latitude).state) && !isnan(id(location_longitude).state)) {
+                      static char buf[32];
+                      snprintf(buf, sizeof(buf), "%.4f, %.4f", 
+                        id(location_latitude).state, 
+                        id(location_longitude).state);
+                      return buf;
+                    }
+                    return "-- , --";
+
+              # Center: Date
+              - label:
+                  id: lbl_status_date
+                  align: CENTER
+                  text_font: segoeui_16
+                  text_color: 0xFFFFFF
+                  text: !lambda |-
+                    auto time = id(time_entity).now();
+                    if (time.is_valid()) {
+                      static char buf[40];
+                      snprintf(buf, sizeof(buf), "%s %s %d, %d", 
+                        time.strftime("%A").c_str(),
+                        time.strftime("%B").c_str(),
+                        time.day_of_month,
+                        time.year);
+                      return buf;
+                    }
+                    return "-- --, ----";
+
+              # Right side container with flex layout
+              - obj:
+                  id: status_icons_container
+                  align: RIGHT_MID
+                  width: SIZE_CONTENT
+                  height: 100%
+                  bg_opa: TRANSP
+                  border_width: 0
+                  pad_all: 0
+                  layout:
+                    type: FLEX
+                    flex_flow: ROW_REVERSE
+                    flex_align_main: START
+                    flex_align_cross: CENTER
+                    pad_column: 5
+                  widgets:
+                    # Home Assistant status (rightmost)
+                    - label:
+                        id: lbl_ha_status
+                        text_font: homeassistant_icons
+                        text_color: 0xFFFFFF
+                        text: "\U000F07D0"
+
+                    # WiFi status
+                    - label:
+                        id: lbl_wifi_status
+                        text_font: wifi_icons
+                        text_color: 0xFFFFFF
+                        text: "\U000F0928"
+
+                    # Battery icon
+                    - label:
+                        id: lbl_battery_status
+                        text_font: battery_icons
+                        text_color: 0xFFFFFF
+                        text: !lambda |-
+                          if (isnan(id(battery_level).state)) return "\U000F0091";  // unknown icon
+                          int x = (int)id(battery_level).state;
+                          if (x >= 95) return "\U000F0079";
+                          else if (x >= 85) return "\U000F0082";
+                          else if (x >= 75) return "\U000F0081";
+                          else if (x >= 65) return "\U000F0080";
+                          else if (x >= 55) return "\U000F007F";
+                          else if (x >= 45) return "\U000F007E";
+                          else if (x >= 35) return "\U000F007D";
+                          else if (x >= 25) return "\U000F007C";
+                          else if (x >= 15) return "\U000F007B";
+                          else if (x >= 5)  return "\U000F007A";
+                          else return "\U000F008E";
+
+                    # Battery percentage text (leftmost)
+                    - label:
+                        id: lbl_battery_percent
+                        text_font: segoeui_16
+                        text_color: 0xFFFFFF
+                        text: !lambda |-
+                          if (isnan(id(battery_level).state)) return "--%";
+                          static char buf[8];
+                          snprintf(buf, sizeof(buf), "%d%%", (int)id(battery_level).state);
+                          return buf;
+
         # Weather Section (below status bar)
         - obj:
             id: weather_container
@@ -491,7 +460,9 @@ lvgl:
 deep_sleep:
   id: deep_sleep_id
   sleep_duration: ${sleep_duration}
-  wakeup_pin: GPIO3
+  wakeup_pin:
+    number: GPIO3
+    ignore_strapping_warning: true
 
 sensor:
   - platform: template
