@@ -63,6 +63,15 @@ binary_sensor:
 
   - id: !remove button_green
 
+  # Battery charging status (check if USB/external power is connected)
+  - platform: template
+    id: battery_charging
+    name: "Battery Charging"
+    lambda: |-
+      // Returns true if battery voltage is rising or above charging threshold
+      // Adjust logic based on your hardware's charging detection
+      return id(battery_voltage).state > 4.1;  // Typical charging voltage
+
 font:
   - file: "fonts/segoeui.ttf"
     id: segoeui_16
@@ -146,142 +155,143 @@ lvgl:
 
   top_layer:
     widgets:
+      # Status Bar - spans full width at top
       - obj:
-          id: main_container
+          id: status_bar
           width: 100%
+          height: 30
           align: TOP_MID
+          x: 0
+          y: 0
+          bg_color: 0x000000
           border_width: 0
-          pad_all: 0
+          pad_all: 3
           widgets:
-              # WiFi status (right side, leftmost)
-              - label:
-                  id: lbl_wifi_status
-                  align: TOP_LEFT
-                  x: 120
-                  y: 5
-                  text_font: wifi_icons
-                  text: !lambda |-
-                    std::string icon;
-
-                    if (WiFi.isConnected())
-                    {
-                      if (!isnan(id(wifi_rssi).state))
-                      {
-                        float r = id(wifi_rssi).state;
-                        if      (r > -55) icon = "\U000F0928"; // wifi-strength-4
-                        else if (r > -65) icon = "\U000F0925"; // wifi-strength-3
-                        else if (r > -72) icon = "\U000F0922"; // wifi-strength-2
-                        else if (r > -80) icon = "\U000F091F"; // wifi-strength-1
-                        else              icon = "\U000F091F"; // wifi-strength-0
-                      }
-                    }
-                    else
-                    {
-                      icon = "";
-                    }
-    
-                    char buf[8];
-                    snprintf(buf, sizeof(buf), "%s", icon.c_str());
+            # Left side: Location
+            - label:
+                id: lbl_status_location
+                align: LEFT_MID
+                x: 5
+                text_font: segoeui_16
+                text_color: 0xFFFFFF
+                text: !lambda |-
+                  if (!id(location_city).state.empty()) {
+                    static char buf[32];
+                    snprintf(buf, sizeof(buf), "\U000F0341 %s", id(location_city).state.c_str());
                     return buf;
+                  }
+                  return "\U000F0341 --";
 
-              # Home Assistant status (right side, second from left)
-              - label:
-                  id: lbl_ha_status
-                  align: TOP_LEFT
-                  x: 90
-                  y: 5
-                  text_font: homeassistant_icons
-                  text: !lambda |-
-                    if (id(ha_connected).state) {
-                      ESP_LOGI("ha", "Connected to Home Assistant");
-                      return "\U000F07D0";
-                    } else {
-                      ESP_LOGW("ha", "NOT connected to Home Assistant");
-                      return "\U000F0028";
-                    }
+            # Center: Date
+            - label:
+                id: lbl_status_date
+                align: CENTER
+                text_font: segoeui_16
+                text_color: 0xFFFFFF
+                text: !lambda |-
+                  auto time = id(time_entity).now();
+                  if (time.is_valid()) {
+                    static char buf[24];
+                    snprintf(buf, sizeof(buf), "%s, %s %d", 
+                      time.strftime("%a").c_str(),
+                      time.strftime("%b").c_str(),
+                      time.day_of_month);
+                    return buf;
+                  }
+                  return "-- --, ----";
 
-              # Battery power cord (right side, second from right)
-              - label:
-                  id: lbl_battery_power_cord
-                  align: TOP_LEFT
-                  x: 40
-                  y: 5
-                  text: "⚡"
-                  text_font: battery_icons
-                  hidden: true  # Initially hidden
-                  
-              # Battery status (rightmost)
-              - label:
-                  id: lbl_battery_status
-                  align: TOP_LEFT
-                  x: 10
-                  y: 5
-                  text_font: battery_icons
-                  text: !lambda |-
-                    static char buf[10];
-                    std::string icon;
-                    int x = id(battery_level).state;
-                    if (x == 100.0) {
-                      icon = "\U000F0079"; // mdi-battery (full)
-                    } else if (x > 90) {
-                      icon = "\U000F0082"; // mdi-battery-90
-                    } else if (x > 80) {
-                      icon = "\U000F0081"; // mdi-battery-80
-                    } else if (x > 70) {
-                      icon = "\U000F0080"; // mdi-battery-70
-                    } else if (x > 60) {
-                      icon = "\U000F007F"; // mdi-battery-60
-                    } else if (x > 50) {
-                      icon = "\U000F007E"; // mdi-battery-50
-                    } else if (x > 40) {
-                      icon = "\U000F007D"; // mdi-battery-40
-                    } else if (x > 30) {
-                      icon = "\U000F007C"; // mdi-battery-30
-                    } else if (x > 20) {
-                      icon = "\U000F007B"; // mdi-battery-20
-                    } else if (x > 10) {
-                      icon = "\U000F007A"; // mdi-battery-10
-                    } else if (x > 0) {
-                      icon = "\U000F008E"; // mdi-battery-outline
-                    } else {
-                      icon = "\U000F0091"; // mdi-battery-unknown
+            # Right side icons (right to left): Battery, Power, WiFi, HA
+            # Home Assistant status (rightmost after battery)
+            - label:
+                id: lbl_ha_status
+                align: RIGHT_MID
+                x: -5
+                text_font: homeassistant_icons
+                text_color: 0xFFFFFF
+                text: !lambda |-
+                  if (id(ha_connected).state) {
+                    return "\U000F07D0";  // home-assistant
+                  } else {
+                    return "\U000F0028";  // alert-circle (disconnected)
+                  }
+
+            # WiFi status
+            - label:
+                id: lbl_wifi_status
+                align: RIGHT_MID
+                x: -35
+                text_font: wifi_icons
+                text_color: 0xFFFFFF
+                text: !lambda |-
+                  if (WiFi.isConnected()) {
+                    if (!isnan(id(wifi_rssi).state)) {
+                      float r = id(wifi_rssi).state;
+                      if      (r > -55) return "\U000F0928";  // wifi-strength-4
+                      else if (r > -65) return "\U000F0925";  // wifi-strength-3
+                      else if (r > -72) return "\U000F0922";  // wifi-strength-2
+                      else              return "\U000F091F";  // wifi-strength-1
                     }
-                    snprintf(buf, sizeof(buf), "%s", icon.c_str());
-                    return buf;
-              - label:
-                  id: lbl_battery_level
-                  align: TOP_LEFT
-                  x: 10
-                  y: 5
-                  text: !lambda |-
-                    int level = (int)(id(battery_level).state + 0.5f);
-                    static char buf[10];
-                    snprintf(buf, sizeof(buf), "%d%%", level);
-                    return buf;
+                    return "\U000F091F";
+                  }
+                  return "\U000F092E";  // wifi-off
+
+            # Power plug icon (charging indicator)
+            - label:
+                id: lbl_power_status
+                align: RIGHT_MID
+                x: -65
+                text_font: battery_icons
+                text_color: 0xFFFFFF
+                text: !lambda |-
+                  if (id(battery_charging).state) {
+                    return "\U000F0084";  // battery-charging
+                  }
+                  return "";  // Hidden when not charging
+
+            # Battery icon with level
+            - label:
+                id: lbl_battery_status
+                align: RIGHT_MID
+                x: -90
+                text_font: battery_icons
+                text_color: 0xFFFFFF
+                text: !lambda |-
+                  int x = id(battery_level).state;
+                  if (x >= 95) return "\U000F0079";       // battery (full)
+                  else if (x >= 85) return "\U000F0082"; // battery-90
+                  else if (x >= 75) return "\U000F0081"; // battery-80
+                  else if (x >= 65) return "\U000F0080"; // battery-70
+                  else if (x >= 55) return "\U000F007F"; // battery-60
+                  else if (x >= 45) return "\U000F007E"; // battery-50
+                  else if (x >= 35) return "\U000F007D"; // battery-40
+                  else if (x >= 25) return "\U000F007C"; // battery-30
+                  else if (x >= 15) return "\U000F007B"; // battery-20
+                  else if (x >= 5)  return "\U000F007A"; // battery-10
+                  else return "\U000F008E";              // battery-outline (empty)
+
+            # Battery percentage text
+            - label:
+                id: lbl_battery_percent
+                align: RIGHT_MID
+                x: -115
+                text_font: segoeui_16
+                text_color: 0xFFFFFF
+                text: !lambda |-
+                  static char buf[8];
+                  snprintf(buf, sizeof(buf), "%d%%", (int)id(battery_level).state);
+                  return buf;
 
   pages:
     - id: main_page
       widgets:
-        # Header container spanning the top of the display
-        - obj:
-            id: header_container
-            width: 100%
-            height: 40
-            align: TOP_LEFT
-            x: 0
-            y: 0
-            bg_color: 0x000000
-            border_width: 0
-            pad_all: 5
-
-        # Weather Section (top center)
+        # Weather Section (below status bar)
         - obj:
             id: weather_container
             width: 320
             height: 200
             align: TOP_MID
             x: 0
-            y: 50
+            y: 35
             bg_color: 0xFFFFFF
             border_width: 3
             border_color: 0x000000
@@ -328,7 +338,7 @@ lvgl:
             height: 130
             align: TOP_MID
             x: 0
-            y: 260
+            y: 245
             bg_color: 0xFFFFFF
             border_width: 3
             border_color: 0x000000
@@ -396,7 +406,7 @@ lvgl:
         - arc:
             id: arc_fuel
             x: 30
-            y: 410
+            y: 390
             start_angle: 135
             end_angle: 45
             rotation: 0
@@ -419,7 +429,7 @@ lvgl:
         - arc:
             id: arc_def
             x: 210
-            y: 410
+            y: 390
             width: 150
             height: 150
             start_angle: 135
@@ -450,7 +460,7 @@ lvgl:
         - arc:
             id: arc_battery
             x: 390
-            y: 410
+            y: 390
             width: 150
             height: 150
             start_angle: 135

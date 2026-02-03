@@ -8,7 +8,7 @@ substitutions:
 esp32:
   board: esp32-s3-devkitc-1
   framework:
-    type: arduino
+    type: esp-idf
 
 i2c:
    - id: bus_a
