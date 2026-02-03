@@ -42,6 +42,7 @@
 # ├────────┼───────┼────────────────────┤
 # │  D0    │ GPIO1 │ Fan PWM            │
 # │  D1    │ GPIO2 │ TEC1 MOSFET PWM    │
+# │  D2    │ GPIO3 │ Fan Tach (RPM)     │
 # │  D3    │ GPIO4 │ DS18B20 One-Wire   │
 # │  D4    │ GPIO5 │ TEC2 MOSFET PWM    │
 # │  D5    │ GPIO6 │ I2C SDA (AHT20)    │
@@ -49,6 +50,7 @@
 # │  3V3   │       │ Sensor power       │
 # │  GND   │       │ Common ground      │
 # └────────┴───────┴────────────────────┘
+# Note: GPIO3 (D2) is a strapping pin - fan tach input only (no external pull)
 #
 # TEC MOSFET WIRING (x2):
 # ┌──────────────────────────────────────────────┐
@@ -63,8 +65,11 @@
 # ┌──────────────────────────────────────────────┐
 # │  12V+ ───────── Fan Pin 1 (Yellow/Red)       │
 # │  GND ────────── Fan Pin 2 (Black)            │
-# │  (not used) ─── Fan Pin 3 (Green) Tach       │
-# │  GPIO1 ──────── Fan Pin 4 (Blue) PWM         │
+# │  GPIO3 (D2) ─── Fan Pin 3 (Green) Tach       │
+# │  GPIO1 (D0) ─── Fan Pin 4 (Blue) PWM         │
+# │                                              │
+# │  Tach signal: 2 pulses per revolution        │
+# │  (Fan has internal pull-up, no ext resistor) │
 # └──────────────────────────────────────────────┘
 #
 # AHT20 TEMP/HUMIDITY SENSOR (I2C):
@@ -178,13 +183,18 @@ one_wire:
 
 # https://www.youtube.com/watch?v=9-AZF6udg-Q&t=6s
 sensor:
+  # Fan tachometer - 2 pulses per revolution
   - platform: pulse_counter
-    pin: GPIOXX
+    pin:
+      number: GPIO3   # D2 - Fan tach input
+      mode:
+        input: true
     name: Fan RPM
     id: fan_rpm
     unit_of_measurement: 'RPM'
+    accuracy_decimals: 0
     filters:
-      - multiply: 0.5
+      - multiply: 0.5  # 2 pulses per revolution, counter gives pulses/min
     count_mode:
       rising_edge: INCREMENT
       falling_edge: DISABLE
