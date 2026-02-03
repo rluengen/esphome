@@ -10,7 +10,7 @@ substitutions:
   device_name: terminal
   friendly_name: "Terminal Display"
   project_version: "1.0.0"
-  log_level: VERBOSE
+  log_level: DEBUG
   sleep_duration: 10min
 
 packages:
@@ -37,48 +37,59 @@ esphome:
   name: ${device_name}
   friendly_name: ${friendly_name}
   comment: "Terminal Dashboard Display"
-  on_boot:
-    priority: 600
-    then:
-      - logger.log:
-          level: INFO
-          format: "[BOOT] ESPHome on_boot starting (priority 600)"
-      - logger.log:
-          level: INFO
-          format: "[BOOT] Pausing LVGL"
-      - lvgl.pause:
-      - logger.log:
-          level: INFO
-          format: "[BOOT] Enabling battery measurement"
-      - output.turn_on: bsp_battery_enable
-      - delay: 150ms
-      - logger.log:
-          level: INFO
-          format: "[BOOT] Updating battery_voltage sensor"
-      - component.update: battery_voltage
-      - logger.log:
-          level: INFO
-          format: "[BOOT] Updating battery_level sensor"
-      - component.update: battery_level
-      - delay: 50ms
-      - lambda: |-
-          ESP_LOGI("BOOT", "Battery voltage: %.2fV, level: %.0f%%", 
-            id(battery_voltage).state, id(battery_level).state);
-      - logger.log:
-          level: INFO
-          format: "[BOOT] Resuming LVGL"
-      - lvgl.resume:
-      - logger.log:
-          level: INFO
-          format: "[BOOT] Updating epaper display"
-      - component.update: epaper_display
-      - logger.log:
-          level: INFO
-          format: "[BOOT] Disabling battery measurement"
-      - output.turn_off: bsp_battery_enable
-      - logger.log:
-          level: INFO
-          format: "[BOOT] Boot sequence complete"
+
+logger:
+  level: ${log_level}
+  baud_rate: 115200
+  hardware_uart: UART0
+
+  # on_boot:
+  #   priority: 600
+  #   then:
+  #     - logger.log:
+  #         level: INFO
+  #         format: "[BOOT] ESPHome on_boot starting (priority 600)"
+  #     - logger.log:
+  #         level: INFO
+  #         format: "[BOOT] Pausing LVGL"
+  #     - lvgl.pause:
+  #     - logger.log:
+  #         level: INFO
+  #         format: "[BOOT] Enabling battery measurement"
+  #     - output.turn_on: bsp_battery_enable
+  #     - delay: 150ms
+  #     - logger.log:
+  #         level: INFO
+  #         format: "[BOOT] Updating battery_voltage sensor"
+  #     - component.update: battery_voltage
+  #     - logger.log:
+  #         level: INFO
+  #         format: "[BOOT] Updating battery_level sensor"
+  #     - component.update: battery_level
+  #     - delay: 50ms
+  #     - lambda: |-
+  #         ESP_LOGI("BOOT", "Battery voltage: %.2fV, level: %.0f%%", 
+  #           id(battery_voltage).state, id(battery_level).state);
+  #     - logger.log:
+  #         level: INFO
+  #         format: "[BOOT] Resuming LVGL"
+  #     - lvgl.resume:
+  #     - logger.log:
+  #         level: INFO
+  #         format: "[BOOT] Updating epaper display"
+  #     - component.update: epaper_display
+  #     - delay: 100ms  # Let display render complete
+  #     - logger.log:
+  #         level: INFO
+  #         format: "[BOOT] Pausing LVGL after initial render"
+  #     - lvgl.pause:
+  #     - logger.log:
+  #         level: INFO
+  #         format: "[BOOT] Disabling battery measurement"
+  #     - output.turn_off: bsp_battery_enable
+  #     - logger.log:
+  #         level: INFO
+  #         format: "[BOOT] Boot sequence complete"
 
 binary_sensor:
   - id: !extend button_left
@@ -87,8 +98,13 @@ binary_sensor:
         - logger.log:
             level: INFO
             format: "[BUTTON] Left button pressed - going to previous page"
+        - lvgl.resume:
         - lvgl.page.previous:
             time: 0ms
+        - delay: 50ms
+        - component.update: epaper_display
+        - delay: 100ms
+        - lvgl.pause:
 
   - id: !extend button_right
     on_press:
@@ -96,10 +112,27 @@ binary_sensor:
         - logger.log:
             level: INFO
             format: "[BUTTON] Right button pressed - going to next page"
+        - lvgl.resume:
         - lvgl.page.next:
             time: 0ms
+        - delay: 50ms
+        - component.update: epaper_display
+        - delay: 100ms
+        - lvgl.pause:
 
   - id: !remove button_green
+
+  # API connection status
+  - platform: status
+    id: api_connected
+    name: "API Connected"
+
+  # WiFi connection status (uses template to check if signal exists)
+  - platform: template
+    id: wifi_connected
+    name: "WiFi Connected"
+    lambda: |-
+      return !isnan(id(wifi_signal_db).state) && id(wifi_signal_db).state < 0;
 
   # Battery charging status (check if USB/external power is connected)
   - platform: template
@@ -132,13 +165,39 @@ interval:
       - logger.log:
           level: INFO
           format: "[INTERVAL] 10-minute interval triggered"
+      - logger.log:
+          level: INFO
+          format: "[INTERVAL] Enabling battery measurement"
+      - output.turn_on: bsp_battery_enable
+      - delay: 150ms
+      - logger.log:
+          level: INFO
+          format: "[INTERVAL] Updating battery sensors"
+      - component.update: battery_voltage
+      - component.update: battery_level
+      - delay: 50ms
       - lambda: |-
-          ESP_LOGI("INTERVAL", "Sensor states - Fuel: %.1f%%, DEF: %.1f%%, Battery: %.1f%%",
-            id(fuel_level).state, id(def_level).state, id(vehicle_battery).state);
+          ESP_LOGI("INTERVAL", "Sensor states - Fuel: %.1f%%, DEF: %.1f%%, Vehicle Battery: %.1f%%, Device Battery: %.0f%% (%.2fV)",
+            id(fuel_level).state, id(def_level).state, id(vehicle_battery).state,
+            id(battery_level).state, id(battery_voltage).state);
+      - logger.log:
+          level: INFO
+          format: "[INTERVAL] Resuming LVGL for update"
+      - lvgl.resume:
+      - delay: 50ms  # Let LVGL process widget updates
       - logger.log:
           level: INFO
           format: "[INTERVAL] Updating epaper display"
       - component.update: epaper_display
+      - delay: 100ms  # Let display render complete
+      - logger.log:
+          level: INFO
+          format: "[INTERVAL] Pausing LVGL after update"
+      - lvgl.pause:
+      - logger.log:
+          level: INFO
+          format: "[INTERVAL] Disabling battery measurement"
+      - output.turn_off: bsp_battery_enable
       - logger.log:
           level: INFO
           format: "[INTERVAL] Display update complete"
@@ -149,6 +208,7 @@ lvgl:
   shadow_width: 0
   text_font: segoeui_16
   align: center
+  resume_on_input: false  # Don't auto-resume on input - we control rendering manually
 
   on_idle:
     timeout: 10s
@@ -181,9 +241,9 @@ lvgl:
           - logger.log:
               level: INFO
               format: "[LVGL] Not charging - entering deep sleep for ${sleep_duration}"
-          - deep_sleep.enter:
-              id: deep_sleep_id
-              sleep_duration: ${sleep_duration}
+          # - deep_sleep.enter:
+          #     id: deep_sleep_id
+          #     sleep_duration: ${sleep_duration}
         else:
           - logger.log:
               level: INFO
@@ -208,6 +268,7 @@ lvgl:
             width: 100%
             height: 30
             align: TOP_MID
+            bg_color: 0x000000
             x: 0
             y: 0
             border_width: 0
@@ -222,6 +283,14 @@ lvgl:
                   text_font: segoeui_16
                   text_color: 0xFFFFFF
                   text: !lambda |-
+                    if (!id(location_city).state.empty() && !id(location_state).state.empty()) {
+                      static char buf[64];
+                      snprintf(buf, sizeof(buf), "%s, %s", 
+                        id(location_city).state.c_str(), 
+                        id(location_state).state.c_str());
+                      return buf;
+                    }
+                  
                     if (!isnan(id(location_latitude).state) && !isnan(id(location_longitude).state)) {
                       static char buf[32];
                       snprintf(buf, sizeof(buf), "%.4f, %.4f", 
@@ -275,14 +344,27 @@ lvgl:
                         id: lbl_ha_status
                         text_font: homeassistant_icons
                         text_color: 0xFFFFFF
-                        text: "\U000F07D0"
+                        text: !lambda |-
+                          if (id(api_connected).state) {
+                            return "\U000F07D0";  // Home Assistant connected icon
+                          }
+                          return "\U000F07D2";  // Home Assistant disconnected icon
 
                     # WiFi status
                     - label:
                         id: lbl_wifi_status
                         text_font: wifi_icons
                         text_color: 0xFFFFFF
-                        text: "\U000F0928"
+                        text: !lambda |-
+                          if (!id(wifi_connected).state) {
+                            return "\U000F05AA";  // wifi-off
+                          }
+                          int rssi = (int)id(wifi_signal_db).state;
+                          if (rssi >= -50) return "\U000F0928";       // wifi-strength-4 (excellent)
+                          else if (rssi >= -60) return "\U000F0925";  // wifi-strength-3 (good)
+                          else if (rssi >= -70) return "\U000F0922";  // wifi-strength-2 (fair)
+                          else if (rssi >= -80) return "\U000F091F";  // wifi-strength-1 (weak)
+                          return "\U000F092F";  // wifi-strength-outline (very weak)
 
                     # Battery icon
                     - label:
@@ -323,9 +405,6 @@ lvgl:
             align: TOP_MID
             x: 0
             y: 35
-            bg_color: 0xFFFFFF
-            border_width: 3
-            border_color: 0x000000
             pad_all: 10
             widgets:
               - label:
@@ -334,7 +413,6 @@ lvgl:
                   x: 0
                   y: 10
                   text_font: weather_icons
-                  text_color: 0x000000
                   text: "\U000F0599"  # Default sunny icon
               
               - label:
@@ -343,7 +421,6 @@ lvgl:
                   x: 0
                   y: 120
                   text_font: segoeui_24
-                  text_color: 0x000000
                   text: !lambda |-
                     if (!id(weather_temp).state.empty()) {
                       return id(weather_temp).state.c_str();
@@ -355,83 +432,11 @@ lvgl:
                   align: BOTTOM_MID
                   x: 0
                   y: -5
-                  text_color: 0x000000
                   text: !lambda |-
                     if (!id(weather_condition).state.empty()) {
                       return id(weather_condition).state.c_str();
                     }
                     return "Unknown";
-
-        # Location Section (below weather)
-        - obj:
-            id: location_container
-            width: 320
-            height: 130
-            align: TOP_MID
-            x: 0
-            y: 245
-            bg_color: 0xFFFFFF
-            border_width: 3
-            border_color: 0x000000
-            pad_all: 10
-            widgets:
-              - label:
-                  id: lbl_location_city
-                  align: TOP_LEFT
-                  x: 5
-                  y: 5
-                  text_color: 0x000000
-                  text: !lambda |-
-                    if (!id(location_city).state.empty() && !id(location_state).state.empty()) {
-                      static char buf[64];
-                      snprintf(buf, sizeof(buf), "%s, %s", 
-                        id(location_city).state.c_str(), 
-                        id(location_state).state.c_str());
-                      return buf;
-                    }
-                    return "";
-              
-              - label:
-                  id: lbl_latitude
-                  align: TOP_LEFT
-                  x: 5
-                  y: 40
-                  text_color: 0x000000
-                  text: !lambda |-
-                    if (!isnan(id(location_latitude).state)) {
-                      static char buf[48];
-                      float lat = id(location_latitude).state;
-                      char dir = lat >= 0 ? 'N' : 'S';
-                      lat = abs(lat);
-                      int deg = (int)lat;
-                      float min_float = (lat - deg) * 60;
-                      int min = (int)min_float;
-                      int sec = (int)((min_float - min) * 60);
-                      snprintf(buf, sizeof(buf), "%d° %d' %d\" %c", deg, min, sec, dir);
-                      return buf;
-                    }
-                    return "";
-              
-              - label:
-                  id: lbl_longitude
-                  align: TOP_LEFT
-                  x: 5
-                  y: 70
-                  text_color: 0x000000
-                  text: !lambda |-
-                    if (!isnan(id(location_longitude).state)) {
-                      static char buf[48];
-                      float lon = id(location_longitude).state;
-                      char dir = lon >= 0 ? 'E' : 'W';
-                      lon = abs(lon);
-                      int deg = (int)lon;
-                      float min_float = (lon - deg) * 60;
-                      int min = (int)min_float;
-                      int sec = (int)((min_float - min) * 60);
-                      snprintf(buf, sizeof(buf), "%d° %d' %d\" %c", deg, min, sec, dir);
-                      return buf;
-                    }
-                    return "";
 
         # Fuel Level Arc
         - arc:
@@ -448,6 +453,7 @@ lvgl:
               - label:
                   align: CENTER
                   text: !lambda |-
+                    if (isnan(id(fuel_level).state)) return "--%";
                     static char buf[16];
                     snprintf(buf, sizeof(buf), "%.0f%%", id(fuel_level).state);
                     return buf;
@@ -479,6 +485,7 @@ lvgl:
               - label:
                   align: CENTER
                   text: !lambda |-
+                    if (isnan(id(def_level).state)) return "--%";
                     static char buf[16];
                     snprintf(buf, sizeof(buf), "%.0f%%", id(def_level).state);
                     return buf;
@@ -510,6 +517,7 @@ lvgl:
               - label:
                   align: CENTER
                   text: !lambda |-
+                    if (isnan(id(vehicle_battery).state)) return "--%";
                     static char buf[16];
                     snprintf(buf, sizeof(buf), "%.0f%%", id(vehicle_battery).state);
                     return buf;
@@ -527,6 +535,11 @@ deep_sleep:
     ignore_strapping_warning: true
 
 sensor:
+  - platform: wifi_signal
+    id: wifi_signal_db
+    name: "WiFi Signal"
+    update_interval: 60s
+
   - platform: template
     name: "Wakeup Cause"
     accuracy_decimals: 0
