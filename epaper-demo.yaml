@@ -26,70 +26,90 @@ packages:
         vars:
           wifi_ssid: !secret wifi_ssid
           wifi_password: !secret wifi_password
-      - path: packages/time/homeassistant.yaml
       - path: packages/icons/network_icons.yaml
       - path: packages/icons/battery_icons.yaml
       - path: packages/icons/weather_icons.yaml
       - path: packages/icons/homeassistant_icons.yaml
       - path: devices/reterminal-e1001.yaml
 
+# Time configuration - Home Assistant primary, SNTP fallback
+time:
+  - platform: homeassistant
+    id: time_entity
+    on_time_sync:
+      then:
+        - logger.log:
+            level: INFO
+            format: "[TIME] Synchronized with Home Assistant"
+
+  - platform: sntp
+    id: time_sntp
+    servers:
+      - 0.pool.ntp.org
+      - 1.pool.ntp.org
+      - 2.pool.ntp.org
+    on_time_sync:
+      then:
+        - logger.log:
+            level: INFO
+            format: "[TIME] Synchronized with SNTP"
+
 esphome:
   name: ${device_name}
   friendly_name: ${friendly_name}
   comment: "Terminal Dashboard Display"
+  on_boot:
+    priority: 600
+    then:
+      - logger.log:
+          level: INFO
+          format: "[BOOT] ESPHome on_boot starting (priority 600)"
+      - logger.log:
+          level: INFO
+          format: "[BOOT] Pausing LVGL"
+      - lvgl.pause:
+      - logger.log:
+          level: INFO
+          format: "[BOOT] Enabling battery measurement"
+      - output.turn_on: bsp_battery_enable
+      - delay: 150ms
+      - logger.log:
+          level: INFO
+          format: "[BOOT] Updating battery_voltage sensor"
+      - component.update: battery_voltage
+      - logger.log:
+          level: INFO
+          format: "[BOOT] Updating battery_level sensor"
+      - component.update: battery_level
+      - delay: 50ms
+      - lambda: |-
+          ESP_LOGI("BOOT", "Battery voltage: %.2fV, level: %.0f%%", 
+            id(battery_voltage).state, id(battery_level).state);
+      - logger.log:
+          level: INFO
+          format: "[BOOT] Resuming LVGL"
+      - lvgl.resume:
+      - logger.log:
+          level: INFO
+          format: "[BOOT] Updating epaper display"
+      - component.update: epaper_display
+      - delay: 100ms  # Let display render complete
+      - logger.log:
+          level: INFO
+          format: "[BOOT] Pausing LVGL after initial render"
+      - lvgl.pause:
+      - logger.log:
+          level: INFO
+          format: "[BOOT] Disabling battery measurement"
+      - output.turn_off: bsp_battery_enable
+      - logger.log:
+          level: INFO
+          format: "[BOOT] Boot sequence complete"
 
 logger:
   level: ${log_level}
   baud_rate: 115200
   hardware_uart: UART0
-
-  # on_boot:
-  #   priority: 600
-  #   then:
-  #     - logger.log:
-  #         level: INFO
-  #         format: "[BOOT] ESPHome on_boot starting (priority 600)"
-  #     - logger.log:
-  #         level: INFO
-  #         format: "[BOOT] Pausing LVGL"
-  #     - lvgl.pause:
-  #     - logger.log:
-  #         level: INFO
-  #         format: "[BOOT] Enabling battery measurement"
-  #     - output.turn_on: bsp_battery_enable
-  #     - delay: 150ms
-  #     - logger.log:
-  #         level: INFO
-  #         format: "[BOOT] Updating battery_voltage sensor"
-  #     - component.update: battery_voltage
-  #     - logger.log:
-  #         level: INFO
-  #         format: "[BOOT] Updating battery_level sensor"
-  #     - component.update: battery_level
-  #     - delay: 50ms
-  #     - lambda: |-
-  #         ESP_LOGI("BOOT", "Battery voltage: %.2fV, level: %.0f%%", 
-  #           id(battery_voltage).state, id(battery_level).state);
-  #     - logger.log:
-  #         level: INFO
-  #         format: "[BOOT] Resuming LVGL"
-  #     - lvgl.resume:
-  #     - logger.log:
-  #         level: INFO
-  #         format: "[BOOT] Updating epaper display"
-  #     - component.update: epaper_display
-  #     - delay: 100ms  # Let display render complete
-  #     - logger.log:
-  #         level: INFO
-  #         format: "[BOOT] Pausing LVGL after initial render"
-  #     - lvgl.pause:
-  #     - logger.log:
-  #         level: INFO
-  #         format: "[BOOT] Disabling battery measurement"
-  #     - output.turn_off: bsp_battery_enable
-  #     - logger.log:
-  #         level: INFO
-  #         format: "[BOOT] Boot sequence complete"
 
 binary_sensor:
   - id: !extend button_left
@@ -310,6 +330,9 @@ lvgl:
                   text_color: 0xFFFFFF
                   text: !lambda |-
                     auto time = id(time_entity).now();
+                    if (!time.is_valid()) {
+                      time = id(time_sntp).now();
+                    }
                     if (time.is_valid()) {
                       static char buf[40];
                       snprintf(buf, sizeof(buf), "%s %s %d, %d", 
