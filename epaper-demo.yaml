@@ -40,30 +40,62 @@ esphome:
   on_boot:
     priority: 600
     then:
-      - logger.log: "esphome on_boot"
+      - logger.log:
+          level: INFO
+          format: "[BOOT] ESPHome on_boot starting (priority 600)"
+      - logger.log:
+          level: INFO
+          format: "[BOOT] Pausing LVGL"
       - lvgl.pause:
+      - logger.log:
+          level: INFO
+          format: "[BOOT] Enabling battery measurement"
       - output.turn_on: bsp_battery_enable
       - delay: 150ms
+      - logger.log:
+          level: INFO
+          format: "[BOOT] Updating battery_voltage sensor"
       - component.update: battery_voltage
+      - logger.log:
+          level: INFO
+          format: "[BOOT] Updating battery_level sensor"
       - component.update: battery_level
       - delay: 50ms
-      - logger.log: "Battery sensors updated, resuming LVGL"
-      - lvgl.resume:
-      - component.update: epaper_display
-      - output.turn_off: bsp_battery_enable
       - lambda: |-
-          ESP_LOGI("esphome", "ESPHome on_boot triggered");
+          ESP_LOGI("BOOT", "Battery voltage: %.2fV, level: %.0f%%", 
+            id(battery_voltage).state, id(battery_level).state);
+      - logger.log:
+          level: INFO
+          format: "[BOOT] Resuming LVGL"
+      - lvgl.resume:
+      - logger.log:
+          level: INFO
+          format: "[BOOT] Updating epaper display"
+      - component.update: epaper_display
+      - logger.log:
+          level: INFO
+          format: "[BOOT] Disabling battery measurement"
+      - output.turn_off: bsp_battery_enable
+      - logger.log:
+          level: INFO
+          format: "[BOOT] Boot sequence complete"
 
 binary_sensor:
   - id: !extend button_left
     on_press:
       then:
+        - logger.log:
+            level: INFO
+            format: "[BUTTON] Left button pressed - going to previous page"
         - lvgl.page.previous:
             time: 0ms
 
   - id: !extend button_right
     on_press:
       then:
+        - logger.log:
+            level: INFO
+            format: "[BUTTON] Right button pressed - going to next page"
         - lvgl.page.next:
             time: 0ms
 
@@ -97,8 +129,19 @@ font:
 interval:
   - interval: 10min
     then:
-      - logger.log: "Update display interval"
+      - logger.log:
+          level: INFO
+          format: "[INTERVAL] 10-minute interval triggered"
+      - lambda: |-
+          ESP_LOGI("INTERVAL", "Sensor states - Fuel: %.1f%%, DEF: %.1f%%, Battery: %.1f%%",
+            id(fuel_level).state, id(def_level).state, id(vehicle_battery).state);
+      - logger.log:
+          level: INFO
+          format: "[INTERVAL] Updating epaper display"
       - component.update: epaper_display
+      - logger.log:
+          level: INFO
+          format: "[INTERVAL] Display update complete"
 
 lvgl:
   border_width: 0
@@ -110,35 +153,50 @@ lvgl:
   on_idle:
     timeout: 10s
     then:
-      - logger.log: "LVGL on_idle"
+      - logger.log:
+          level: INFO
+          format: "[LVGL] on_idle triggered (10s timeout)"
       - lambda: |-
-          ESP_LOGI("display", "on_idle");
+          ESP_LOGI("LVGL", "Idle timeout reached - display inactive for 10s");
   
   on_ready:
     then:
-      - logger.log: "LVGL on_ready"
+      - logger.log:
+          level: INFO
+          format: "[LVGL] on_ready - LVGL initialized"
       - lambda: |-
-          ESP_LOGI("display", "on_ready");
+          ESP_LOGI("LVGL", "LVGL ready and initialized");
 
   on_pause:
-    - logger.log: "LVGL on_pause"
+    - logger.log:
+        level: INFO
+        format: "[LVGL] on_pause triggered"
     - lambda: |-
-        ESP_LOGI("display", "on_pause");
+        ESP_LOGI("LVGL", "Battery charging: %s, voltage: %.2fV", 
+          id(battery_charging).state ? "YES" : "NO", id(battery_voltage).state);
     - if:
         condition:
           binary_sensor.is_off: battery_charging
         then:
-          - logger.log: "Not charging, entering deep sleep"
+          - logger.log:
+              level: INFO
+              format: "[LVGL] Not charging - entering deep sleep for ${sleep_duration}"
           - deep_sleep.enter:
               id: deep_sleep_id
               sleep_duration: ${sleep_duration}
         else:
-          - logger.log: "Charging, skipping deep sleep"
+          - logger.log:
+              level: INFO
+              format: "[LVGL] Charging detected - skipping deep sleep"
 
   on_resume:
-    - logger.log: "LVGL on_resume"
+    - logger.log:
+        level: INFO
+        format: "[LVGL] on_resume - display waking up"
   on_boot:
-    - logger.log: "LVGL on_boot"
+    - logger.log:
+        level: INFO
+        format: "[LVGL] on_boot - LVGL starting"
 
   pages:
     - id: main_page
@@ -177,6 +235,8 @@ lvgl:
               - label:
                   id: lbl_status_date
                   align: CENTER
+                  x: 0
+                  y: 0
                   text_font: segoeui_16
                   text_color: 0xFFFFFF
                   text: !lambda |-
@@ -196,6 +256,8 @@ lvgl:
               - obj:
                   id: status_icons_container
                   align: RIGHT_MID
+                  x: 0
+                  y: 0
                   width: SIZE_CONTENT
                   height: 100%
                   bg_opa: TRANSP
@@ -473,37 +535,42 @@ sensor:
   - platform: homeassistant
     id: location_latitude
     entity_id: sensor.location_latitude
+    on_value:
+      then:
+        - lambda: |-
+            ESP_LOGI("HA_SENSOR", "location_latitude updated: %.6f", x);
 
   - platform: homeassistant
     id: location_longitude
     entity_id: sensor.location_longitude
+    on_value:
+      then:
+        - lambda: |-
+            ESP_LOGI("HA_SENSOR", "location_longitude updated: %.6f", x);
 
   - platform: homeassistant
     id: fuel_level
     entity_id: sensor.fuel_level
     on_value:
       then:
-        - lvgl.arc.update:
-            id: arc_fuel
-            value: !lambda return x;
+        - lambda: |-
+            ESP_LOGI("HA_SENSOR", "fuel_level updated: %.1f%%", x);
 
   - platform: homeassistant
     id: def_level
     entity_id: sensor.def_level
     on_value:
       then:
-        - lvgl.arc.update:
-            id: arc_def
-            value: !lambda return x;
+        - lambda: |-
+            ESP_LOGI("HA_SENSOR", "def_level updated: %.1f%%", x);
 
   - platform: homeassistant
     id: vehicle_battery
     entity_id: sensor.vehicle_battery
     on_value:
       then:
-        - lvgl.arc.update:
-            id: arc_battery
-            value: !lambda return x;
+        - lambda: |-
+            ESP_LOGI("HA_SENSOR", "vehicle_battery updated: %.1f%%", x);
 
 display:
   - id: !extend epaper_display
@@ -518,38 +585,30 @@ text_sensor:
     attribute: condition
     on_value:
       then:
-        - lvgl.label.update:
-            id: lbl_weather_icon
-            text: !lambda |-
-              std::map<std::string, std::string> weather_icons = {
-                {"clear-night", "\U000F0594"},
-                {"cloudy", "\U000F0590"},
-                {"exceptional", "\U000F0F2F"},
-                {"fog", "\U000F0591"},
-                {"hail", "\U000F0592"},
-                {"lightning", "\U000F0593"},
-                {"lightning-rainy", "\U000F067E"},
-                {"partlycloudy", "\U000F0595"},
-                {"pouring", "\U000F0596"},
-                {"rainy", "\U000F0597"},
-                {"snowy", "\U000F0598"},
-                {"snowy-rainy", "\U000F067F"},
-                {"sunny", "\U000F0599"},
-                {"windy", "\U000F059D"},
-                {"windy-variant", "\U000F059E"}
-              };
-              std::string condition = x;
-              return weather_icons.count(condition) ? weather_icons[condition].c_str() : "\U000F14E4";
+        - lambda: |-
+            ESP_LOGI("HA_TEXT", "weather_condition updated: %s", x.c_str());
 
   - platform: homeassistant
     id: weather_temp
     entity_id: weather.forecast_home
     attribute: temperature
+    on_value:
+      then:
+        - lambda: |-
+            ESP_LOGI("HA_TEXT", "weather_temp updated: %s", x.c_str());
 
   - platform: homeassistant
     id: location_city
     entity_id: sensor.location_city
+    on_value:
+      then:
+        - lambda: |-
+            ESP_LOGI("HA_TEXT", "location_city updated: %s", x.c_str());
 
   - platform: homeassistant
     id: location_state
     entity_id: sensor.location_state
+    on_value:
+      then:
+        - lambda: |-
+            ESP_LOGI("HA_TEXT", "location_state updated: %s", x.c_str());
