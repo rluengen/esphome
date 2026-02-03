@@ -7,7 +7,8 @@ font:
     bpp: 4
     glyphs: [
       "\U000F07D0", # mdi-home-assistant
-      "\U000F07D2", # mdi-home-assistant-off (disconnected)
+      "\U000F06A1", # mdi-home-outline (connected)
+      "\U000F0F21", # mdi-home-off (disconnected)
       "\U000F0028", # alert-circle
       ]
 
