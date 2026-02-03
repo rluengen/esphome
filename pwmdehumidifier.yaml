@@ -3,6 +3,36 @@
 # ============================================================================
 # Board: Seeed XIAO ESP32-S3
 #
+
+# fan header connector
+#   ??
+# 1-wire connector, x2
+#   ??
+# TEC connector, 6A, x2
+#   Amphenol boardlock connectors x2
+# 12v -> 5v converter mount
+# qwiic connector for aht20
+# power supply connector
+#   Amphenol boardlock connector
+
+# https://github.com/wallnalyr/esp-fan-controller
+# ESP32-C3          DS18B20
+# ---------         -------
+# 3.3V  ──────────── VDD (red)
+# GND   ──────────── GND (black)
+# GPIO4 ──────┬───── DATA (yellow)
+#             │
+#            4.7kΩ
+#             │
+# 3.3V  ──────┘
+# 
+# ESP32-C3          Noctua Fan
+# ---------         ----------
+# GPIO8 ──────────── PWM (blue)
+# GND   ──────────── GND (black)
+#                    +12V (yellow) ── 12V supply
+#                    Tach (green) ── (optional, not used)
+
 # WIRING DIAGRAM
 # ==============
 #
@@ -146,7 +176,20 @@ one_wire:
   - platform: gpio
     pin: GPIO4   # D3
 
+# https://www.youtube.com/watch?v=9-AZF6udg-Q&t=6s
 sensor:
+  - platform: pulse_counter
+    pin: GPIOXX
+    name: Fan RPM
+    id: fan_rpm
+    unit_of_measurement: 'RPM'
+    filters:
+      - multiply: 0.5
+    count_mode:
+      rising_edge: INCREMENT
+      falling_edge: DISABLE
+    update_interval: 1s
+
   - platform: aht10
     variant: AHT20
     temperature:
@@ -205,7 +248,7 @@ binary_sensor:
     id: hot_overtemp
     name: "Hot Side Overtemp"
     lambda: |-
-      if (id(hot_temp).has_state() && id(hot_temp).state > 70.0) {
+      if (id(hot_temp).has_state() && id(hot_temp).state > 35.0) {
         return true;
       }
       return false;
@@ -251,6 +294,7 @@ number:
     id: humidity_target
     min_value: 30
     max_value: 70
+    restore_value: true
     step: 1
     unit_of_measurement: "%"
     initial_value: 60
@@ -264,12 +308,13 @@ interval:
       - lambda: |-
           if (!id(hot_temp).has_state()) return;
 
-          float t = id(hot_temp).state;
+          float temperature = id(hot_temp).state;
           float level = 0.0f;
 
-          // Fan curve: 35C to 0.0, 55C to 1.0
-          if (t > 35.0f) {
-            level = (t - 35.0f) / 20.0f;
+          // TODO: create a variable which has the low-end fan value, or is this room temperature?
+
+          if (temperature > 35.0f) {
+            level = (temperature - 35.0f) / 20.0f;
             if (level > 1.0f) level = 1.0f;
           }
 
