@@ -36,10 +36,6 @@ binary_sensor:
     id: button_left
     name: "Left Button"
 
-  - platform: template
-    id: is_powered
-    internal: true
-
 output:
   - platform: gpio
     pin: GPIO6
@@ -67,11 +63,6 @@ sensor:
     attenuation: 12db
     filters:
       - multiply: 2.0  # Voltage divider compensation
-    on_value:
-      then:
-        - lambda: |-
-            const bool powered = !isnan(id(battery_voltage).state) && id(battery_voltage).state > 4.5; // threshold
-            id(is_powered).publish_state(powered);
 
   - platform: template
     name: "Battery Level"

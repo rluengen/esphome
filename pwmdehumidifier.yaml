@@ -1,5 +1,5 @@
 # ============================================================================
-# PWM TEC Dehumidifier Controller
+# PWM Thermoelectric Cooler (TEC) Dehumidifier Controller
 # ============================================================================
 # Board: Seeed XIAO ESP32-S3
 #
@@ -8,7 +8,7 @@
 #   ??
 # 1-wire connector, x2
 #   ??
-# TEC connector, 6A, x2
+# Thermoelectric Cooler (TEC) connector, 6A, x2
 #   Amphenol boardlock connectors x2
 # 12v -> 5v converter mount
 # qwiic connector for aht20
@@ -36,23 +36,21 @@
 # WIRING DIAGRAM
 # ==============
 #
-# XIAO ESP32-S3 Pinout:
-# ┌─────────────────────────────────────┐
-# │  Pin   │ GPIO  │ Function           │
-# ├────────┼───────┼────────────────────┤
-# │  D0    │ GPIO1 │ Fan PWM            │
-# │  D1    │ GPIO2 │ TEC1 MOSFET PWM    │
-# │  D2    │ GPIO3 │ Fan Tach (RPM)     │
-# │  D3    │ GPIO4 │ DS18B20 One-Wire   │
-# │  D4    │ GPIO5 │ TEC2 MOSFET PWM    │
-# │  D5    │ GPIO6 │ I2C SDA (AHT20)    │
-# │  D6    │ GPIO7 │ I2C SCL (AHT20)    │
-# │  3V3   │       │ Sensor power       │
-# │  GND   │       │ Common ground      │
-# └────────┴───────┴────────────────────┘
-# Note: GPIO3 (D2) is a strapping pin - fan tach input only (no external pull)
+# XIAO ESP32-S3 Pinout (top view, USB-C at top):
+# ┌───────────────────────────────────────────────────────────────────────┐
+# │  Left Side              │───[USB-C]─────│              Right Side    │
+# │  Pin  │ GPIO  │ Function│               │ Function   │ GPIO  │ Pin   │
+# ├───────┼───────┼─────────┤               ├────────────┼───────┼───────┤
+# │  D0   │ GPIO1 │ Fan PWM │               │            │  5V   │  5V   │
+# │  D1   │ GPIO2 │ Fan Tach│               │            │  GND  │  GND  │
+# │  D2   │ GPIO3 │         │               │Sensor power│  3V3  │  3V3  │
+# │  D3   │ GPIO4 │ DS18B20 │               │            │ GPIO9 │  D10  │
+# │  D4   │ GPIO5 │ I2C SDA │               │  TEC1 PWM  │ GPIO8 │  D9   │
+# │  D5   │ GPIO6 │ I2C SCL │               │  TEC2 PWM  │ GPIO7 │  D8   │
+# │  D6   │GPIO43 │ (TX)    │               │  (RX)      │GPIO44 │  D7   │
+# └───────┴───────┴─────────┴───[ANTENNA]───┴────────────┴───────┴───────┘
 #
-# TEC MOSFET WIRING (x2):
+# Thermoelectric Cooler (TEC) MOSFET WIRING (x2):
 # ┌──────────────────────────────────────────────┐
 # │  XIAO GPIO ──── MOSFET Gate (via resistor)   │
 # │  12V+ ───────── TEC+ (red)                   │
@@ -65,7 +63,7 @@
 # ┌──────────────────────────────────────────────┐
 # │  12V+ ───────── Fan Pin 1 (Yellow/Red)       │
 # │  GND ────────── Fan Pin 2 (Black)            │
-# │  GPIO3 (D2) ─── Fan Pin 3 (Green) Tach       │
+# │  GPIO2 (D1) ─── Fan Pin 3 (Green) Tach       │
 # │  GPIO1 (D0) ─── Fan Pin 4 (Blue) PWM         │
 # │                                              │
 # │  Tach signal: 2 pulses per revolution        │
@@ -76,8 +74,8 @@
 # ┌──────────────────────────────────────────────┐
 # │  3V3 ────────── VCC                          │
 # │  GND ────────── GND                          │
-# │  GPIO6 (D5) ─── SDA                          │
-# │  GPIO7 (D6) ─── SCL                          │
+# │  GPIO5 (D4) ─── SDA                          │
+# │  GPIO6 (D5) ─── SCL                          │
 # └──────────────────────────────────────────────┘
 #
 # DS18B20 TEMPERATURE SENSORS (One-Wire, 2 sensors):
@@ -93,7 +91,7 @@
 #
 # POWER SUPPLY:
 # ┌──────────────────────────────────────────────┐
-# │  12V DC supply for TECs and fan              │
+# │  12V DC supply for Thermoelectric Coolers    │
 # │  3.3V from XIAO for sensors                  │
 # │  Common GND between all components           │
 # └──────────────────────────────────────────────┘
@@ -137,27 +135,33 @@ packages:
           wifi_ssid: !secret wifi_ssid
           wifi_password: !secret wifi_password
       - path: packages/time/homeassistant.yaml
+
+logger:
+  logs:
+    pulse_counter: WARN
+    sensor: INFO
+    i2c.idf: WARN
   
 output:
-  # TEC1 MOSFET PWM
+  # Thermoelectric Cooler 1 MOSFET PWM
   - platform: ledc
     id: tec1_pwm
-    pin: GPIO2   # D1
+    pin: GPIO8   # D9
     frequency: 20000 Hz
 
-  # TEC2 MOSFET PWM
+  # Thermoelectric Cooler 2 MOSFET PWM
   - platform: ledc
     id: tec2_pwm
-    pin: GPIO5   # D4
+    pin: GPIO7   # D8
     frequency: 20000 Hz
 
   # Fan PWM
   - platform: ledc
     id: fan_pwm
-    pin: GPIO1   # D0 (GPIO3/D2 is a strapping pin)
+    pin: GPIO1
     frequency: 25000 Hz
 
-  # Shared power level for both TECs (and fan)
+  # Shared power level for both Thermoelectric Coolers (and fan)
   - platform: template
     id: tec_power
     type: float
@@ -168,13 +172,13 @@ output:
           // Clamp to configurable max power
           float max_level = id(tec_max_power).state;
           if (level > max_level) level = max_level;
-          // Drive both TEC MOSFETs
+          // Drive both Thermoelectric Cooler MOSFETs
           id(tec1_pwm).set_level(level);
           id(tec2_pwm).set_level(level);
 
 i2c:
-  sda: GPIO6   # D5
-  scl: GPIO7   # D6
+  sda: GPIO5   # D4
+  scl: GPIO6   # D5
   scan: true
 
 one_wire:
@@ -183,10 +187,19 @@ one_wire:
 
 # https://www.youtube.com/watch?v=9-AZF6udg-Q&t=6s
 sensor:
+  # Exterior temperature from Home Assistant (for cold weather mode)
+  - platform: homeassistant
+    name: "Exterior Temperature"
+    id: exterior_temp
+    entity_id: sensor.outdoor_temperature  # Change to your HA outdoor temp sensor
+    unit_of_measurement: "°C"
+    filters:
+      - filter_out: nan
+
   # Fan tachometer - 2 pulses per revolution
   - platform: pulse_counter
     pin:
-      number: GPIO3   # D2 - Fan tach input
+      number: GPIO2   # D1 - Fan tach input
       mode:
         input: true
     name: Fan RPM
@@ -195,10 +208,15 @@ sensor:
     accuracy_decimals: 0
     filters:
       - multiply: 0.5  # 2 pulses per revolution, counter gives pulses/min
+      - delta: 1.0     # Only publish when RPM changes by at least 1
     count_mode:
       rising_edge: INCREMENT
       falling_edge: DISABLE
     update_interval: 1s
+    on_value:
+      - logger.log:
+          format: "Fan RPM changed to %.0f"
+          args: ['x']
 
   - platform: aht10
     variant: AHT20
@@ -239,7 +257,7 @@ sensor:
       float dew = (magnus_temperature_constant * gamma) / (magnus_coefficient - gamma);
       return dew;
 
-  # Cold side DS18B20 (controls both TECs)
+  # Cold side DS18B20 (controls both Thermoelectric Coolers)
   - platform: dallas_temp
     # boot and replace with unique one wire address: address: 0x1111111111111111
     name: "Cold Side Temperature"
@@ -263,7 +281,7 @@ binary_sensor:
       }
       return false;
     on_press:
-      - logger.log: "HOT SIDE OVER TEMP, shutting down both TECs"
+      - logger.log: "HOT SIDE OVER TEMP, shutting down both Thermoelectric Coolers"
       - output.turn_off: tec1_pwm
       - output.turn_off: tec2_pwm
       - climate.control:
@@ -312,20 +330,81 @@ number:
     entity_category: config
     mode: box
 
+  - platform: template
+    name: "Dew Point Offset (°C)"
+    id: dew_point_offset
+    min_value: 0
+    max_value: 10
+    step: 0.5
+    unit_of_measurement: "°C"
+    initial_value: 2
+    optimistic: true
+    restore_value: true
+    entity_category: config
+    mode: box
+    icon: "mdi:thermometer-minus"
+
+  - platform: template
+    name: "Wall Insulation Factor"
+    id: wall_insulation_factor
+    min_value: 0.1
+    max_value: 0.9
+    step: 0.1
+    initial_value: 0.5
+    optimistic: true
+    restore_value: true
+    entity_category: config
+    mode: slider
+    icon: "mdi:home-thermometer"
+    # 0.1 = wall temp close to exterior (poor insulation)
+    # 0.9 = wall temp close to interior (good insulation)
+
+# How far below estimated wall temp to keep the dew point when cold outside
+  - platform: template
+    name: "Cold Weather Safety Margin (°C)"
+    id: cold_weather_margin
+    min_value: 1
+    max_value: 5
+    step: 0.5
+    unit_of_measurement: "°C"
+    initial_value: 2
+    optimistic: true
+    restore_value: true
+    entity_category: config
+    mode: box
+    icon: "mdi:snowflake-thermometer"
+
+  - platform: template
+    name: "Fan Max Temp (°C)"
+    id: fan_max_temp
+    min_value: 25
+    max_value: 70
+    step: 1
+    unit_of_measurement: "°C"
+    initial_value: 35
+    optimistic: true
+    restore_value: true
+    entity_category: config
+    mode: box
+    icon: "mdi:fan-alert"
+
 interval:
   - interval: 5s
     then:
       - lambda: |-
-          if (!id(hot_temp).has_state()) return;
+          if (!id(hot_temp).has_state() || !id(box_air_temp).has_state()) return;
 
-          float temperature = id(hot_temp).state;
+          float hot = id(hot_temp).state;
+          float ambient = id(box_air_temp).state;
+          float max_temp = id(fan_max_temp).state;
           float level = 0.0f;
 
-          // TODO: create a variable which has the low-end fan value, or is this room temperature?
-
-          if (temperature > 35.0f) {
-            level = (temperature - 35.0f) / 20.0f;
+          // Fan off when hot side equals ambient, ramps to 100% at max_temp
+          // Linear interpolation: 0% at ambient, 100% at max_temp
+          if (hot > ambient && ambient < max_temp) {
+            level = (hot - ambient) / (max_temp - ambient);
             if (level > 1.0f) level = 1.0f;
+            if (level < 0.0f) level = 0.0f;
           }
 
           // Overtemp forces full fan
@@ -342,25 +421,58 @@ interval:
 
           float current_humidity = id(box_humidity).state;
           float target_humidity = id(humidity_target).state;
+          float interior_temp = id(box_air_temp).state;
 
-          // If humidity is below target, turn off TEC cooling
-          if (current_humidity < target_humidity) {
+          // Cold weather mode: estimate wall temp and adjust target humidity
+          float effective_target = target_humidity;
+          if (id(exterior_temp).has_state()) {
+            float exterior = id(exterior_temp).state;
+            float insulation = id(wall_insulation_factor).state;
+            float margin = id(cold_weather_margin).state;
+            
+            // Estimate coldest wall temperature based on insulation factor
+            // wall_temp = exterior + (interior - exterior) * insulation_factor
+            float wall_temp = exterior + (interior_temp - exterior) * insulation;
+            
+            // Calculate max humidity where dew point stays below wall temp
+            // Using simplified inverse Magnus formula
+            float safe_dew_point = wall_temp - margin;
+            
+            // Calculate max safe humidity for this dew point at current interior temp
+            // RH = 100 * exp((17.62 * Td) / (243.12 + Td)) / exp((17.62 * T) / (243.12 + T))
+            float gamma_dp = (17.62f * safe_dew_point) / (243.12f + safe_dew_point);
+            float gamma_t = (17.62f * interior_temp) / (243.12f + interior_temp);
+            float max_safe_humidity = 100.0f * exp(gamma_dp - gamma_t);
+            
+            // Use the lower of user target or cold-weather safe target
+            if (max_safe_humidity < target_humidity) {
+              effective_target = max_safe_humidity;
+              ESP_LOGI("dehumidifier", "Cold weather mode: Wall temp %.1fC, limiting humidity to %.1f%% (was %.1f%%)", 
+                       wall_temp, effective_target, target_humidity);
+            }
+          }
+
+          // If humidity is below effective target, turn off Thermoelectric Cooler
+          if (current_humidity < effective_target) {
             auto call = id(tec_climate).make_call();
             call.set_mode(CLIMATE_MODE_OFF);
             call.perform();
-            ESP_LOGD("dehumidifier", "Humidity %.1f%% below target %.1f%%, TEC off", current_humidity, target_humidity);
+            ESP_LOGD("dehumidifier", "Humidity %.1f%% below target %.1f%%, Thermoelectric Cooler off", current_humidity, effective_target);
             return;
           }
 
-          // Humidity above target - calculate TEC target temp
+          // Humidity above target - calculate Thermoelectric Cooler target temp
           float dp = id(dew_point).state;
-          float target = dp - 2.0f;  // 2C below dew point
+          float offset = id(dew_point_offset).state;
+          float target = dp - offset;
 
           // Optional safety clamp so you don't go insanely cold
           if (target < 0.0f) target = 0.0f;
+
+          ESP_LOGI("dehumidifier", "Dew point: %.1fC, Thermoelectric Cooler target: %.1fC (dew point - %.1fC)", dp, target, offset);
 
           auto call = id(tec_climate).make_call();
           call.set_mode(CLIMATE_MODE_COOL);
           call.set_target_temperature(target);
           call.perform();
-          ESP_LOGD("dehumidifier", "Humidity %.1f%% above target %.1f%%, TEC cooling to %.1fC", current_humidity, target_humidity, target);
+          ESP_LOGD("dehumidifier", "Humidity %.1f%% above target %.1f%%, Thermoelectric Cooler cooling to %.1fC", current_humidity, target_humidity, target);

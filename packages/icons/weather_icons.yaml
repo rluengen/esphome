@@ -24,4 +24,6 @@ font:
       "\U000F059D", # windy
       "\U000F059E", # windy-variant
       "\U000F14E4", # sunny-off
+      "\U000F059C", # weather-sunset-up (sunrise)
+      "\U000F059B", # weather-sunset-down (sunset)
       ]

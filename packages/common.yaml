@@ -12,6 +12,7 @@ logger:
 api:
   encryption:
     key: ${api_encryption_key}
+  reboot_timeout: 0s  # Allow device to work without Home Assistant connected
   on_client_connected:
     - logger.log:
         format: "Client %s connected to API with IP %s"

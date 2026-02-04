@@ -11,7 +11,7 @@ substitutions:
   friendly_name: "Terminal Display"
   project_version: "1.0.0"
   log_level: DEBUG
-  sleep_duration: 10min
+  sleep_duration: 1min
 
 packages:
   remote_packages:
@@ -59,42 +59,123 @@ esphome:
   friendly_name: ${friendly_name}
   comment: "Terminal Dashboard Display"
   on_boot:
-    priority: 600
+    priority: -100  # Run after all components are initialized (including SPI)
     then:
       - logger.log:
           level: INFO
-          format: "[BOOT] ESPHome on_boot starting (priority 600)"
-      - logger.log:
-          level: INFO
-          format: "[BOOT] Pausing LVGL"
-      - lvgl.pause:
-      - logger.log:
-          level: INFO
-          format: "[BOOT] Enabling battery measurement"
-      - output.turn_on: bsp_battery_enable
-      - delay: 150ms
-      - logger.log:
-          level: INFO
-          format: "[BOOT] Updating battery_voltage sensor"
-      - component.update: battery_voltage
-      - delay: 100ms
-      - logger.log:
-          level: INFO
-          format: "[BOOT] Updating battery_level sensor"
-      - component.update: battery_level
-      - delay: 100ms
-      - component.update: battery_level
-      - delay: 50ms
+          format: "[BOOT] ESPHome on_boot starting (priority -100)"
       - lambda: |-
-          ESP_LOGI("BOOT", "Battery voltage: %.2fV, level: %.0f%%", 
-            id(battery_voltage).state, id(battery_level).state);
+          int cause = esp_sleep_get_wakeup_cause();
+          const char* cause_str;
+          switch (cause) {
+            case 0: cause_str = "Not from deep sleep"; break;
+            case 1: cause_str = "EXT0 (RTC_IO)"; break;
+            case 2: cause_str = "EXT1 (RTC_CNTL)"; break;
+            case 3: cause_str = "Timer"; break;
+            case 4: cause_str = "Touchpad"; break;
+            case 5: cause_str = "ULP"; break;
+            case 6: cause_str = "GPIO"; break;
+            case 7: cause_str = "UART"; break;
+            default: cause_str = "Unknown"; break;
+          }
+          ESP_LOGI("BOOT", "Wakeup cause: %d (%s)", cause, cause_str);
+          // Store wakeup cause for use in automations
+          id(wakeup_from_sleep) = (cause != 0);
+      # - logger.log:
+      #     level: INFO
+      #     format: "[BOOT] Pausing LVGL"
+      # - lvgl.pause:
+      - script.execute: update_display
       - logger.log:
           level: INFO
-          format: "[BOOT] Resuming LVGL"
+          format: "[BOOT] Boot sequence complete"
+
+logger:
+  level: ${log_level}
+  baud_rate: 115200
+  hardware_uart: UART0
+
+# Globals for state tracking
+globals:
+  - id: wakeup_from_sleep
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+  - id: boot_complete
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+
+# Script to update display - called from boot and interval
+script:
+  - id: update_display
+    mode: single  # Prevent multiple concurrent executions
+    then:
+      # Wait for API connection so HA sensors are available
+      - logger.log:
+          level: INFO
+          format: "[DISPLAY] Waiting for API connection..."
+      - wait_until:
+          condition:
+            binary_sensor.is_on: api_connected
+          timeout: 30s
+      - lambda: |-
+          if (id(api_connected).state) {
+            ESP_LOGI("DISPLAY", "API connected - waiting for sensor data...");
+          } else {
+            ESP_LOGW("DISPLAY", "API connection timeout - proceeding anyway");
+          }
+      # Give HA sensors time to populate after API connects
+      - delay: 2s
+      # Wait for time to be valid (up to 30 seconds)
+      - logger.log:
+          level: INFO
+          format: "[DISPLAY] Waiting for time sync..."
+      - wait_until:
+          condition:
+            lambda: 'return id(time_entity).now().is_valid() || id(time_sntp).now().is_valid();'
+          timeout: 30s
+      - lambda: |-
+          if (id(time_entity).now().is_valid()) {
+            ESP_LOGI("DISPLAY", "Time valid from Home Assistant");
+          } else if (id(time_sntp).now().is_valid()) {
+            ESP_LOGI("DISPLAY", "Time valid from SNTP");
+          } else {
+            ESP_LOGW("DISPLAY", "Time sync timeout - proceeding anyway");
+          }
+      - logger.log:
+          level: INFO
+          format: "[DISPLAY] Enabling battery measurement"
+      - output.turn_on: bsp_battery_enable
+      - delay: 200ms
+      - logger.log:
+          level: INFO
+          format: "[DISPLAY] Updating battery sensors"
+      - component.update: battery_voltage
+      - delay: 200ms
+      # Wait for battery voltage to be valid
+      - wait_until:
+          condition:
+            lambda: 'return !isnan(id(battery_voltage).state);'
+          timeout: 5s
+      - lambda: |-
+          ESP_LOGI("DISPLAY", "Battery voltage: %.3fV", id(battery_voltage).state);
+      - component.update: battery_level
+      - delay: 200ms
+      - component.update: battery_level
+      - delay: 100ms
+      - lambda: |-
+          ESP_LOGI("DISPLAY", "Sensors - Fuel: %.1f%%, DEF: %.1f%%, Vehicle Battery: %.1f%%, Device Battery: %.0f%% (%.2fV)",
+            id(fuel_level).state, id(def_level).state, id(vehicle_battery).state,
+            id(battery_level).state, id(battery_voltage).state);
+      - logger.log:
+          level: INFO
+          format: "[DISPLAY] Resuming LVGL"
       - lvgl.resume:
+      - delay: 50ms
       - logger.log:
           level: INFO
-          format: "[BOOT] Updating all widgets"
+          format: "[DISPLAY] Updating all widgets"
       # Status bar widgets
       - lvgl.label.update:
           id: lbl_status_location
@@ -119,8 +200,10 @@ esphome:
           text: !lambda |-
             auto time = id(time_entity).now();
             if (!time.is_valid()) {
+              ESP_LOGI("DISPLAY", "[TIME] time_entity is invalid, falling back to sntp");
               time = id(time_sntp).now();
             }
+
             if (time.is_valid()) {
               static char buf[40];
               snprintf(buf, sizeof(buf), "%s %s %d, %d", 
@@ -130,13 +213,17 @@ esphome:
                 time.year);
               return buf;
             }
+            
+            ESP_LOGI("DISPLAY", "[TIME] time is invalid");
             return "-- --, ----";
       - lvgl.label.update:
           id: lbl_ha_status
           text: !lambda |-
             if (id(api_connected).state) {
+              ESP_LOGI("DISPLAY", "[API] API is connected");
               return "\U000F06A1";
             }
+            ESP_LOGI("DISPLAY", "[API] API is not connected");
             return "\U000F0F21";
       - lvgl.label.update:
           id: lbl_wifi_status
@@ -153,14 +240,25 @@ esphome:
       - lvgl.label.update:
           id: lbl_battery_percent
           text: !lambda |-
-            if (isnan(id(battery_level).state)) return "--%";
+            if (isnan(id(battery_level).state)) 
+            {
+              ESP_LOGI("BATTERY", "Battery percent is invalid");
+              return "--%";
+            }
             static char buf[8];
             snprintf(buf, sizeof(buf), "%d%%", (int)id(battery_level).state);
+            ESP_LOGI("BATTERY", "Setting battery percent label to: '%s'", buf);
             return buf;
       - lvgl.label.update:
           id: lbl_battery_status
           text: !lambda |-
-            if (isnan(id(battery_level).state)) return "\U000F0091";
+            if (isnan(id(battery_level).state)) {
+              ESP_LOGI("BATTERY", "Battery percent is invalid");
+              return "\U000F0091";
+            }
+
+            ESP_LOGI("BATTERY", "Battery percent: %.1f%%", id(battery_level).state);
+
             int x = (int)id(battery_level).state;
             if (x >= 95) return "\U000F0079";
             else if (x >= 85) return "\U000F0082";
@@ -188,27 +286,162 @@ esphome:
               return id(weather_condition).state.c_str();
             }
             return "Unknown";
+      # Sunrise/Sunset widgets
+      - lvgl.label.update:
+          id: lbl_sunrise_time
+          text: !lambda |-
+            if (!id(sunrise_time).state.empty()) {
+              return id(sunrise_time).state.c_str();
+            }
+            return "--:--";
+      - lvgl.label.update:
+          id: lbl_sunset_time
+          text: !lambda |-
+            if (!id(sunset_time).state.empty()) {
+              return id(sunset_time).state.c_str();
+            }
+            return "--:--";
+      # Interior climate widgets
+      - lvgl.label.update:
+          id: lbl_interior_temp
+          text: !lambda |-
+            if (isnan(id(interior_temp).state)) return "--°";
+            static char buf[16];
+            snprintf(buf, sizeof(buf), "%.1f°", id(interior_temp).state);
+            return buf;
+      - lvgl.label.update:
+          id: lbl_interior_humidity
+          text: !lambda |-
+            if (isnan(id(interior_humidity).state)) return "--%";
+            static char buf[16];
+            snprintf(buf, sizeof(buf), "%.0f%%", id(interior_humidity).state);
+            return buf;
+      - lvgl.label.update:
+          id: lbl_fridge_temp
+          text: !lambda |-
+            if (isnan(id(fridge_temp).state)) return "--°";
+            static char buf[16];
+            snprintf(buf, sizeof(buf), "%.1f°", id(fridge_temp).state);
+            return buf;
+      # Air quality widgets
+      - lvgl.label.update:
+          id: lbl_co2_value
+          text: !lambda |-
+            if (isnan(id(air_co2).state)) return "--ppm";
+            static char buf[16];
+            snprintf(buf, sizeof(buf), "%.0fppm", id(air_co2).state);
+            return buf;
+      - lvgl.label.update:
+          id: lbl_pm25_value
+          text: !lambda |-
+            if (isnan(id(air_pm25).state)) return "--";
+            static char buf[16];
+            snprintf(buf, sizeof(buf), "%.0f", id(air_pm25).state);
+            return buf;
+      - lvgl.label.update:
+          id: lbl_voc_value
+          text: !lambda |-
+            if (isnan(id(air_voc).state)) return "--";
+            static char buf[16];
+            snprintf(buf, sizeof(buf), "%.0f", id(air_voc).state);
+            return buf;
+      - lvgl.label.update:
+          id: lbl_nox_value
+          text: !lambda |-
+            if (isnan(id(air_nox).state)) return "--";
+            static char buf[16];
+            snprintf(buf, sizeof(buf), "%.0f", id(air_nox).state);
+            return buf;
+      # Arc widgets
+      - lvgl.label.update:
+          id: lbl_fuel_value
+          text: !lambda |-
+            if (isnan(id(fuel_level).state)) return "--%";
+            static char buf[16];
+            snprintf(buf, sizeof(buf), "%.0f%%", id(fuel_level).state);
+            return buf;
+      - lvgl.arc.update:
+          id: arc_fuel
+          value: !lambda 'return isnan(id(fuel_level).state) ? 0 : (int)id(fuel_level).state;'
+      - lvgl.label.update:
+          id: lbl_def_value
+          text: !lambda |-
+            if (isnan(id(def_level).state)) return "--%";
+            static char buf[16];
+            snprintf(buf, sizeof(buf), "%.0f%%", id(def_level).state);
+            return buf;
+      - lvgl.arc.update:
+          id: arc_def
+          value: !lambda 'return isnan(id(def_level).state) ? 0 : (int)id(def_level).state;'
+      - lvgl.label.update:
+          id: lbl_vehicle_battery_value
+          text: !lambda |-
+            if (isnan(id(vehicle_battery).state)) return "--%";
+            static char buf[16];
+            snprintf(buf, sizeof(buf), "%.0f%%", id(vehicle_battery).state);
+            return buf;
+      - lvgl.arc.update:
+          id: arc_battery
+          value: !lambda 'return isnan(id(vehicle_battery).state) ? 0 : (int)id(vehicle_battery).state;'
+      - lvgl.label.update:
+          id: lbl_water_value
+          text: !lambda |-
+            if (isnan(id(water_level).state)) return "--%";
+            static char buf[16];
+            snprintf(buf, sizeof(buf), "%.0f%%", id(water_level).state);
+            return buf;
+      - lvgl.arc.update:
+          id: arc_water
+          value: !lambda 'return isnan(id(water_level).state) ? 0 : (int)id(water_level).state;'
       - logger.log:
           level: INFO
-          format: "[BOOT] Updating epaper display"
+          format: "[DISPLAY] All widgets updated, waiting for LVGL to process..."
+      - delay: 100ms  # Give LVGL time to process all updates
+      - logger.log:
+          level: INFO
+          format: "[DISPLAY] Updating epaper display"
       - component.update: epaper_display
-      - delay: 100ms  # Let display render complete
+      - delay: 100ms
       - logger.log:
           level: INFO
-          format: "[BOOT] Pausing LVGL after initial render"
-      - lvgl.pause:
-      - logger.log:
-          level: INFO
-          format: "[BOOT] Disabling battery measurement"
+          format: "[DISPLAY] Disabling battery measurement"
       - output.turn_off: bsp_battery_enable
+      - lambda: 'id(boot_complete) = true;'
       - logger.log:
           level: INFO
-          format: "[BOOT] Boot sequence complete"
+          format: "[DISPLAY] Update complete"
+      - logger.log:
+          level: INFO
+          format: "[DISPLAY] Pausing LVGL"
+      - lvgl.pause:
 
-logger:
-  level: ${log_level}
-  baud_rate: 115200
-  hardware_uart: UART0
+  - id: page_previous
+    mode: single
+    then:
+      - logger.log:
+          level: INFO
+          format: "[PAGE] Going to previous page"
+      - lvgl.resume:
+      - lvgl.page.previous:
+          time: 0ms
+      - delay: 50ms
+      - component.update: epaper_display
+      - delay: 100ms
+      - lvgl.pause:
+
+  - id: page_next
+    mode: single
+    then:
+      - logger.log:
+          level: INFO
+          format: "[PAGE] Going to next page"
+      - lvgl.resume:
+      - lvgl.page.next:
+          time: 0ms
+      - delay: 50ms
+      - component.update: epaper_display
+      - delay: 100ms
+      - lvgl.pause:
 
 binary_sensor:
   - id: !extend button_left
@@ -217,13 +450,7 @@ binary_sensor:
         - logger.log:
             level: INFO
             format: "[BUTTON] Left button pressed - going to previous page"
-        - lvgl.resume:
-        - lvgl.page.previous:
-            time: 0ms
-        - delay: 50ms
-        - component.update: epaper_display
-        - delay: 100ms
-        - lvgl.pause:
+        - script.execute: page_previous
 
   - id: !extend button_right
     on_press:
@@ -231,15 +458,14 @@ binary_sensor:
         - logger.log:
             level: INFO
             format: "[BUTTON] Right button pressed - going to next page"
-        - lvgl.resume:
-        - lvgl.page.next:
-            time: 0ms
-        - delay: 50ms
-        - component.update: epaper_display
-        - delay: 100ms
-        - lvgl.pause:
+        - script.execute: page_next
 
-  - id: !remove button_green
+  - id: !extend button_green
+    on_press:
+      then:
+        - logger.log:
+            level: INFO
+            format: "[BUTTON] Green button pressed"
 
   # API connection status
   - platform: status
@@ -269,175 +495,65 @@ font:
     id: segoeui_16
     size: 16
     bpp: 4
+    glyphs: " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~°₂"
   
   - file: "fonts/segoeui.ttf"
     id: segoeui_20
     size: 20
     bpp: 4
+    glyphs: " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~°"
   
   - file: "fonts/segoeui.ttf"
     id: segoeui_24
     size: 24
     bpp: 4
+    glyphs: " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~°"
 
-  # Override homeassistant_icons to include all needed glyphs
+  # Small weather icons for sunrise/sunset
   - file: "fonts/materialdesignicons-webfont.ttf"
-    id: homeassistant_icons
-    size: 20
+    id: sun_icons
+    size: 24
     bpp: 4
     glyphs: [
-      "\U000F07D0", # mdi-home-assistant
-      "\U000F06A1", # mdi-home-outline (connected)
-      "\U000F0F21", # mdi-home-off (disconnected)
-      "\U000F0028", # alert-circle
+      "\U000F059C", # weather-sunset-up (sunrise)
+      "\U000F059B", # weather-sunset-down (sunset)
       ]
 
 interval:
-  - interval: 1min
+  - interval: ${sleep_duration}
     then:
-      - logger.log:
-          level: INFO
-          format: "[INTERVAL] 10-minute interval triggered"
-      - logger.log:
-          level: INFO
-          format: "[INTERVAL] Enabling battery measurement"
-      - output.turn_on: bsp_battery_enable
-      - delay: 150ms
-      - logger.log:
-          level: INFO
-          format: "[INTERVAL] Updating battery sensors"
-      - component.update: battery_voltage
-      - component.update: battery_level
-      - delay: 50ms
-      - lambda: |-
-          ESP_LOGI("INTERVAL", "Sensor states - Fuel: %.1f%%, DEF: %.1f%%, Vehicle Battery: %.1f%%, Device Battery: %.0f%% (%.2fV)",
-            id(fuel_level).state, id(def_level).state, id(vehicle_battery).state,
-            id(battery_level).state, id(battery_voltage).state);
-      - logger.log:
-          level: INFO
-          format: "[INTERVAL] Resuming LVGL for update"
-      - lvgl.resume:
-      - delay: 50ms  # Let LVGL process widget updates
-      - logger.log:
-          level: INFO
-          format: "[INTERVAL] Updating all widgets"
-      # Status bar widgets
-      - lvgl.label.update:
-          id: lbl_status_location
-          text: !lambda |-
-            if (!id(location_city).state.empty() && !id(location_state).state.empty()) {
-              static char buf[64];
-              snprintf(buf, sizeof(buf), "%s, %s", 
-                id(location_city).state.c_str(), 
-                id(location_state).state.c_str());
-              return buf;
-            }
-            if (!isnan(id(location_latitude).state) && !isnan(id(location_longitude).state)) {
-              static char buf[32];
-              snprintf(buf, sizeof(buf), "%.4f, %.4f", 
-                id(location_latitude).state, 
-                id(location_longitude).state);
-              return buf;
-            }
-            return "-- , --";
-      - lvgl.label.update:
-          id: lbl_status_date
-          text: !lambda |-
-            auto time = id(time_entity).now();
-            if (!time.is_valid()) {
-              time = id(time_sntp).now();
-            }
-            if (time.is_valid()) {
-              static char buf[40];
-              snprintf(buf, sizeof(buf), "%s %s %d, %d", 
-                time.strftime("%A").c_str(),
-                time.strftime("%B").c_str(),
-                time.day_of_month,
-                time.year);
-              return buf;
-            }
-            return "-- --, ----";
-      - lvgl.label.update:
-          id: lbl_ha_status
-          text: !lambda |-
-            if (id(api_connected).state) {
-              return "\U000F06A1";
-            }
-            return "\U000F0F21";
-      - lvgl.label.update:
-          id: lbl_wifi_status
-          text: !lambda |-
-            if (!id(wifi_connected).state) {
-              return "\U000F05AA";
-            }
-            int rssi = (int)id(wifi_signal_db).state;
-            if (rssi >= -50) return "\U000F0928";
-            else if (rssi >= -60) return "\U000F0925";
-            else if (rssi >= -70) return "\U000F0922";
-            else if (rssi >= -80) return "\U000F091F";
-            return "\U000F092F";
-      - lvgl.label.update:
-          id: lbl_battery_percent
-          text: !lambda |-
-            if (isnan(id(battery_level).state)) return "--%";
-            static char buf[8];
-            snprintf(buf, sizeof(buf), "%d%%", (int)id(battery_level).state);
-            return buf;
-      - lvgl.label.update:
-          id: lbl_battery_status
-          text: !lambda |-
-            if (isnan(id(battery_level).state)) return "\U000F0091";
-            int x = (int)id(battery_level).state;
-            if (x >= 95) return "\U000F0079";
-            else if (x >= 85) return "\U000F0082";
-            else if (x >= 75) return "\U000F0081";
-            else if (x >= 65) return "\U000F0080";
-            else if (x >= 55) return "\U000F007F";
-            else if (x >= 45) return "\U000F007E";
-            else if (x >= 35) return "\U000F007D";
-            else if (x >= 25) return "\U000F007C";
-            else if (x >= 15) return "\U000F007B";
-            else if (x >= 5)  return "\U000F007A";
-            else return "\U000F008E";
-      # Weather widgets
-      - lvgl.label.update:
-          id: lbl_weather_temp
-          text: !lambda |-
-            if (!id(weather_temp).state.empty()) {
-              return id(weather_temp).state.c_str();
-            }
-            return "N/A";
-      - lvgl.label.update:
-          id: lbl_weather_condition
-          text: !lambda |-
-            if (!id(weather_condition).state.empty()) {
-              return id(weather_condition).state.c_str();
-            }
-            return "Unknown";
-      - logger.log:
-          level: INFO
-          format: "[INTERVAL] Updating epaper display"
-      - component.update: epaper_display
-      - delay: 100ms  # Let display render complete
-      - logger.log:
-          level: INFO
-          format: "[INTERVAL] Pausing LVGL after update"
-      - lvgl.pause:
-      - logger.log:
-          level: INFO
-          format: "[INTERVAL] Disabling battery measurement"
-      - output.turn_off: bsp_battery_enable
-      - logger.log:
-          level: INFO
-          format: "[INTERVAL] Display update complete"
+      - if:
+          condition:
+            lambda: 'return id(boot_complete);'
+          then:
+            - logger.log:
+                level: INFO
+                format: "[INTERVAL] Refresh triggered"
+            - script.execute: update_display
+          else:
+            - logger.log:
+                level: INFO
+                format: "[INTERVAL] Skipped - boot not complete"
 
 lvgl:
+  buffer_size: 10%  # Further reduced buffer for e-paper to prevent memory exhaustion
   border_width: 0
   outline_width: 0
   shadow_width: 0
   text_font: segoeui_16
   align: center
   resume_on_input: false  # Don't auto-resume on input - we control rendering manually
+
+  # Style definitions for reusable styling (inverted for e-paper)
+  # Note: 7.50inv2 is 2-color only (black/white), no grayscale
+  style_definitions:
+    - id: style_arc
+      arc_width: 18
+      arc_color: 0x000000  # Black in LVGL → white on e-paper (unfilled track)
+      arc_rounded: true
+    - id: style_arc_indicator
+      arc_width: 18
+      arc_color: 0xFFFFFF  # White in LVGL → black on e-paper (filled portion)
 
   on_idle:
     timeout: 10s
@@ -470,9 +586,9 @@ lvgl:
           - logger.log:
               level: INFO
               format: "[LVGL] Not charging - entering deep sleep for ${sleep_duration}"
-          # - deep_sleep.enter:
-          #     id: deep_sleep_id
-          #     sleep_duration: ${sleep_duration}
+          - deep_sleep.enter:
+              id: deep_sleep_id
+              sleep_duration: ${sleep_duration}
         else:
           - logger.log:
               level: INFO
@@ -512,23 +628,7 @@ lvgl:
                   x: 5
                   text_font: segoeui_16
                   text_color: 0xFFFFFF
-                  text: !lambda |-
-                    if (!id(location_city).state.empty() && !id(location_state).state.empty()) {
-                      static char buf[64];
-                      snprintf(buf, sizeof(buf), "%s, %s", 
-                        id(location_city).state.c_str(), 
-                        id(location_state).state.c_str());
-                      return buf;
-                    }
-                  
-                    if (!isnan(id(location_latitude).state) && !isnan(id(location_longitude).state)) {
-                      static char buf[32];
-                      snprintf(buf, sizeof(buf), "%.4f, %.4f", 
-                        id(location_latitude).state, 
-                        id(location_longitude).state);
-                      return buf;
-                    }
-                    return "-- , --";
+                  text: ""
 
               # Center: Date
               - label:
@@ -538,21 +638,7 @@ lvgl:
                   y: 0
                   text_font: segoeui_16
                   text_color: 0xFFFFFF
-                  text: !lambda |-
-                    auto time = id(time_entity).now();
-                    if (!time.is_valid()) {
-                      time = id(time_sntp).now();
-                    }
-                    if (time.is_valid()) {
-                      static char buf[40];
-                      snprintf(buf, sizeof(buf), "%s %s %d, %d", 
-                        time.strftime("%A").c_str(),
-                        time.strftime("%B").c_str(),
-                        time.day_of_month,
-                        time.year);
-                      return buf;
-                    }
-                    return "-- --, ----";
+                  text: "-- --, ----"
 
               # Right side container with flex layout
               - obj:
@@ -577,58 +663,28 @@ lvgl:
                         id: lbl_ha_status
                         text_font: homeassistant_icons
                         text_color: 0xFFFFFF
-                        text: !lambda |-
-                          if (id(api_connected).state) {
-                            return "\U000F06A1";  // mdi-home-outline (connected)
-                          }
-                          return "\U000F0F21";  // mdi-home-off (disconnected)
+                        text: "\U000F0F21"
 
                     # WiFi status
                     - label:
                         id: lbl_wifi_status
                         text_font: wifi_icons
                         text_color: 0xFFFFFF
-                        text: !lambda |-
-                          if (!id(wifi_connected).state) {
-                            return "\U000F05AA";  // wifi-off
-                          }
-                          int rssi = (int)id(wifi_signal_db).state;
-                          if (rssi >= -50) return "\U000F0928";       // wifi-strength-4 (excellent)
-                          else if (rssi >= -60) return "\U000F0925";  // wifi-strength-3 (good)
-                          else if (rssi >= -70) return "\U000F0922";  // wifi-strength-2 (fair)
-                          else if (rssi >= -80) return "\U000F091F";  // wifi-strength-1 (weak)
-                          return "\U000F092F";  // wifi-strength-outline (very weak)
+                        text: "\U000F05AA"
 
                     # Battery icon
                     - label:
                         id: lbl_battery_status
                         text_font: battery_icons
                         text_color: 0xFFFFFF
-                        text: !lambda |-
-                          if (isnan(id(battery_level).state)) return "\U000F0091";  // unknown icon
-                          int x = (int)id(battery_level).state;
-                          if (x >= 95) return "\U000F0079";
-                          else if (x >= 85) return "\U000F0082";
-                          else if (x >= 75) return "\U000F0081";
-                          else if (x >= 65) return "\U000F0080";
-                          else if (x >= 55) return "\U000F007F";
-                          else if (x >= 45) return "\U000F007E";
-                          else if (x >= 35) return "\U000F007D";
-                          else if (x >= 25) return "\U000F007C";
-                          else if (x >= 15) return "\U000F007B";
-                          else if (x >= 5)  return "\U000F007A";
-                          else return "\U000F008E";
+                        text: "\U000F0091"
 
                     # Battery percentage text (leftmost)
                     - label:
                         id: lbl_battery_percent
                         text_font: segoeui_16
                         text_color: 0xFFFFFF
-                        text: !lambda |-
-                          if (isnan(id(battery_level).state)) return "--%";
-                          static char buf[8];
-                          snprintf(buf, sizeof(buf), "%d%%", (int)id(battery_level).state);
-                          return buf;
+                        text: "--%"  # Static initial, updated by script
 
         # Weather Section (below status bar)
         - obj:
@@ -639,6 +695,8 @@ lvgl:
             x: 0
             y: 35
             pad_all: 10
+            bg_opa: TRANSP
+            border_width: 0
             widgets:
               - label:
                   id: lbl_weather_icon
@@ -646,6 +704,7 @@ lvgl:
                   x: 0
                   y: 10
                   text_font: weather_icons
+                  text_color: 0xFFFFFF
                   text: "\U000F0599"  # Default sunny icon
               
               - label:
@@ -654,52 +713,207 @@ lvgl:
                   x: 0
                   y: 120
                   text_font: segoeui_24
-                  text: !lambda |-
-                    if (!id(weather_temp).state.empty()) {
-                      return id(weather_temp).state.c_str();
-                    }
-                    return "N/A";
+                  text_color: 0xFFFFFF
+                  text: "--°"
               
               - label:
                   id: lbl_weather_condition
                   align: BOTTOM_MID
                   x: 0
                   y: -5
-                  text: !lambda |-
-                    if (!id(weather_condition).state.empty()) {
-                      return id(weather_condition).state.c_str();
-                    }
-                    return "Unknown";
+                  text_color: 0xFFFFFF
+                  text: "Unknown"
 
+        # Sunrise/Sunset Section
+        - obj:
+            id: sun_container
+            width: 300
+            height: 30
+            align: TOP_MID
+            x: 0
+            y: 205
+            bg_opa: TRANSP
+            border_width: 0
+            widgets:
+              - label:
+                  id: lbl_sunrise_icon
+                  align: LEFT_MID
+                  x: 0
+                  text_font: sun_icons
+                  text_color: 0xFFFFFF
+                  text: "\U000F059C"  # mdi:weather-sunset-up
+              - label:
+                  id: lbl_sunrise_time
+                  align: LEFT_MID
+                  x: 30
+                  text_font: segoeui_16
+                  text_color: 0xFFFFFF
+                  text: "--:--"
+              - label:
+                  id: lbl_sunset_icon
+                  align: RIGHT_MID
+                  x: -70
+                  text_font: sun_icons
+                  text_color: 0xFFFFFF
+                  text: "\U000F059B"  # mdi:weather-sunset-down
+              - label:
+                  id: lbl_sunset_time
+                  align: RIGHT_MID
+                  x: 0
+                  text_font: segoeui_16
+                  text_color: 0xFFFFFF
+                  text: "--:--"
+
+        # Interior Climate Section
+        - obj:
+            id: interior_container
+            width: 600
+            height: 50
+            align: TOP_MID
+            x: 0
+            y: 240
+            bg_opa: TRANSP
+            border_width: 0
+            widgets:
+              - label:
+                  id: lbl_interior_label
+                  align: LEFT_MID
+                  x: 0
+                  text_font: segoeui_16
+                  text_color: 0xFFFFFF
+                  text: "Interior:"
+              - label:
+                  id: lbl_interior_temp
+                  align: LEFT_MID
+                  x: 80
+                  text_font: segoeui_20
+                  text_color: 0xFFFFFF
+                  text: "--°"
+              - label:
+                  id: lbl_interior_humidity
+                  align: LEFT_MID
+                  x: 150
+                  text_font: segoeui_20
+                  text_color: 0xFFFFFF
+                  text: "--%"
+              - label:
+                  id: lbl_fridge_label
+                  align: RIGHT_MID
+                  x: -120
+                  text_font: segoeui_16
+                  text_color: 0xFFFFFF
+                  text: "Fridge:"
+              - label:
+                  id: lbl_fridge_temp
+                  align: RIGHT_MID
+                  x: 0
+                  text_font: segoeui_20
+                  text_color: 0xFFFFFF
+                  text: "--°"
+
+        # Air Quality Section
+        - obj:
+            id: air_quality_container
+            width: 700
+            height: 30
+            align: TOP_MID
+            x: 0
+            y: 270
+            bg_opa: TRANSP
+            border_width: 0
+            widgets:
+              - label:
+                  id: lbl_co2_label
+                  align: LEFT_MID
+                  x: 0
+                  text_font: segoeui_16
+                  text_color: 0xFFFFFF
+                  text: "CO₂:"
+              - label:
+                  id: lbl_co2_value
+                  align: LEFT_MID
+                  x: 45
+                  text_font: segoeui_16
+                  text_color: 0xFFFFFF
+                  text: "--ppm"
+              - label:
+                  id: lbl_pm25_label
+                  align: LEFT_MID
+                  x: 140
+                  text_font: segoeui_16
+                  text_color: 0xFFFFFF
+                  text: "PM2.5:"
+              - label:
+                  id: lbl_pm25_value
+                  align: LEFT_MID
+                  x: 200
+                  text_font: segoeui_16
+                  text_color: 0xFFFFFF
+                  text: "--"
+              - label:
+                  id: lbl_voc_label
+                  align: RIGHT_MID
+                  x: -200
+                  text_font: segoeui_16
+                  text_color: 0xFFFFFF
+                  text: "VOC:"
+              - label:
+                  id: lbl_voc_value
+                  align: RIGHT_MID
+                  x: -150
+                  text_font: segoeui_16
+                  text_color: 0xFFFFFF
+                  text: "--"
+              - label:
+                  id: lbl_nox_label
+                  align: RIGHT_MID
+                  x: -80
+                  text_font: segoeui_16
+                  text_color: 0xFFFFFF
+                  text: "NOx:"
+              - label:
+                  id: lbl_nox_value
+                  align: RIGHT_MID
+                  x: 0
+                  text_font: segoeui_16
+                  text_color: 0xFFFFFF
+                  text: "--"
+  
         # Fuel Level Arc
         - arc:
             id: arc_fuel
-            x: 30
-            y: 390
+            x: 20
+            y: 300
+            width: 150
+            height: 150
             start_angle: 135
             end_angle: 45
             rotation: 0
             min_value: 0
             max_value: 100
             value: 75
+            styles: style_arc
+            indicator:
+              styles: style_arc_indicator
             widgets:
               - label:
+                  id: lbl_fuel_value
                   align: CENTER
-                  text: !lambda |-
-                    if (isnan(id(fuel_level).state)) return "--%";
-                    static char buf[16];
-                    snprintf(buf, sizeof(buf), "%.0f%%", id(fuel_level).state);
-                    return buf;
+                  text_font: segoeui_24
+                  text_color: 0xFFFFFF
+                  text: "-- %"
               - label:
+                  id: lbl_fuel_label
                   align: BOTTOM_MID
-                  y: 25
+                  y: -5
+                  text_color: 0xFFFFFF
                   text: "Fuel"
 
         # DEF Level Arc
         - arc:
             id: arc_def
-            x: 210
-            y: 390
+            x: 180
+            y: 300
             width: 150
             height: 150
             start_angle: 135
@@ -707,31 +921,33 @@ lvgl:
             rotation: 0
             min_value: 0
             max_value: 100
-            value: 50
-            arc_width: 18
-            arc_color: 0x000000
-            arc_rounded: true
+            value: 75
+            styles: style_arc
             indicator:
-              arc_color: 0xFFFFFF
-              arc_width: 18
+              styles: style_arc_indicator
             widgets:
               - label:
+                  id: lbl_def_value
                   align: CENTER
+                  text_font: segoeui_24
+                  text_color: 0xFFFFFF
                   text: !lambda |-
                     if (isnan(id(def_level).state)) return "--%";
                     static char buf[16];
                     snprintf(buf, sizeof(buf), "%.0f%%", id(def_level).state);
                     return buf;
               - label:
+                  id: lbl_def_label
                   align: BOTTOM_MID
-                  y: 25
+                  y: -5
+                  text_color: 0xFFFFFF
                   text: "DEF"
 
         # Battery Level Arc
         - arc:
             id: arc_battery
-            x: 390
-            y: 390
+            x: 340
+            y: 300
             width: 150
             height: 150
             start_angle: 135
@@ -739,33 +955,63 @@ lvgl:
             rotation: 0
             min_value: 0
             max_value: 100
-            value: 90
-            arc_width: 18
-            arc_color: 0x000000
-            arc_rounded: false
+            value: 75
+            styles: style_arc
             indicator:
-              arc_color: 0xFFFFFF
-              arc_width: 18
+              styles: style_arc_indicator
             widgets:
               - label:
+                  id: lbl_vehicle_battery_value
                   align: CENTER
+                  text_font: segoeui_24
+                  text_color: 0xFFFFFF
                   text: !lambda |-
                     if (isnan(id(vehicle_battery).state)) return "--%";
                     static char buf[16];
                     snprintf(buf, sizeof(buf), "%.0f%%", id(vehicle_battery).state);
                     return buf;
               - label:
+                  id: lbl_vehicle_battery_label
                   align: BOTTOM_MID
-                  y: 25
+                  y: -5
+                  text_color: 0xFFFFFF
                   text: "Battery"
 
+        # Water Level Arc
+        - arc:
+            id: arc_water
+            x: 500
+            y: 300
+            width: 150
+            height: 150
+            start_angle: 135
+            end_angle: 45
+            rotation: 0
+            min_value: 0
+            max_value: 100
+            value: 0
+            styles: style_arc
+            indicator:
+              styles: style_arc_indicator
+            widgets:
+              - label:
+                  id: lbl_water_value
+                  align: CENTER
+                  text_font: segoeui_24
+                  text_color: 0xFFFFFF
+                  text: "--%"
+              - label:
+                  id: lbl_water_label
+                  align: BOTTOM_MID
+                  y: -5
+                  text_color: 0xFFFFFF
+                  text: "Water"
+
 # Deep sleep configuration - https://esphome.io/components/deep_sleep/
+# Note: GPIO3 wakeup disabled due to false triggers - using timer only
 deep_sleep:
   id: deep_sleep_id
   sleep_duration: ${sleep_duration}
-  wakeup_pin:
-    number: GPIO3
-    ignore_strapping_warning: true
 
 sensor:
   # Override battery sensors to use manual updates only
@@ -825,6 +1071,70 @@ sensor:
         - lambda: |-
             ESP_LOGI("HA_SENSOR", "vehicle_battery updated: %.1f%%", x);
 
+  - platform: homeassistant
+    id: interior_temp
+    entity_id: sensor.interior_temperature  # Change to your actual entity_id
+    on_value:
+      then:
+        - lambda: |-
+            ESP_LOGI("HA_SENSOR", "interior_temp updated: %.1f", x);
+
+  - platform: homeassistant
+    id: interior_humidity
+    entity_id: sensor.interior_humidity  # Change to your actual entity_id
+    on_value:
+      then:
+        - lambda: |-
+            ESP_LOGI("HA_SENSOR", "interior_humidity updated: %.1f%%", x);
+
+  - platform: homeassistant
+    id: air_co2
+    entity_id: sensor.air_quality_co2  # TODO: Change to your actual CO2 entity
+    on_value:
+      then:
+        - lambda: |-
+            ESP_LOGI("HA_SENSOR", "air_co2 updated: %.0f ppm", x);
+
+  - platform: homeassistant
+    id: air_pm25
+    entity_id: sensor.air_quality_pm25  # TODO: Change to your actual PM2.5 entity
+    on_value:
+      then:
+        - lambda: |-
+            ESP_LOGI("HA_SENSOR", "air_pm25 updated: %.0f", x);
+
+  - platform: homeassistant
+    id: air_voc
+    entity_id: sensor.air_quality_voc  # TODO: Change to your actual VOC entity
+    on_value:
+      then:
+        - lambda: |-
+            ESP_LOGI("HA_SENSOR", "air_voc updated: %.0f", x);
+
+  - platform: homeassistant
+    id: air_nox
+    entity_id: sensor.air_quality_nox  # TODO: Change to your actual NOx entity
+    on_value:
+      then:
+        - lambda: |-
+            ESP_LOGI("HA_SENSOR", "air_nox updated: %.0f", x);
+
+  - platform: homeassistant
+    id: fridge_temp
+    entity_id: sensor.fridge_temperature  # TODO: Change to your actual fridge temp entity
+    on_value:
+      then:
+        - lambda: |-
+            ESP_LOGI("HA_SENSOR", "fridge_temp updated: %.1f", x);
+
+  - platform: homeassistant
+    id: water_level
+    entity_id: sensor.water_level  # TODO: Change to your actual water level entity
+    on_value:
+      then:
+        - lambda: |-
+            ESP_LOGI("HA_SENSOR", "water_level updated: %.1f%%", x);
+
 display:
   - id: !extend epaper_display
     auto_clear_enabled: false
@@ -865,3 +1175,19 @@ text_sensor:
       then:
         - lambda: |-
             ESP_LOGI("HA_TEXT", "location_state updated: %s", x.c_str());
+
+  - platform: homeassistant
+    id: sunrise_time
+    entity_id: sensor.sun_next_rising  # TODO: Change to your actual sunrise entity
+    on_value:
+      then:
+        - lambda: |-
+            ESP_LOGI("HA_TEXT", "sunrise_time updated: %s", x.c_str());
+
+  - platform: homeassistant
+    id: sunset_time
+    entity_id: sensor.sun_next_setting  # TODO: Change to your actual sunset entity
+    on_value:
+      then:
+        - lambda: |-
+            ESP_LOGI("HA_TEXT", "sunset_time updated: %s", x.c_str());
