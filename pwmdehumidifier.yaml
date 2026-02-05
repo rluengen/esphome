@@ -6,32 +6,10 @@
 
 # fan header connector
 #   ??
-# 1-wire connector, x2
-#   ??
-# Thermoelectric Cooler (TEC) connector, 6A, x2
-#   Amphenol boardlock connectors x2
 # 12v -> 5v converter mount
 # qwiic connector for aht20
 # power supply connector
 #   Amphenol boardlock connector
-
-# https://github.com/wallnalyr/esp-fan-controller
-# ESP32-C3          DS18B20
-# ---------         -------
-# 3.3V  ──────────── VDD (red)
-# GND   ──────────── GND (black)
-# GPIO4 ──────┬───── DATA (yellow)
-#             │
-#            4.7kΩ
-#             │
-# 3.3V  ──────┘
-# 
-# ESP32-C3          Noctua Fan
-# ---------         ----------
-# GPIO8 ──────────── PWM (blue)
-# GND   ──────────── GND (black)
-#                    +12V (yellow) ── 12V supply
-#                    Tach (green) ── (optional, not used)
 
 # WIRING DIAGRAM
 # ==============
@@ -141,7 +119,19 @@ logger:
     pulse_counter: WARN
     sensor: INFO
     i2c.idf: WARN
-  
+
+# Globals for deep sleep tracking
+globals:
+  - id: low_humidity_count
+    type: int
+    restore_value: no
+    initial_value: '0'
+
+# Deep sleep component
+deep_sleep:
+  id: deep_sleep_control
+  sleep_duration: 5min  # Default, overridden by number entity
+
 output:
   # Thermoelectric Cooler 1 MOSFET PWM
   - platform: ledc
@@ -175,6 +165,8 @@ output:
           // Drive both Thermoelectric Cooler MOSFETs
           id(tec1_pwm).set_level(level);
           id(tec2_pwm).set_level(level);
+          ESP_LOGD("tec_power", "PID requested %.1f%%, clamped to %.1f%% (max %.1f%%)", 
+                   state * 100.0f, level * 100.0f, max_level * 100.0f);
 
 i2c:
   sda: GPIO5   # D4
@@ -242,12 +234,26 @@ sensor:
     unit_of_measurement: "°C"
     accuracy_decimals: 1
     lambda: |-
-      if (!id(box_air_temp).has_state() || !id(box_humidity).has_state()) {
+      if (!id(box_air_temp).has_state()) {
+        ESP_LOGW("dew_point", "[dew_point] box_air_temp has no state yet");
+        return NAN;
+      }
+      if (!id(box_humidity).has_state()) {
+        ESP_LOGW("dew_point", "[dew_point] box_humidity has no state yet");
         return NAN;
       }
 
       float temperature = id(box_air_temp).state;
       float humidity = id(box_humidity).state;
+      
+      if (isnan(temperature)) {
+        ESP_LOGW("dew_point", "[dew_point] box_air_temp is NaN");
+        return NAN;
+      }
+      if (isnan(humidity)) {
+        ESP_LOGW("dew_point", "[dew_point] box_humidity is NaN");
+        return NAN;
+      }
 
       // Magnus formula coefficients (valid for -45°C to +60°C)
       const float magnus_coefficient = 17.62;
@@ -255,21 +261,27 @@ sensor:
 
       float gamma = (magnus_coefficient * temperature) / (magnus_temperature_constant + temperature) + log(humidity / 100.0f);
       float dew = (magnus_temperature_constant * gamma) / (magnus_coefficient - gamma);
+      
+      ESP_LOGD("dew_point", "Temp: %.1fC, Humidity: %.1f%%, Dew Point: %.1fC", temperature, humidity, dew);
       return dew;
 
   # Cold side DS18B20 (controls both Thermoelectric Coolers)
   - platform: dallas_temp
-    # boot and replace with unique one wire address: address: 0x1111111111111111
+    address: 0xd72401000047f728
     name: "Cold Side Temperature"
     id: cold_temp
     update_interval: 2s
+    filters:
+      - filter_out: nan  # Ignore failed readings
 
   # Hot side DS18B20 (controls fan + safety)
   - platform: dallas_temp
-    # boot and replace with unique one wire address: address: 0x2222222222222222
+    address: 0x2222222222222222  # TODO: Replace with actual sensor address from logs
     name: "Hot Side Temperature"
     id: hot_temp
     update_interval: 2s
+    filters:
+      - filter_out: nan  # Ignore failed readings
 
 binary_sensor:
   - platform: template
@@ -289,6 +301,7 @@ binary_sensor:
           mode: "OFF"
 
 climate:
+  # https://esphome.io/components/climate/pid/
   - platform: pid
     id: tec_climate
     name: "Dual TEC Cooler"
@@ -388,6 +401,38 @@ number:
     mode: box
     icon: "mdi:fan-alert"
 
+  - platform: template
+    name: "Sleep Duration (minutes)"
+    id: sleep_duration_min
+    min_value: 1
+    max_value: 30
+    step: 1
+    unit_of_measurement: "min"
+    initial_value: 5
+    optimistic: true
+    restore_value: true
+    entity_category: config
+    mode: box
+    icon: "mdi:timer-sand"
+
+switch:
+  - platform: template
+    name: "Deep Sleep Enable"
+    id: deep_sleep_enable
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    entity_category: config
+    icon: "mdi:sleep"
+
+  - platform: template
+    name: "Prevent Sleep"
+    id: prevent_sleep
+    optimistic: true
+    restore_mode: ALWAYS_OFF
+    entity_category: config
+    icon: "mdi:sleep-off"
+    # Use this to temporarily prevent sleep (e.g., during OTA updates)
+
 interval:
   - interval: 5s
     then:
@@ -458,16 +503,42 @@ interval:
             call.set_mode(CLIMATE_MODE_OFF);
             call.perform();
             ESP_LOGD("dehumidifier", "Humidity %.1f%% below target %.1f%%, Thermoelectric Cooler off", current_humidity, effective_target);
+            
+            // Track consecutive low humidity readings for deep sleep
+            id(low_humidity_count) += 1;
+            ESP_LOGD("dehumidifier", "Low humidity count: %d", id(low_humidity_count));
+            
+            // Enter deep sleep after 2 consecutive low humidity checks (1 minute)
+            if (id(deep_sleep_enable).state && !id(prevent_sleep).state && id(low_humidity_count) >= 2) {
+              int sleep_mins = (int)id(sleep_duration_min).state;
+              ESP_LOGI("dehumidifier", "Entering deep sleep for %d minutes", sleep_mins);
+              id(deep_sleep_control).set_sleep_duration(sleep_mins * 60000);  // Convert to ms
+              id(deep_sleep_control).begin_sleep();
+            }
             return;
           }
+          
+          // Reset low humidity counter when dehumidifying
+          id(low_humidity_count) = 0;
 
           // Humidity above target - calculate Thermoelectric Cooler target temp
           float dp = id(dew_point).state;
+          if (isnan(dp)) {
+            ESP_LOGW("dehumidifier", "Dew point not available, skipping");
+            return;
+          }
+          
           float offset = id(dew_point_offset).state;
           float target = dp - offset;
 
           // Optional safety clamp so you don't go insanely cold
           if (target < 0.0f) target = 0.0f;
+
+          // Don't enable cooling if hot side is overtemp
+          if (id(hot_overtemp).state) {
+            ESP_LOGW("dehumidifier", "Hot side overtemp - not enabling Thermoelectric Cooler cooling");
+            return;
+          }
 
           ESP_LOGI("dehumidifier", "Dew point: %.1fC, Thermoelectric Cooler target: %.1fC (dew point - %.1fC)", dp, target, offset);
 
