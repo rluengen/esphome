@@ -243,7 +243,7 @@ script:
             if (isnan(id(battery_level).state)) 
             {
               ESP_LOGI("BATTERY", "Battery percent is invalid");
-              return "--%";
+              return "-- %";
             }
             static char buf[8];
             snprintf(buf, sizeof(buf), "%d%%", (int)id(battery_level).state);
@@ -278,7 +278,7 @@ script:
             if (!id(weather_temp).state.empty()) {
               return id(weather_temp).state.c_str();
             }
-            return "N/A";
+            return "--°";
       - lvgl.label.update:
           id: lbl_weather_condition
           text: !lambda |-
@@ -332,12 +332,30 @@ script:
             snprintf(buf, sizeof(buf), "%.0fppm", id(air_co2).state);
             return buf;
       - lvgl.label.update:
+          id: lbl_co2_status
+          text: !lambda |-
+            if (isnan(id(air_co2).state)) return "";
+            float val = id(air_co2).state;
+            if (val < 800) return "Good";
+            if (val < 1000) return "Fair";
+            if (val < 1500) return "Poor";
+            return "Bad";
+      - lvgl.label.update:
           id: lbl_pm25_value
           text: !lambda |-
             if (isnan(id(air_pm25).state)) return "--";
             static char buf[16];
             snprintf(buf, sizeof(buf), "%.0f", id(air_pm25).state);
             return buf;
+      - lvgl.label.update:
+          id: lbl_pm25_status
+          text: !lambda |-
+            if (isnan(id(air_pm25).state)) return "";
+            float val = id(air_pm25).state;
+            if (val < 12) return "Good";
+            if (val < 35) return "Fair";
+            if (val < 55) return "Poor";
+            return "Bad";
       - lvgl.label.update:
           id: lbl_voc_value
           text: !lambda |-
@@ -346,12 +364,30 @@ script:
             snprintf(buf, sizeof(buf), "%.0f", id(air_voc).state);
             return buf;
       - lvgl.label.update:
+          id: lbl_voc_status
+          text: !lambda |-
+            if (isnan(id(air_voc).state)) return "";
+            float val = id(air_voc).state;
+            if (val < 150) return "Good";
+            if (val < 250) return "Fair";
+            if (val < 400) return "Poor";
+            return "Bad";
+      - lvgl.label.update:
           id: lbl_nox_value
           text: !lambda |-
             if (isnan(id(air_nox).state)) return "--";
             static char buf[16];
             snprintf(buf, sizeof(buf), "%.0f", id(air_nox).state);
             return buf;
+      - lvgl.label.update:
+          id: lbl_nox_status
+          text: !lambda |-
+            if (isnan(id(air_nox).state)) return "";
+            float val = id(air_nox).state;
+            if (val < 20) return "Good";
+            if (val < 50) return "Fair";
+            if (val < 150) return "Poor";
+            return "Bad";
       # Arc widgets
       - lvgl.label.update:
           id: lbl_fuel_value
@@ -628,7 +664,7 @@ lvgl:
                   x: 5
                   text_font: segoeui_16
                   text_color: 0xFFFFFF
-                  text: ""
+                  text: "-"
 
               # Center: Date
               - label:
@@ -686,198 +722,315 @@ lvgl:
                         text_color: 0xFFFFFF
                         text: "--%"  # Static initial, updated by script
 
-        # Weather Section (below status bar)
+        # Weather Section (left side)
         - obj:
             id: weather_container
-            width: 320
-            height: 200
-            align: TOP_MID
-            x: 0
+            width: SIZE_CONTENT
+            height: SIZE_CONTENT
+            align: TOP_LEFT
+            x: 20
             y: 35
             pad_all: 10
             bg_opa: TRANSP
             border_width: 0
+            layout:
+              type: FLEX
+              flex_flow: COLUMN
+              flex_align_main: START
+              flex_align_cross: CENTER
+              pad_row: 5
             widgets:
               - label:
                   id: lbl_weather_icon
-                  align: TOP_MID
-                  x: 0
-                  y: 10
                   text_font: weather_icons
                   text_color: 0xFFFFFF
                   text: "\U000F0599"  # Default sunny icon
               
               - label:
                   id: lbl_weather_temp
-                  align: TOP_MID
-                  x: 0
-                  y: 120
                   text_font: segoeui_24
                   text_color: 0xFFFFFF
                   text: "--°"
               
               - label:
                   id: lbl_weather_condition
-                  align: BOTTOM_MID
-                  x: 0
-                  y: -5
                   text_color: 0xFFFFFF
                   text: "Unknown"
 
-        # Sunrise/Sunset Section
+        # Info Column (right of weather)
         - obj:
-            id: sun_container
-            width: 300
-            height: 30
-            align: TOP_MID
-            x: 0
-            y: 205
+            id: info_column
+            width: SIZE_CONTENT
+            height: SIZE_CONTENT
+            align: TOP_LEFT
+            x: 140
+            y: 35
             bg_opa: TRANSP
             border_width: 0
+            pad_all: 5
+            layout:
+              type: FLEX
+              flex_flow: ROW
+              flex_align_main: START
+              flex_align_cross: START
+              pad_column: 20
             widgets:
-              - label:
-                  id: lbl_sunrise_icon
-                  align: LEFT_MID
-                  x: 0
-                  text_font: sun_icons
-                  text_color: 0xFFFFFF
-                  text: "\U000F059C"  # mdi:weather-sunset-up
-              - label:
-                  id: lbl_sunrise_time
-                  align: LEFT_MID
-                  x: 30
-                  text_font: segoeui_16
-                  text_color: 0xFFFFFF
-                  text: "--:--"
-              - label:
-                  id: lbl_sunset_icon
-                  align: RIGHT_MID
-                  x: -70
-                  text_font: sun_icons
-                  text_color: 0xFFFFFF
-                  text: "\U000F059B"  # mdi:weather-sunset-down
-              - label:
-                  id: lbl_sunset_time
-                  align: RIGHT_MID
-                  x: 0
-                  text_font: segoeui_16
-                  text_color: 0xFFFFFF
-                  text: "--:--"
+              # Sunrise/Sunset Column
+              - obj:
+                  id: sun_container
+                  width: SIZE_CONTENT
+                  height: SIZE_CONTENT
+                  bg_opa: TRANSP
+                  border_width: 0
+                  pad_all: 0
+                  layout:
+                    type: FLEX
+                    flex_flow: COLUMN
+                    flex_align_main: START
+                    flex_align_cross: START
+                    pad_row: 5
+                  widgets:
+                    # Sunrise row
+                    - obj:
+                        width: SIZE_CONTENT
+                        height: SIZE_CONTENT
+                        bg_opa: TRANSP
+                        border_width: 0
+                        pad_all: 0
+                        layout:
+                          type: FLEX
+                          flex_flow: ROW
+                          flex_align_cross: CENTER
+                          pad_column: 5
+                        widgets:
+                          - label:
+                              id: lbl_sunrise_icon
+                              text_font: sun_icons
+                              text_color: 0xFFFFFF
+                              text: "\U000F059C"  # mdi:weather-sunset-up
+                          - label:
+                              id: lbl_sunrise_time
+                              text_font: segoeui_16
+                              text_color: 0xFFFFFF
+                              text: "--:--"
+                    # Sunset row
+                    - obj:
+                        width: SIZE_CONTENT
+                        height: SIZE_CONTENT
+                        bg_opa: TRANSP
+                        border_width: 0
+                        pad_all: 0
+                        layout:
+                          type: FLEX
+                          flex_flow: ROW
+                          flex_align_cross: CENTER
+                          pad_column: 5
+                        widgets:
+                          - label:
+                              id: lbl_sunset_icon
+                              text_font: sun_icons
+                              text_color: 0xFFFFFF
+                              text: "\U000F059B"  # mdi:weather-sunset-down
+                          - label:
+                              id: lbl_sunset_time
+                              text_font: segoeui_16
+                              text_color: 0xFFFFFF
+                              text: "--:--"
 
-        # Interior Climate Section
-        - obj:
-            id: interior_container
-            width: 600
-            height: 50
-            align: TOP_MID
-            x: 0
-            y: 240
-            bg_opa: TRANSP
-            border_width: 0
-            widgets:
-              - label:
-                  id: lbl_interior_label
-                  align: LEFT_MID
-                  x: 0
-                  text_font: segoeui_16
-                  text_color: 0xFFFFFF
-                  text: "Interior:"
-              - label:
-                  id: lbl_interior_temp
-                  align: LEFT_MID
-                  x: 80
-                  text_font: segoeui_20
-                  text_color: 0xFFFFFF
-                  text: "--°"
-              - label:
-                  id: lbl_interior_humidity
-                  align: LEFT_MID
-                  x: 150
-                  text_font: segoeui_20
-                  text_color: 0xFFFFFF
-                  text: "--%"
-              - label:
-                  id: lbl_fridge_label
-                  align: RIGHT_MID
-                  x: -120
-                  text_font: segoeui_16
-                  text_color: 0xFFFFFF
-                  text: "Fridge:"
-              - label:
-                  id: lbl_fridge_temp
-                  align: RIGHT_MID
-                  x: 0
-                  text_font: segoeui_20
-                  text_color: 0xFFFFFF
-                  text: "--°"
+              # Interior Climate Column
+              - obj:
+                  id: interior_container
+                  width: SIZE_CONTENT
+                  height: SIZE_CONTENT
+                  bg_opa: TRANSP
+                  border_width: 0
+                  pad_all: 0
+                  layout:
+                    type: FLEX
+                    flex_flow: COLUMN
+                    flex_align_main: START
+                    flex_align_cross: START
+                    pad_row: 5
+                  widgets:
+                    # Interior temp/humidity row
+                    - obj:
+                        width: SIZE_CONTENT
+                        height: SIZE_CONTENT
+                        bg_opa: TRANSP
+                        border_width: 0
+                        pad_all: 0
+                        layout:
+                          type: FLEX
+                          flex_flow: ROW
+                          flex_align_cross: CENTER
+                          pad_column: 5
+                        widgets:
+                          - label:
+                              id: lbl_interior_label
+                              text_font: segoeui_16
+                              text_color: 0xFFFFFF
+                              text: "Interior:"
+                          - label:
+                              id: lbl_interior_temp
+                              text_font: segoeui_20
+                              text_color: 0xFFFFFF
+                              text: "--°"
+                          - label:
+                              id: lbl_interior_humidity
+                              text_font: segoeui_20
+                              text_color: 0xFFFFFF
+                              text: "--%"
+                    # Fridge row
+                    - obj:
+                        width: SIZE_CONTENT
+                        height: SIZE_CONTENT
+                        bg_opa: TRANSP
+                        border_width: 0
+                        pad_all: 0
+                        layout:
+                          type: FLEX
+                          flex_flow: ROW
+                          flex_align_cross: CENTER
+                          pad_column: 5
+                        widgets:
+                          - label:
+                              id: lbl_fridge_label
+                              text_font: segoeui_16
+                              text_color: 0xFFFFFF
+                              text: "Fridge:"
+                          - label:
+                              id: lbl_fridge_temp
+                              text_font: segoeui_20
+                              text_color: 0xFFFFFF
+                              text: "--°"
 
-        # Air Quality Section
-        - obj:
-            id: air_quality_container
-            width: 700
-            height: 30
-            align: TOP_MID
-            x: 0
-            y: 270
-            bg_opa: TRANSP
-            border_width: 0
-            widgets:
-              - label:
-                  id: lbl_co2_label
-                  align: LEFT_MID
-                  x: 0
-                  text_font: segoeui_16
-                  text_color: 0xFFFFFF
-                  text: "CO₂:"
-              - label:
-                  id: lbl_co2_value
-                  align: LEFT_MID
-                  x: 45
-                  text_font: segoeui_16
-                  text_color: 0xFFFFFF
-                  text: "--ppm"
-              - label:
-                  id: lbl_pm25_label
-                  align: LEFT_MID
-                  x: 140
-                  text_font: segoeui_16
-                  text_color: 0xFFFFFF
-                  text: "PM2.5:"
-              - label:
-                  id: lbl_pm25_value
-                  align: LEFT_MID
-                  x: 200
-                  text_font: segoeui_16
-                  text_color: 0xFFFFFF
-                  text: "--"
-              - label:
-                  id: lbl_voc_label
-                  align: RIGHT_MID
-                  x: -200
-                  text_font: segoeui_16
-                  text_color: 0xFFFFFF
-                  text: "VOC:"
-              - label:
-                  id: lbl_voc_value
-                  align: RIGHT_MID
-                  x: -150
-                  text_font: segoeui_16
-                  text_color: 0xFFFFFF
-                  text: "--"
-              - label:
-                  id: lbl_nox_label
-                  align: RIGHT_MID
-                  x: -80
-                  text_font: segoeui_16
-                  text_color: 0xFFFFFF
-                  text: "NOx:"
-              - label:
-                  id: lbl_nox_value
-                  align: RIGHT_MID
-                  x: 0
-                  text_font: segoeui_16
-                  text_color: 0xFFFFFF
-                  text: "--"
+              # Air Quality Column
+              - obj:
+                  id: air_quality_container
+                  width: SIZE_CONTENT
+                  height: SIZE_CONTENT
+                  bg_opa: TRANSP
+                  border_width: 0
+                  pad_all: 0
+                  layout:
+                    type: FLEX
+                    flex_flow: COLUMN
+                    flex_align_main: START
+                    flex_align_cross: START
+                    pad_row: 5
+                  widgets:
+                    # CO2 row
+                    - obj:
+                        width: SIZE_CONTENT
+                        height: SIZE_CONTENT
+                        bg_opa: TRANSP
+                        border_width: 0
+                        pad_all: 0
+                        layout:
+                          type: FLEX
+                          flex_flow: ROW
+                          flex_align_cross: CENTER
+                          pad_column: 5
+                        widgets:
+                          - label:
+                              id: lbl_co2_label
+                              text_font: segoeui_16
+                              text_color: 0xFFFFFF
+                              text: "CO₂:"
+                          - label:
+                              id: lbl_co2_value
+                              text_font: segoeui_16
+                              text_color: 0xFFFFFF
+                              text: "--ppm"
+                          - label:
+                              id: lbl_co2_status
+                              text_font: segoeui_16
+                              text_color: 0x888888
+                              text: ""
+                    # PM2.5 row
+                    - obj:
+                        width: SIZE_CONTENT
+                        height: SIZE_CONTENT
+                        bg_opa: TRANSP
+                        border_width: 0
+                        pad_all: 0
+                        layout:
+                          type: FLEX
+                          flex_flow: ROW
+                          flex_align_cross: CENTER
+                          pad_column: 5
+                        widgets:
+                          - label:
+                              id: lbl_pm25_label
+                              text_font: segoeui_16
+                              text_color: 0xFFFFFF
+                              text: "PM2.5:"
+                          - label:
+                              id: lbl_pm25_value
+                              text_font: segoeui_16
+                              text_color: 0xFFFFFF
+                              text: "--"
+                          - label:
+                              id: lbl_pm25_status
+                              text_font: segoeui_16
+                              text_color: 0x888888
+                              text: ""
+                    # VOC row
+                    - obj:
+                        width: SIZE_CONTENT
+                        height: SIZE_CONTENT
+                        bg_opa: TRANSP
+                        border_width: 0
+                        pad_all: 0
+                        layout:
+                          type: FLEX
+                          flex_flow: ROW
+                          flex_align_cross: CENTER
+                          pad_column: 5
+                        widgets:
+                          - label:
+                              id: lbl_voc_label
+                              text_font: segoeui_16
+                              text_color: 0xFFFFFF
+                              text: "VOC:"
+                          - label:
+                              id: lbl_voc_value
+                              text_font: segoeui_16
+                              text_color: 0xFFFFFF
+                              text: "--"
+                          - label:
+                              id: lbl_voc_status
+                              text_font: segoeui_16
+                              text_color: 0x888888
+                              text: ""
+                    # NOx row
+                    - obj:
+                        width: SIZE_CONTENT
+                        height: SIZE_CONTENT
+                        bg_opa: TRANSP
+                        border_width: 0
+                        pad_all: 0
+                        layout:
+                          type: FLEX
+                          flex_flow: ROW
+                          flex_align_cross: CENTER
+                          pad_column: 5
+                        widgets:
+                          - label:
+                              id: lbl_nox_label
+                              text_font: segoeui_16
+                              text_color: 0xFFFFFF
+                              text: "NOx:"
+                          - label:
+                              id: lbl_nox_value
+                              text_font: segoeui_16
+                              text_color: 0xFFFFFF
+                              text: "--"
+                          - label:
+                              id: lbl_nox_status
+                              text_font: segoeui_16
+                              text_color: 0x888888
+                              text: ""
   
         # Fuel Level Arc
         - arc:
@@ -891,7 +1044,6 @@ lvgl:
             rotation: 0
             min_value: 0
             max_value: 100
-            value: 75
             styles: style_arc
             indicator:
               styles: style_arc_indicator
@@ -921,7 +1073,6 @@ lvgl:
             rotation: 0
             min_value: 0
             max_value: 100
-            value: 75
             styles: style_arc
             indicator:
               styles: style_arc_indicator
@@ -955,7 +1106,6 @@ lvgl:
             rotation: 0
             min_value: 0
             max_value: 100
-            value: 75
             styles: style_arc
             indicator:
               styles: style_arc_indicator
