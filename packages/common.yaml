@@ -55,31 +55,6 @@ sensor:
     name: "${friendly_name} Uptime"
     update_interval: 60s
 
-  - platform: wifi_signal
-    id: wifi_rssi
-    name: "${friendly_name} WiFi Signal"
-    update_interval: 60s
-    filters:
-      - throttle: 5min
-    on_value:
-      then:
-        - lambda: |-
-            static int last_bars = -1;
-            int bars = 0;
-            if (!isnan(id(wifi_rssi).state)) {
-              float r = id(wifi_rssi).state;
-              if      (r > -55) bars = 4;
-              else if (r > -65) bars = 3;
-              else if (r > -72) bars = 2;
-              else if (r > -80) bars = 1;
-              else               bars = 0;
-            }
-
-            if (bars != last_bars) {
-              last_bars = bars;
-              // TODO: the wifi bar count has changed: id(redraw_debounced).execute();
-            }
-
 # Text sensor for device information
 text_sensor:
   - platform: version
