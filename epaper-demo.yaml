@@ -511,13 +511,6 @@ binary_sensor:
             format: "[BUTTON] Right button pressed - going to next page"
         - script.execute: page_next
 
-  - id: !extend button_green
-    on_press:
-      then:
-        - logger.log:
-            level: INFO
-            format: "[BUTTON] Green button pressed"
-
   # API connection status
   - platform: status
     id: api_connected
