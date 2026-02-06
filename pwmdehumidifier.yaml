@@ -126,6 +126,10 @@ globals:
     type: int
     restore_value: no
     initial_value: '0'
+  - id: last_tec_power
+    type: float
+    restore_value: no
+    initial_value: '-1.0'
 
 # Deep sleep component
 deep_sleep:
@@ -162,6 +166,13 @@ output:
           // Clamp to configurable max power
           float max_level = id(tec_max_power).state;
           if (level > max_level) level = max_level;
+          
+          // Only update if level changed significantly
+          if (fabs(level - id(last_tec_power)) < 0.01f) {
+            return;  // No significant change, skip update
+          }
+          id(last_tec_power) = level;
+          
           // Drive both Thermoelectric Cooler MOSFETs
           id(tec1_pwm).set_level(level);
           id(tec2_pwm).set_level(level);
@@ -270,18 +281,26 @@ sensor:
     address: 0xd72401000047f728
     name: "Cold Side Temperature"
     id: cold_temp
-    update_interval: 2s
+    update_interval: 5s
     filters:
       - filter_out: nan  # Ignore failed readings
+      - exponential_moving_average:
+          alpha: 0.2
+          send_every: 1
+      - delta: 0.1  # Only publish when temp changes by at least 0.1°C
 
   # Hot side DS18B20 (controls fan + safety)
   - platform: dallas_temp
     address: 0x2222222222222222  # TODO: Replace with actual sensor address from logs
     name: "Hot Side Temperature"
     id: hot_temp
-    update_interval: 2s
+    update_interval: 5s
     filters:
       - filter_out: nan  # Ignore failed readings
+      - exponential_moving_average:
+          alpha: 0.2
+          send_every: 1
+      - delta: 0.1  # Only publish when temp changes by at least 0.1°C
 
 binary_sensor:
   - platform: template
@@ -433,30 +452,42 @@ switch:
     icon: "mdi:sleep-off"
     # Use this to temporarily prevent sleep (e.g., during OTA updates)
 
+fan:
+  - platform: speed
+    name: "Fan"
+    id: fan_speed_control
+    output: fan_pwm
+    speed_count: 100
+    restore_mode: ALWAYS_OFF
+
 interval:
-  - interval: 5s
+  - interval: 15s
     then:
       - lambda: |-
-          if (!id(hot_temp).has_state() || !id(box_air_temp).has_state()) return;
-
-          float hot = id(hot_temp).state;
-          float ambient = id(box_air_temp).state;
-          float max_temp = id(fan_max_temp).state;
           float level = 0.0f;
+          if (id(hot_temp).has_state() && id(box_air_temp).has_state()) {
+            float hot = id(hot_temp).state;
+            float ambient = id(box_air_temp).state;
+            float max_temp = id(fan_max_temp).state;
 
-          // Fan off when hot side equals ambient, ramps to 100% at max_temp
-          // Linear interpolation: 0% at ambient, 100% at max_temp
-          if (hot > ambient && ambient < max_temp) {
-            level = (hot - ambient) / (max_temp - ambient);
-            if (level > 1.0f) level = 1.0f;
-            if (level < 0.0f) level = 0.0f;
+            // Fan off when hot side equals ambient, ramps to 100% at max_temp
+            // Linear interpolation: 0% at ambient, 100% at max_temp
+            if (hot > ambient && ambient < max_temp) {
+              level = (hot - ambient) / (max_temp - ambient);
+              if (level > 1.0f) level = 1.0f;
+              if (level < 0.0f) level = 0.0f;
+            }
+
+            // Overtemp forces full fan
+            if (id(hot_overtemp).state) {
+              level = 1.0f;
+              ESP_LOGW("fan", "Overtemp! Forcing fan to 100%%");
+            }
+            
+            ESP_LOGD("fan", "Hot: %.1fC, Ambient: %.1fC, Fan speed: %.0f%%", hot, ambient, level * 100.0f);
+          } else {
+            ESP_LOGD("fan", "Sensors not ready, fan speed: 0%%");
           }
-
-          // Overtemp forces full fan
-          if (id(hot_overtemp).state) {
-            level = 1.0f;
-          }
-
           id(fan_pwm).set_level(level);
 
   - interval: 30s
@@ -512,6 +543,11 @@ interval:
             if (id(deep_sleep_enable).state && !id(prevent_sleep).state && id(low_humidity_count) >= 2) {
               int sleep_mins = (int)id(sleep_duration_min).state;
               ESP_LOGI("dehumidifier", "Entering deep sleep for %d minutes", sleep_mins);
+              // Set fan PWM high before sleep (high duty = low/off fan speed for 4-pin PWM fans)
+              // Then hold the GPIO state during deep sleep
+              id(fan_pwm).set_level(1.0f);
+              gpio_hold_en(GPIO_NUM_1);  // Hold fan PWM pin (GPIO1) state during deep sleep
+              gpio_deep_sleep_hold_en();  // Enable GPIO hold during deep sleep
               id(deep_sleep_control).set_sleep_duration(sleep_mins * 60000);  // Convert to ms
               id(deep_sleep_control).begin_sleep();
             }

@@ -309,7 +309,7 @@ script:
             if (isnan(id(sht4x_temperature).state)) return "--°";
             static char buf[16];
             float temp = id(sht4x_temperature).state;
-            bool use_f = (id(temp_unit_select).state == "F");
+            bool use_f = (id(temp_unit_select).current_option() == "F");
             if (use_f) {
               temp = temp * 9.0f / 5.0f + 32.0f;
               snprintf(buf, sizeof(buf), "%.1f°F", temp);
@@ -330,7 +330,7 @@ script:
             if (isnan(id(fridge_temp).state)) return "--°";
             static char buf[16];
             float temp = id(fridge_temp).state;
-            bool use_f = (id(temp_unit_select).state == "F");
+            bool use_f = (id(temp_unit_select).current_option() == "F");
             if (use_f) {
               temp = temp * 9.0f / 5.0f + 32.0f;
               snprintf(buf, sizeof(buf), "%.1f°F", temp);
@@ -415,6 +415,13 @@ script:
           id: arc_fuel
           value: !lambda 'return isnan(id(fuel_level).state) ? 0 : (int)id(fuel_level).state;'
       - lvgl.label.update:
+          id: lbl_fuel_range
+          text: !lambda |-
+            if (isnan(id(fuel_range).state)) return "-- mi";
+            static char buf[16];
+            snprintf(buf, sizeof(buf), "%.0f mi", id(fuel_range).state);
+            return buf;
+      - lvgl.label.update:
           id: lbl_def_value
           text: !lambda |-
             if (isnan(id(def_level).state)) return "--%";
@@ -424,6 +431,13 @@ script:
       - lvgl.arc.update:
           id: arc_def
           value: !lambda 'return isnan(id(def_level).state) ? 0 : (int)id(def_level).state;'
+      - lvgl.label.update:
+          id: lbl_def_range
+          text: !lambda |-
+            if (isnan(id(def_range).state)) return "-- mi";
+            static char buf[16];
+            snprintf(buf, sizeof(buf), "%.0f mi", id(def_range).state);
+            return buf;
       - lvgl.label.update:
           id: lbl_vehicle_battery_value
           text: !lambda |-
@@ -435,6 +449,18 @@ script:
           id: arc_battery
           value: !lambda 'return isnan(id(vehicle_battery).state) ? 0 : (int)id(vehicle_battery).state;'
       - lvgl.label.update:
+          id: lbl_battery_time
+          text: !lambda |-
+            if (isnan(id(battery_time_remaining).state)) return "-- hrs";
+            static char buf[16];
+            float hrs = id(battery_time_remaining).state;
+            if (hrs >= 24) {
+              snprintf(buf, sizeof(buf), "%.0f days", hrs / 24.0f);
+            } else {
+              snprintf(buf, sizeof(buf), "%.1f hrs", hrs);
+            }
+            return buf;
+      - lvgl.label.update:
           id: lbl_water_value
           text: !lambda |-
             if (isnan(id(water_level).state)) return "--%";
@@ -444,6 +470,18 @@ script:
       - lvgl.arc.update:
           id: arc_water
           value: !lambda 'return isnan(id(water_level).state) ? 0 : (int)id(water_level).state;'
+      - lvgl.label.update:
+          id: lbl_water_time
+          text: !lambda |-
+            if (isnan(id(water_time_remaining).state)) return "-- hrs";
+            static char buf[16];
+            float hrs = id(water_time_remaining).state;
+            if (hrs >= 24) {
+              snprintf(buf, sizeof(buf), "%.0f days", hrs / 24.0f);
+            } else {
+              snprintf(buf, sizeof(buf), "%.1f hrs", hrs);
+            }
+            return buf;
       - logger.log:
           level: INFO
           format: "[DISPLAY] All widgets updated, waiting for LVGL to process..."
@@ -563,6 +601,17 @@ font:
       "\U000F059B", # weather-sunset-down (sunset)
       ]
 
+  # Climate icons for interior/fridge
+  - file: "fonts/materialdesignicons-webfont.ttf"
+    id: climate_icons
+    size: 20
+    bpp: 4
+    glyphs: [
+      "\U000F11D4", # rv-truck (interior)
+      "\U000F15EE", # fridge-industrial
+      "\U000F0058", # water-percent (humidity)
+      ]
+
 interval:
   - interval: ${sleep_duration}
     then:
@@ -670,7 +719,7 @@ lvgl:
                   id: lbl_status_location
                   align: LEFT_MID
                   x: 5
-                  text_font: segoeui_16
+                  text_font: segoeui_20
                   text_color: 0xFFFFFF
                   text: "-"
 
@@ -680,7 +729,7 @@ lvgl:
                   align: CENTER
                   x: 0
                   y: 0
-                  text_font: segoeui_16
+                  text_font: segoeui_20
                   text_color: 0xFFFFFF
                   text: "-- --, ----"
 
@@ -726,7 +775,7 @@ lvgl:
                     # Battery percentage text (leftmost)
                     - label:
                         id: lbl_battery_percent
-                        text_font: segoeui_16
+                        text_font: segoeui_20
                         text_color: 0xFFFFFF
                         text: "--%"  # Static initial, updated by script
 
@@ -875,14 +924,19 @@ lvgl:
                         widgets:
                           - label:
                               id: lbl_interior_label
-                              text_font: segoeui_16
+                              text_font: climate_icons
                               text_color: 0xFFFFFF
-                              text: "Interior:"
+                              text: "\U000F11D4"
                           - label:
                               id: lbl_interior_temp
                               text_font: segoeui_20
                               text_color: 0xFFFFFF
                               text: "--°"
+                          - label:
+                              id: lbl_humidity_icon
+                              text_font: climate_icons
+                              text_color: 0xFFFFFF
+                              text: "\U000F0058"
                           - label:
                               id: lbl_interior_humidity
                               text_font: segoeui_20
@@ -903,9 +957,9 @@ lvgl:
                         widgets:
                           - label:
                               id: lbl_fridge_label
-                              text_font: segoeui_16
+                              text_font: climate_icons
                               text_color: 0xFFFFFF
-                              text: "Fridge:"
+                              text: "\U000F15EE"
                           - label:
                               id: lbl_fridge_temp
                               text_font: segoeui_20
@@ -1039,131 +1093,173 @@ lvgl:
                               text_font: segoeui_16
                               text_color: 0x888888
                               text: ""
-  
-        # Fuel Level Arc
-        - arc:
-            id: arc_fuel
-            x: 20
-            y: 300
-            width: 150
-            height: 150
-            start_angle: 135
-            end_angle: 45
-            rotation: 0
-            min_value: 0
-            max_value: 100
-            styles: style_arc
-            indicator:
-              styles: style_arc_indicator
-            widgets:
-              - label:
-                  id: lbl_fuel_value
-                  align: CENTER
-                  text_font: segoeui_24
-                  text_color: 0xFFFFFF
-                  text: "-- %"
-              - label:
-                  id: lbl_fuel_label
-                  align: BOTTOM_MID
-                  y: -5
-                  text_color: 0xFFFFFF
-                  text: "Fuel"
 
-        # DEF Level Arc
-        - arc:
-            id: arc_def
-            x: 180
-            y: 300
-            width: 150
-            height: 150
-            start_angle: 135
-            end_angle: 45
-            rotation: 0
-            min_value: 0
-            max_value: 100
-            styles: style_arc
-            indicator:
-              styles: style_arc_indicator
+        # Arc gauges container - evenly spaced across bottom
+        - obj:
+            id: arcs_container
+            width: 100%
+            height: 170
+            align: BOTTOM_MID
+            y: -10
+            bg_opa: TRANSP
+            border_width: 0
+            scrollbar_mode: "OFF"
+            pad_left: 20
+            pad_right: 20
+            layout:
+              type: FLEX
+              flex_flow: ROW
+              flex_align_main: SPACE_EVENLY
+              flex_align_cross: CENTER
             widgets:
-              - label:
-                  id: lbl_def_value
-                  align: CENTER
-                  text_font: segoeui_24
-                  text_color: 0xFFFFFF
-                  text: !lambda |-
-                    if (isnan(id(def_level).state)) return "--%";
-                    static char buf[16];
-                    snprintf(buf, sizeof(buf), "%.0f%%", id(def_level).state);
-                    return buf;
-              - label:
-                  id: lbl_def_label
-                  align: BOTTOM_MID
-                  y: -5
-                  text_color: 0xFFFFFF
-                  text: "DEF"
+              # Fuel Level Arc
+              - arc:
+                  id: arc_fuel
+                  width: 150
+                  height: 150
+                  start_angle: 135
+                  end_angle: 45
+                  rotation: 0
+                  min_value: 0
+                  max_value: 100
+                  styles: style_arc
+                  indicator:
+                    styles: style_arc_indicator
+                  widgets:
+                    - label:
+                        id: lbl_fuel_value
+                        align: CENTER
+                        y: -10
+                        text_font: segoeui_24
+                        text_color: 0xFFFFFF
+                        text: "-- %"
+                    - label:
+                        id: lbl_fuel_range
+                        align: CENTER
+                        y: 15
+                        text_font: segoeui_16
+                        text_color: 0xFFFFFF
+                        text: "-- mi"
+                    - label:
+                        id: lbl_fuel_label
+                        align: BOTTOM_MID
+                        y: -5
+                        text_color: 0xFFFFFF
+                        text: "Fuel"
 
-        # Battery Level Arc
-        - arc:
-            id: arc_battery
-            x: 340
-            y: 300
-            width: 150
-            height: 150
-            start_angle: 135
-            end_angle: 45
-            rotation: 0
-            min_value: 0
-            max_value: 100
-            styles: style_arc
-            indicator:
-              styles: style_arc_indicator
-            widgets:
-              - label:
-                  id: lbl_vehicle_battery_value
-                  align: CENTER
-                  text_font: segoeui_24
-                  text_color: 0xFFFFFF
-                  text: !lambda |-
-                    if (isnan(id(vehicle_battery).state)) return "--%";
-                    static char buf[16];
-                    snprintf(buf, sizeof(buf), "%.0f%%", id(vehicle_battery).state);
-                    return buf;
-              - label:
-                  id: lbl_vehicle_battery_label
-                  align: BOTTOM_MID
-                  y: -5
-                  text_color: 0xFFFFFF
-                  text: "Battery"
+              # DEF Level Arc
+              - arc:
+                  id: arc_def
+                  width: 150
+                  height: 150
+                  start_angle: 135
+                  end_angle: 45
+                  rotation: 0
+                  min_value: 0
+                  max_value: 100
+                  styles: style_arc
+                  indicator:
+                    styles: style_arc_indicator
+                  widgets:
+                    - label:
+                        id: lbl_def_value
+                        align: CENTER
+                        y: -10
+                        text_font: segoeui_24
+                        text_color: 0xFFFFFF
+                        text: !lambda |-
+                          if (isnan(id(def_level).state)) return "--%";
+                          static char buf[16];
+                          snprintf(buf, sizeof(buf), "%.0f%%", id(def_level).state);
+                          return buf;
+                    - label:
+                        id: lbl_def_range
+                        align: CENTER
+                        y: 15
+                        text_font: segoeui_16
+                        text_color: 0xFFFFFF
+                        text: "-- mi"
+                    - label:
+                        id: lbl_def_label
+                        align: BOTTOM_MID
+                        y: -5
+                        text_color: 0xFFFFFF
+                        text: "DEF"
 
-        # Water Level Arc
-        - arc:
-            id: arc_water
-            x: 500
-            y: 300
-            width: 150
-            height: 150
-            start_angle: 135
-            end_angle: 45
-            rotation: 0
-            min_value: 0
-            max_value: 100
-            value: 0
-            styles: style_arc
-            indicator:
-              styles: style_arc_indicator
-            widgets:
-              - label:
-                  id: lbl_water_value
-                  align: CENTER
-                  text_font: segoeui_24
-                  text_color: 0xFFFFFF
-                  text: "--%"
-              - label:
-                  id: lbl_water_label
-                  align: BOTTOM_MID
-                  y: -5
-                  text_color: 0xFFFFFF
-                  text: "Water"
+              # Battery Level Arc
+              - arc:
+                  id: arc_battery
+                  width: 150
+                  height: 150
+                  start_angle: 135
+                  end_angle: 45
+                  rotation: 0
+                  min_value: 0
+                  max_value: 100
+                  styles: style_arc
+                  indicator:
+                    styles: style_arc_indicator
+                  widgets:
+                    - label:
+                        id: lbl_vehicle_battery_value
+                        align: CENTER
+                        y: -10
+                        text_font: segoeui_24
+                        text_color: 0xFFFFFF
+                        text: !lambda |-
+                          if (isnan(id(vehicle_battery).state)) return "--%";
+                          static char buf[16];
+                          snprintf(buf, sizeof(buf), "%.0f%%", id(vehicle_battery).state);
+                          return buf;
+                    - label:
+                        id: lbl_battery_time
+                        align: CENTER
+                        y: 15
+                        text_font: segoeui_16
+                        text_color: 0xFFFFFF
+                        text: "-- hrs"
+                    - label:
+                        id: lbl_vehicle_battery_label
+                        align: BOTTOM_MID
+                        y: -5
+                        text_color: 0xFFFFFF
+                        text: "Battery"
+
+              # Water Level Arc
+              - arc:
+                  id: arc_water
+                  width: 150
+                  height: 150
+                  start_angle: 135
+                  end_angle: 45
+                  rotation: 0
+                  min_value: 0
+                  max_value: 100
+                  value: 0
+                  styles: style_arc
+                  indicator:
+                    styles: style_arc_indicator
+                  widgets:
+                    - label:
+                        id: lbl_water_value
+                        align: CENTER
+                        y: -10
+                        text_font: segoeui_24
+                        text_color: 0xFFFFFF
+                        text: "--%"
+                    - label:
+                        id: lbl_water_time
+                        align: CENTER
+                        y: 15
+                        text_font: segoeui_16
+                        text_color: 0xFFFFFF
+                        text: "-- hrs"
+                    - label:
+                        id: lbl_water_label
+                        align: BOTTOM_MID
+                        y: -5
+                        text_color: 0xFFFFFF
+                        text: "Water"
 
 # Deep sleep configuration - https://esphome.io/components/deep_sleep/
 # Note: GPIO3 wakeup disabled due to false triggers - using timer only
@@ -1278,6 +1374,38 @@ sensor:
       then:
         - lambda: |-
             ESP_LOGI("HA_SENSOR", "water_level updated: %.1f%%", x);
+
+  - platform: homeassistant
+    id: fuel_range
+    entity_id: sensor.fuel_range  # Estimated miles remaining on fuel
+    on_value:
+      then:
+        - lambda: |-
+            ESP_LOGI("HA_SENSOR", "fuel_range updated: %.0f mi", x);
+
+  - platform: homeassistant
+    id: def_range
+    entity_id: sensor.def_range  # Estimated miles remaining on DEF
+    on_value:
+      then:
+        - lambda: |-
+            ESP_LOGI("HA_SENSOR", "def_range updated: %.0f mi", x);
+
+  - platform: homeassistant
+    id: battery_time_remaining
+    entity_id: sensor.battery_time_remaining  # Estimated hours remaining on battery
+    on_value:
+      then:
+        - lambda: |-
+            ESP_LOGI("HA_SENSOR", "battery_time_remaining updated: %.1f hrs", x);
+
+  - platform: homeassistant
+    id: water_time_remaining
+    entity_id: sensor.water_time_remaining  # Estimated hours remaining on water
+    on_value:
+      then:
+        - lambda: |-
+            ESP_LOGI("HA_SENSOR", "water_time_remaining updated: %.1f hrs", x);
 
 select:
   - platform: template

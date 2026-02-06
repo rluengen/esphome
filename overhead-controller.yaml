@@ -21,6 +21,7 @@ packages:
       - path: packages/time/homeassistant.yaml
       - path: packages/icons/homeassistant_icons.yaml
       - path: packages/icons/network_icons.yaml
+      - path: packages/icons/battery_icons.yaml
       - path: devices/waveshare-ESP32-S3-Touch-LCD-5B.yaml
 
 esphome:
@@ -42,8 +43,110 @@ display:
   - id: !extend main_display
     auto_clear_enabled: false
 
+# Update date label when time changes (every minute)
+time:
+  - id: !extend time_entity
+    on_time:
+      - seconds: 0
+        then:
+          - lvgl.label.update:
+              id: lbl_status_date
+              text: !lambda |-
+                auto time = id(time_entity).now();
+                if (time.is_valid()) {
+                  static char buf[40];
+                  snprintf(buf, sizeof(buf), "%s %s %d, %d", 
+                    time.strftime("%A").c_str(),
+                    time.strftime("%B").c_str(),
+                    time.day_of_month,
+                    time.year);
+                  return buf;
+                }
+                return "-- --, ----";
+
+font:
+  - file: "fonts/segoeui.ttf"
+    id: segoeui_16
+    size: 16
+    bpp: 4
+    glyphs: " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~Â°"
+  
+  - file: "fonts/segoeui.ttf"
+    id: segoeui_20
+    size: 20
+    bpp: 4
+    glyphs: " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~Â°"
+
+binary_sensor:
+  # API connection status
+  - platform: status
+    id: api_connected
+    name: "API Connected"
+    on_state:
+      then:
+        - lvgl.label.update:
+            id: lbl_ha_status
+            text: !lambda |-
+              if (id(api_connected).state) {
+                return "\U000F06A1";
+              }
+              return "\U000F0F21";
+
+  # WiFi connection status
+  - platform: template
+    id: wifi_connected
+    name: "WiFi Connected"
+    lambda: |-
+      return !isnan(id(wifi_signal_db).state) && id(wifi_signal_db).state < 0;
 
 sensor:
+  - platform: wifi_signal
+    id: wifi_signal_db
+    name: "WiFi Signal"
+    update_interval: 60s
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: lbl_wifi_status
+            text: !lambda |-
+              if (!id(wifi_connected).state) {
+                return "\U000F05AA";
+              }
+              int rssi = (int)id(wifi_signal_db).state;
+              if (rssi >= -50) return "\U000F0928";
+              else if (rssi >= -60) return "\U000F0925";
+              else if (rssi >= -70) return "\U000F0922";
+              else if (rssi >= -80) return "\U000F091F";
+              return "\U000F092F";
+
+  - platform: homeassistant
+    id: location_latitude
+    entity_id: sensor.location_latitude
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: lbl_status_location
+            text: !lambda |-
+              if (!id(location_city).state.empty() && !id(location_state).state.empty()) {
+                static char buf[64];
+                snprintf(buf, sizeof(buf), "%s, %s", 
+                  id(location_city).state.c_str(), 
+                  id(location_state).state.c_str());
+                return buf;
+              }
+              if (!isnan(id(location_latitude).state) && !isnan(id(location_longitude).state)) {
+                static char buf[32];
+                snprintf(buf, sizeof(buf), "%.4f, %.4f", 
+                  id(location_latitude).state, 
+                  id(location_longitude).state);
+                return buf;
+              }
+              return "-- , --";
+
+  - platform: homeassistant
+    id: location_longitude
+    entity_id: sensor.location_longitude
+
   - platform: homeassistant
     id: interior_temp
     entity_id: sensor.interior_temperature
@@ -52,7 +155,7 @@ sensor:
         - lvgl.label.update:
             id: interior_temp_label
             text: !lambda |-
-              return (to_string(x) + "°C").c_str();
+              return (to_string(x) + "ï¿½C").c_str();
 
   - platform: homeassistant
     id: exterior_temp
@@ -62,7 +165,7 @@ sensor:
         - lvgl.label.update:
             id: exterior_temp_label
             text: !lambda |-
-              return (to_string(x) + "°C").c_str();
+              return (to_string(x) + "ï¿½C").c_str();
 
   - platform: homeassistant
     id: interior_humidity
@@ -119,12 +222,40 @@ text_sensor:
     id: longitude
     entity_id: zone.home
     attribute: longitude
+
+  - platform: homeassistant
+    id: location_city
+    entity_id: sensor.location_city
     on_value:
       then:
         - lvgl.label.update:
-            id: latlon_label
+            id: lbl_status_location
             text: !lambda |-
-              return ("Lat: " + id(latitude).state + " Lon: " + x).c_str();
+              if (!id(location_city).state.empty() && !id(location_state).state.empty()) {
+                static char buf[64];
+                snprintf(buf, sizeof(buf), "%s, %s", 
+                  id(location_city).state.c_str(), 
+                  id(location_state).state.c_str());
+                return buf;
+              }
+              return "-- , --";
+
+  - platform: homeassistant
+    id: location_state
+    entity_id: sensor.location_state
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: lbl_status_location
+            text: !lambda |-
+              if (!id(location_city).state.empty() && !id(location_state).state.empty()) {
+                static char buf[64];
+                snprintf(buf, sizeof(buf), "%s, %s", 
+                  id(location_city).state.c_str(), 
+                  id(location_state).state.c_str());
+                return buf;
+              }
+              return "-- , --";
 
 switch:
   - platform: homeassistant
@@ -137,72 +268,84 @@ light:
     entity_id: light.cabin
 
 lvgl:
-  widgets:
-    - label:
-        align: CENTER
-        text: 'Hello World!'
-
-lvgl:
   theme:
     preset: default
+  text_font: segoeui_16
 
-  widgets:
+  pages:
+    - id: main_page
+      scrollbar_mode: "OFF"
+      widgets:
+        # Status Bar - at top of main page
+        - obj:
+            id: status_bar
+            width: 100%
+            height: 30
+            align: TOP_MID
+            x: 0
+            y: 0
+            border_width: 0
+            radius: 0
+            pad_all: 3
+            widgets:
+              # Left side: Location
+              - label:
+                  id: lbl_status_location
+                  align: LEFT_MID
+                  x: 5
+                  text_font: segoeui_20
+                  text: "-"
 
-    # -----------------------------
-    # TITLE BAR
-    # -----------------------------
-    - label:
-        id: title_label
-        text: "Dashboard"
-        align: TOP_MID
-        y: 5
+              # Center: Date
+              - label:
+                  id: lbl_status_date
+                  align: CENTER
+                  x: 0
+                  y: 0
+                  text_font: segoeui_20
+                  text: "-- --, ----"
 
-    - label:
-        id: time_label
-        text: "--:--"
-        align: TOP_LEFT
-        x: 5
-        y: 30
+              # Right side container with flex layout
+              - obj:
+                  id: status_icons_container
+                  align: RIGHT_MID
+                  x: 0
+                  y: 0
+                  width: SIZE_CONTENT
+                  height: 100%
+                  bg_opa: TRANSP
+                  border_width: 0
+                  pad_all: 0
+                  layout:
+                    type: FLEX
+                    flex_flow: ROW_REVERSE
+                    flex_align_main: START
+                    flex_align_cross: CENTER
+                    pad_column: 5
+                  widgets:
+                    # Home Assistant status (rightmost)
+                    - label:
+                        id: lbl_ha_status
+                        text_font: homeassistant_icons
+                        text: "\U000F0F21"
 
-    - label:
-        id: date_label
-        text: "---- --, ----"
-        align: TOP_LEFT
-        x: 5
-        y: 50
+                    # WiFi status
+                    - label:
+                        id: lbl_wifi_status
+                        text_font: wifi_icons
+                        text: "\U000F05AA"
 
-    - label:
-        id: location_label
-        text: "Location"
-        align: TOP_RIGHT
-        x: -5
-        y: 30
+        # -----------------------------
+        # INTERIOR / EXTERIOR DATA
+        # -----------------------------
+        - label:
+            id: interior_temp_label
+            text: "--Â°C"
+            align: LEFT_MID
+            x: 10
+            y: -40
 
-    - label:
-        id: latlon_label
-        text: "Lat: -- Lon: --"
-        align: TOP_RIGHT
-        x: -5
-        y: 55
-
-    - label:
-        id: wifi_label
-        text: "WiFi: Connected"
-        align: TOP_LEFT
-        x: 5
-        y: 55
-
-    # -----------------------------
-    # INTERIOR / EXTERIOR DATA
-    # -----------------------------
-    - label:
-        id: interior_temp_label
-        text: "--°C"
-        align: LEFT_MID
-        x: 10
-        y: -40
-
-    - label:
+        - label:
         id: interior_humidity_label
         text: "--%"
         align: LEFT_MID
@@ -211,7 +354,7 @@ lvgl:
 
     - label:
         id: exterior_temp_label
-        text: "--°C"
+        text: "--ï¿½C"
         align: LEFT_MID
         x: 10
         y: 40
@@ -311,29 +454,3 @@ globals:
 #       then:
 #         - lambda: |-
 #             id(screen_on) = false;
-
-# -----------------------------
-# TIME UPDATES
-# -----------------------------
-interval:
-  - interval: 60s
-    then:
-      - if:
-          condition:
-            lambda: 'return id(screen_on);'
-          then:
-            - lvgl.label.update:
-                id: time_label
-                text: !lambda |-
-                  char buf[16];
-                  time_t now = ::time(nullptr);
-                  strftime(buf, sizeof(buf), "%H:%M", localtime(&now));
-                  return std::string(buf).c_str();
-
-            - lvgl.label.update:
-                id: date_label
-                text: !lambda |-
-                  char buf[32];
-                  time_t now = ::time(nullptr);
-                  strftime(buf, sizeof(buf), "%a, %b %d %Y", localtime(&now));
-                  return std::string(buf).c_str();
