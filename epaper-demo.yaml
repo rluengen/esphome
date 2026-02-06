@@ -152,6 +152,7 @@ script:
           level: INFO
           format: "[DISPLAY] Updating battery sensors"
       - component.update: battery_voltage
+      - component.update: sht4x_component
       - delay: 200ms
       # Wait for battery voltage to be valid
       - wait_until:

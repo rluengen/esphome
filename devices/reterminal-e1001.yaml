@@ -64,7 +64,7 @@ sensor:
     pin: GPIO1
     name: "Battery Voltage"
     id: battery_voltage
-    update_interval: 300s
+    update_interval: never
     attenuation: 12db
     filters:
       - multiply: 2.0  # Voltage divider compensation
@@ -105,7 +105,7 @@ sensor:
       name: "Humidity"
       id: sht4x_humidity
     address: 0x44
-    update_interval:
+    update_interval: never
 
 light:
   - platform: binary
