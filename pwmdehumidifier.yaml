@@ -543,9 +543,10 @@ interval:
             if (id(deep_sleep_enable).state && !id(prevent_sleep).state && id(low_humidity_count) >= 2) {
               int sleep_mins = (int)id(sleep_duration_min).state;
               ESP_LOGI("dehumidifier", "Entering deep sleep for %d minutes", sleep_mins);
+
               // Set fan PWM high before sleep (high duty = low/off fan speed for 4-pin PWM fans)
               // Then hold the GPIO state during deep sleep
-              id(fan_pwm).set_level(1.0f);
+              id(fan_pwm).set_level(0.0f);
               gpio_hold_en(GPIO_NUM_1);  // Hold fan PWM pin (GPIO1) state during deep sleep
               gpio_deep_sleep_hold_en();  // Enable GPIO hold during deep sleep
               id(deep_sleep_control).set_sleep_duration(sleep_mins * 60000);  // Convert to ms

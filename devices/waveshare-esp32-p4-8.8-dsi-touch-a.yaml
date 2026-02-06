@@ -1,0 +1,148 @@
+# ESPHome config for Waveshare 8.8-DSI-TOUCH-A on ESP32-P4
+# Uses MIPI-DSI display with LVGL and a centered "hello world" label
+
+substitutions:
+  device_name: waveshare-88-dsi
+  friendly_name: Waveshare 8.8" DSI
+
+# added for debugging
+web_server:
+  port: 80
+
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
+
+esp32:
+  board: esp32-p4-evboard
+  variant: esp32p4
+  flash_size: 16MB
+  framework:
+    type: esp-idf
+
+# Required for MIPI-DSI display
+psram:
+  mode: hex
+  speed: 200MHZ
+
+# LDO for MIPI-DSI PHY - required for display to initialize
+esp_ldo:
+  - voltage: 2.5V
+    channel: 3
+
+logger:
+  level: INFO
+
+# I2C for GT911 Touchscreen and panel/backlight MCU
+# ESP32-P4 EVBoard default I2C used here
+i2c:
+  sda: GPIO7
+  scl: GPIO8
+  frequency: 400kHz
+  scan: true
+
+# I2C device for panel/backlight control (address 0x45)
+i2c_device:
+  - address: 0x45
+    id: display_backlight_i2c
+
+# Backlight brightness control as a light
+output:
+  - platform: template
+    id: backlight_output
+    type: float
+    write_action:
+      - lambda: |-
+          // Write to BOTH brightness registers to cover panel variants
+          uint8_t brightness = (uint8_t)(state * 255);
+          uint8_t inverted = 255 - brightness;  // 0xab uses inverted brightness
+          // ESP32-P4 style (register 0x96, direct 0-255)
+          id(display_backlight_i2c).write_byte(0x96, brightness);
+          // RPi style (register 0xab inverted + 0xaa latch)
+          id(display_backlight_i2c).write_byte(0xab, inverted);
+          id(display_backlight_i2c).write_byte(0xaa, 0x01);
+
+light:
+  - platform: monochromatic
+    name: "Display Backlight"
+    id: display_backlight
+    output: backlight_output
+    default_transition_length: 250ms
+    restore_mode: ALWAYS_ON
+
+# Diagnostic: toggle MIPI enable register and log I2C ACK
+switch:
+  - platform: template
+    name: "Panel MIPI Enable (0xAD)"
+    id: panel_mipi_enable
+    turn_on_action:
+      - lambda: |-
+          bool ack = id(display_backlight_i2c).write_byte(0xad, 0x01);
+          ESP_LOGI("panel_diag", "Wrote 0xAD=0x01 (MIPI enable), ACK: %s", ack ? "YES" : "NO");
+    turn_off_action:
+      - lambda: |-
+          bool ack = id(display_backlight_i2c).write_byte(0xad, 0x00);
+          ESP_LOGI("panel_diag", "Wrote 0xAD=0x00 (MIPI disable), ACK: %s", ack ? "YES" : "NO");
+
+# MIPI-DSI Display - Waveshare 8.8" (480x1920 portrait)
+display:
+  - platform: mipi_dsi
+    id: dsi_display
+    model: CUSTOM
+    rotation: 0
+    dimensions:
+      width: 480
+      height: 1920
+    lanes: 2
+    color_order: rgb
+    hsync_front_porch: 50
+    hsync_pulse_width: 50
+    hsync_back_porch: 50
+    vsync_front_porch: 20
+    vsync_pulse_width: 20
+    vsync_back_porch: 20
+    pclk_frequency: 83333000
+    lane_bit_rate: 800Mbps
+    color_depth: 16
+    pixel_mode: 16bit
+    init_sequence:
+      - [0x11, 120]  # Sleep out
+      - [0x29, 20]   # Display on
+
+# Periodic diagnostics: confirm backlight writes and read MCU status
+interval:
+  - interval: 20s
+    then:
+      - lambda: |-
+          float b = id(display_backlight).current_values.get_brightness();
+          uint8_t brightness = (uint8_t)(b * 255);
+          uint8_t inverted = 255 - brightness;
+          bool ack_ab = id(display_backlight_i2c).write_byte(0xab, inverted);
+          bool ack_aa = id(display_backlight_i2c).write_byte(0xaa, 0x01);
+          uint8_t status = 0;
+          id(display_backlight_i2c).read_byte(0x80, &status);
+          ESP_LOGI("panel_diag", "Backlight 0xAB/0xAA ACK: %s/%s, MCU status 0x80: 0x%02X", ack_ab ? "YES" : "NO", ack_aa ? "YES" : "NO", status);
+
+# GT911 Touchscreen in polling mode
+touchscreen:
+  - platform: gt911
+    id: dsi_touchscreen
+    update_interval: 50ms
+
+# LVGL configuration with a centered "hello world" label
+lvgl:
+  displays:
+    - dsi_display
+  touchscreens:
+    - dsi_touchscreen
+  color_depth: 16
+  buffer_size: 100%
+  byte_order: little_endian
+  pages:
+    - id: main_page
+      widgets:
+        - label:
+            text: "hello world"
+            align: CENTER
+            text_font: montserrat_48
+            text_color: 0xFFFFFF

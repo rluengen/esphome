@@ -157,7 +157,6 @@ light:
                        id(main_can_lights).current_values.get_brightness() * 100);
             }
 
-
   - platform: monochromatic
     id: bed_can_lights
     name: "Bed Can Lights"
