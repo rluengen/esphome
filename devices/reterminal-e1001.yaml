@@ -15,14 +15,14 @@ i2c:
   scan: false
 
 binary_sensor:
-  - platform: gpio
-    pin:
-      number: GPIO3         # Green button
-      mode: INPUT_PULLUP
-      inverted: true
-      ignore_strapping_warning: true
-    id: button_green
-    name: "Green Button"
+  # - platform: gpio
+  #   pin:
+  #     number: GPIO3         # Green button
+  #     mode: INPUT_PULLUP
+  #     inverted: true
+  #     ignore_strapping_warning: true
+  #   id: button_green
+  #   name: "Green Button"
 
   - platform: gpio
     pin:

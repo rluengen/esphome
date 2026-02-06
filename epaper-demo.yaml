@@ -11,7 +11,7 @@ substitutions:
   friendly_name: "Terminal Display"
   project_version: "1.0.0"
   log_level: DEBUG
-  sleep_duration: 1min
+  sleep_duration: 15min
 
 packages:
   remote_packages:
@@ -306,23 +306,37 @@ script:
       - lvgl.label.update:
           id: lbl_interior_temp
           text: !lambda |-
-            if (isnan(id(interior_temp).state)) return "--°";
+            if (isnan(id(sht4x_temperature).state)) return "--°";
             static char buf[16];
-            snprintf(buf, sizeof(buf), "%.1f°", id(interior_temp).state);
+            float temp = id(sht4x_temperature).state;
+            bool use_f = (id(temp_unit_select).state == "F");
+            if (use_f) {
+              temp = temp * 9.0f / 5.0f + 32.0f;
+              snprintf(buf, sizeof(buf), "%.1f°F", temp);
+            } else {
+              snprintf(buf, sizeof(buf), "%.1f°C", temp);
+            }
             return buf;
       - lvgl.label.update:
           id: lbl_interior_humidity
           text: !lambda |-
-            if (isnan(id(interior_humidity).state)) return "--%";
+            if (isnan(id(sht4x_humidity).state)) return "--%";
             static char buf[16];
-            snprintf(buf, sizeof(buf), "%.0f%%", id(interior_humidity).state);
+            snprintf(buf, sizeof(buf), "%.0f%%", id(sht4x_humidity).state);
             return buf;
       - lvgl.label.update:
           id: lbl_fridge_temp
           text: !lambda |-
             if (isnan(id(fridge_temp).state)) return "--°";
             static char buf[16];
-            snprintf(buf, sizeof(buf), "%.1f°", id(fridge_temp).state);
+            float temp = id(fridge_temp).state;
+            bool use_f = (id(temp_unit_select).state == "F");
+            if (use_f) {
+              temp = temp * 9.0f / 5.0f + 32.0f;
+              snprintf(buf, sizeof(buf), "%.1f°F", temp);
+            } else {
+              snprintf(buf, sizeof(buf), "%.1f°C", temp);
+            }
             return buf;
       # Air quality widgets
       - lvgl.label.update:
@@ -1163,6 +1177,8 @@ lvgl:
 deep_sleep:
   id: deep_sleep_id
   sleep_duration: ${sleep_duration}
+  wakeup_pin: GPIO3
+  wakeup_pin_mode: INVERT_WAKEUP
 
 sensor:
   # Override battery sensors to use manual updates only
@@ -1223,22 +1239,6 @@ sensor:
             ESP_LOGI("HA_SENSOR", "vehicle_battery updated: %.1f%%", x);
 
   - platform: homeassistant
-    id: interior_temp
-    entity_id: sensor.interior_temperature  # Change to your actual entity_id
-    on_value:
-      then:
-        - lambda: |-
-            ESP_LOGI("HA_SENSOR", "interior_temp updated: %.1f", x);
-
-  - platform: homeassistant
-    id: interior_humidity
-    entity_id: sensor.interior_humidity  # Change to your actual entity_id
-    on_value:
-      then:
-        - lambda: |-
-            ESP_LOGI("HA_SENSOR", "interior_humidity updated: %.1f%%", x);
-
-  - platform: homeassistant
     id: air_co2
     entity_id: sensor.air_quality_co2  # TODO: Change to your actual CO2 entity
     on_value:
@@ -1285,6 +1285,18 @@ sensor:
       then:
         - lambda: |-
             ESP_LOGI("HA_SENSOR", "water_level updated: %.1f%%", x);
+
+select:
+  - platform: template
+    id: temp_unit_select
+    name: "Temperature Unit"
+    optimistic: true
+    restore_value: true
+    options:
+      - "C"
+      - "F"
+    initial_option: "F"
+    icon: "mdi:thermometer"
 
 display:
   - id: !extend epaper_display
