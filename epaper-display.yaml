@@ -22,6 +22,8 @@ packages:
       - path: packages/common.yaml
         vars:
           api_encryption_key: !secret encryption_key
+      - path: packages/time/homeassistant.yaml
+      - path: packages/time/sntp.yaml
       - path: packages/network/wifi.yaml
         vars:
           wifi_ssid: !secret wifi_ssid
@@ -32,27 +34,6 @@ packages:
       - path: packages/icons/homeassistant_icons.yaml
       - path: devices/reterminal-e1001.yaml
 
-# Time configuration - Home Assistant primary, SNTP fallback
-time:
-  - platform: homeassistant
-    id: time_entity
-    on_time_sync:
-      then:
-        - logger.log:
-            level: INFO
-            format: "[TIME] Synchronized with Home Assistant"
-
-  - platform: sntp
-    id: time_sntp
-    servers:
-      - 0.pool.ntp.org
-      - 1.pool.ntp.org
-      - 2.pool.ntp.org
-    on_time_sync:
-      then:
-        - logger.log:
-            level: INFO
-            format: "[TIME] Synchronized with SNTP"
 
 esphome:
   name: ${device_name}
@@ -133,12 +114,12 @@ script:
           format: "[DISPLAY] Waiting for time sync..."
       - wait_until:
           condition:
-            lambda: 'return id(time_entity).now().is_valid() || id(time_sntp).now().is_valid();'
+            lambda: 'return id(ha_time).now().is_valid() || id(sntp_time).now().is_valid();'
           timeout: 30s
       - lambda: |-
-          if (id(time_entity).now().is_valid()) {
+          if (id(ha_time).now().is_valid()) {
             ESP_LOGI("DISPLAY", "Time valid from Home Assistant");
-          } else if (id(time_sntp).now().is_valid()) {
+          } else if (id(sntp_time).now().is_valid()) {
             ESP_LOGI("DISPLAY", "Time valid from SNTP");
           } else {
             ESP_LOGW("DISPLAY", "Time sync timeout - proceeding anyway");
@@ -199,10 +180,10 @@ script:
       - lvgl.label.update:
           id: lbl_status_date
           text: !lambda |-
-            auto time = id(time_entity).now();
+            auto time = id(ha_time).now();
             if (!time.is_valid()) {
-              ESP_LOGI("DISPLAY", "[TIME] time_entity is invalid, falling back to sntp");
-              time = id(time_sntp).now();
+              ESP_LOGI("DISPLAY", "[TIME] ha_time is invalid, falling back to sntp_time");
+              time = id(sntp_time).now();
             }
 
             if (time.is_valid()) {

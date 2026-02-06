@@ -35,11 +35,6 @@ packages:
       - path: packages/icons/battery_icons.yaml
       - path: packages/icons/homeassistant_icons.yaml
 
-#      - path: packages/home_assistant_light.yaml
-#        vars:
-#          light_id: rear_can_lights
-#          entity_id: light.rear_can_lights
-
 esphome:
   name: ${device_name}
   friendly_name: ${friendly_name}
@@ -98,15 +93,6 @@ lvgl:
   top_layer:
     widgets:
       - label:
-          id: battery_icon
-          align: TOP_LEFT
-          x: 5
-          y: 30
-          text: "\U000F05A8"  # mdi:battery
-          text_font: battery_icons
-          text_color: 0xFFFFFF
-
-      - label:
           id: wifi_icon
           align: TOP_LEFT
           x: 5
@@ -115,15 +101,6 @@ lvgl:
           text_font: battery_icons
           text_color: 0xFFFFFF
 
-      # - label:
-      #     id: wifi_signal_label
-      #     align: TOP_LEFT
-      #     x: 25
-      #     y: 5
-      #     text: "-"
-      #     text_font: segoeui_16
-      #     text_color: 0x00FF00
-      
       - label:
           id: ha_status_icon
           align: TOP_RIGHT
@@ -133,87 +110,357 @@ lvgl:
           text_font: homeassistant_icons
           text_color: 0xFFFFFF
 
+      # Stationary brightness arc overlay (non-interactive, transparent background)
+      - arc:
+          id: brightness_arc
+          align: CENTER
+          x: 0
+          y: 0
+          clickable: false
+          bg_opa: TRANSP
+          arc_color: 0x444444
+          arc_width: 12
+          min_value: 0
+          max_value: 100
+          value: 0
+          adjustable: false
+          radius: 90
+          indicator:
+            arc_color: 0xFFC107
+            arc_width: 14
+
   pages:
     - id: main_page
       widgets:
-        # Circular arc showing brightness level (0-100%)
-        - arc:
-            id: brightness_arc
-            align: CENTER
-            x: 0
-            y: 0
-            arc_color: 0x444444
-            arc_width: 12
-            min_value: 0
-            max_value: 100
-            value: 0
-            adjustable: false
-            bg_color: 0x222222
-            bg_opa: COVER
-            radius: 90
-            indicator:
-              arc_color: 0xFFDD44
-              arc_width: 14
+        # Swipeable TileView (no headers; swipe horizontally between tiles)
+        - tileview:
+            id: light_tiles
+            tiles:
+              - id: tile_all_lights
+                row: 0
+                column: 0
+                dir: HOR
+                widgets:
+                  - label:
+                      id: tile_all_lights_icon
+                      align: CENTER
+                      x: 0
+                      y: -35
+                      text: "\U000F0335"
+                      text_font: mdi_icons_large
+                      text_color: 0xFFFFFF
+                  - label:
+                      id: tile_all_lights_name
+                      align: CENTER
+                      x: 0
+                      y: 10
+                      text: "All Lights"
+                      text_font: segoeui_16
+                      text_color: 0xFFFFFF
+                  - label:
+                      id: tile_all_lights_pct
+                      align: CENTER
+                      x: 0
+                      y: 40
+                      text: "%"
+                      text_font: segoeui_16
+                      text_color: 0xFFDD44
 
-        # Light icon (centered, above name)
-        - label:
-            id: light_icon_label
-            align: CENTER
-            x: 0
-            y: -35
-            text: "\U000F0335"  # mdi:lightbulb as default
-            text_font: mdi_icons_large
-            text_color: 0xFFFFFF
+              - id: tile_bed_interior
+                row: 0
+                column: 1
+                dir: HOR
+                widgets:
+                  - label:
+                      id: tile_bed_interior_icon
+                      align: CENTER
+                      x: 0
+                      y: -35
+                      text: "\U000F0335"
+                      text_font: mdi_icons_large
+                      text_color: 0xFFFFFF
+                  - label:
+                      id: tile_bed_interior_name
+                      align: CENTER
+                      x: 0
+                      y: 10
+                      text: "Bed Interior"
+                      text_font: segoeui_16
+                      text_color: 0xFFFFFF
+                  - label:
+                      id: tile_bed_interior_pct
+                      align: CENTER
+                      x: 0
+                      y: 40
+                      text: "%"
+                      text_font: segoeui_16
+                      text_color: 0xFFDD44
 
-        # Light name (centered)
-        - label:
-            id: light_name_label
-            align: CENTER
-            x: 0
-            y: 10
-            text: "Living Room"
-            text_font: segoeui_16
-            text_color: 0xFFFFFF
+              - id: tile_main_can
+                row: 0
+                column: 2
+                dir: HOR
+                widgets:
+                  - label:
+                      id: tile_main_can_icon
+                      align: CENTER
+                      x: 0
+                      y: -35
+                      text: "\U000F0335"
+                      text_font: mdi_icons_large
+                      text_color: 0xFFFFFF
+                  - label:
+                      id: tile_main_can_name
+                      align: CENTER
+                      x: 0
+                      y: 10
+                      text: "Main Can"
+                      text_font: segoeui_16
+                      text_color: 0xFFFFFF
+                  - label:
+                      id: tile_main_can_pct
+                      align: CENTER
+                      x: 0
+                      y: 40
+                      text: "%"
+                      text_font: segoeui_16
+                      text_color: 0xFFDD44
 
-        # Brightness percentage (centered, below name)
-        - label:
-            id: brightness_pct_label
-            align: CENTER
-            x: 0
-            y: 40
-            text: "%"
-            text_font: segoeui_16
-            text_color: 0xFFDD44
+              - id: tile_bed_can
+                row: 0
+                column: 3
+                dir: HOR
+                widgets:
+                  - label:
+                      id: tile_bed_can_icon
+                      align: CENTER
+                      x: 0
+                      y: -35
+                      text: "\U000F0335"
+                      text_font: mdi_icons_large
+                      text_color: 0xFFFFFF
+                  - label:
+                      id: tile_bed_can_name
+                      align: CENTER
+                      x: 0
+                      y: 10
+                      text: "Bed Can"
+                      text_font: segoeui_16
+                      text_color: 0xFFFFFF
+                  - label:
+                      id: tile_bed_can_pct
+                      align: CENTER
+                      x: 0
+                      y: 40
+                      text: "%"
+                      text_font: segoeui_16
+                      text_color: 0xFFDD44
 
-        # Light selector roller (left side)
-        - roller:
-            id: light_roller
-            align: LEFT_MID
-            x: 10
-            y: 0
-            width: 140
-            height: 100
-            options:
-              - "All Lights"
-              - "Bed Interior"
-              - "Main Can"
-              - "Bed Can"
-              - "LED Capsule"
-              - "Exterior"
-              - "Door"
-              - "Dog Crate"
+              - id: tile_led_capsule
+                row: 0
+                column: 4
+                dir: HOR
+                widgets:
+                  - label:
+                      id: tile_led_capsule_icon
+                      align: CENTER
+                      x: 0
+                      y: -35
+                      text: "\U000F0335"
+                      text_font: mdi_icons_large
+                      text_color: 0xFFFFFF
+                  - label:
+                      id: tile_led_capsule_name
+                      align: CENTER
+                      x: 0
+                      y: 10
+                      text: "LED Capsule"
+                      text_font: segoeui_16
+                      text_color: 0xFFFFFF
+                  - label:
+                      id: tile_led_capsule_pct
+                      align: CENTER
+                      x: 0
+                      y: 40
+                      text: "%"
+                      text_font: segoeui_16
+                      text_color: 0xFFDD44
 
-        - obj:
-            align: RIGHT_MID
-            x: -10
-            y: 0
-            width: 60
-            height: 60
-            bg_opa: COVER
-            bg_color: 0x333333
-            border_width: 2
-            border_color: 0xFFDD44
-            radius: 30
+              - id: tile_exterior
+                row: 0
+                column: 5
+                dir: HOR
+                widgets:
+                  - label:
+                      id: tile_exterior_icon
+                      align: CENTER
+                      x: 0
+                      y: -35
+                      text: "\U000F0335"
+                      text_font: mdi_icons_large
+                      text_color: 0xFFFFFF
+                  - label:
+                      id: tile_exterior_name
+                      align: CENTER
+                      x: 0
+                      y: 10
+                      text: "Exterior"
+                      text_font: segoeui_16
+                      text_color: 0xFFFFFF
+                  - label:
+                      id: tile_exterior_pct
+                      align: CENTER
+                      x: 0
+                      y: 40
+                      text: "%"
+                      text_font: segoeui_16
+                      text_color: 0xFFDD44
+
+              - id: tile_door
+                row: 0
+                column: 6
+                dir: HOR
+                widgets:
+                  - label:
+                      id: tile_door_icon
+                      align: CENTER
+                      x: 0
+                      y: -35
+                      text: "\U000F0335"
+                      text_font: mdi_icons_large
+                      text_color: 0xFFFFFF
+                  - label:
+                      id: tile_door_name
+                      align: CENTER
+                      x: 0
+                      y: 10
+                      text: "Door"
+                      text_font: segoeui_16
+                      text_color: 0xFFFFFF
+                  - label:
+                      id: tile_door_pct
+                      align: CENTER
+                      x: 0
+                      y: 40
+                      text: "%"
+                      text_font: segoeui_16
+                      text_color: 0xFFDD44
+
+              - id: tile_dog_crate
+                row: 0
+                column: 7
+                dir: HOR
+                widgets:
+                  - label:
+                      id: tile_dog_crate_icon
+                      align: CENTER
+                      x: 0
+                      y: -35
+                      text: "\U000F0335"
+                      text_font: mdi_icons_large
+                      text_color: 0xFFFFFF
+                  - label:
+                      id: tile_dog_crate_name
+                      align: CENTER
+                      x: 0
+                      y: 10
+                      text: "Dog Crate"
+                      text_font: segoeui_16
+                      text_color: 0xFFFFFF
+                  - label:
+                      id: tile_dog_crate_pct
+                      align: CENTER
+                      x: 0
+                      y: 40
+                      text: "%"
+                      text_font: segoeui_16
+                      text_color: 0xFFDD44
+
+            on_value:
+              then:
+                - lambda: |-
+                    // Map visible tile to selected index and entity, compute brightness
+                    int idx = 0;
+                    if (tile == id(tile_all_lights)) idx = 0;
+                    else if (tile == id(tile_bed_interior)) idx = 1;
+                    else if (tile == id(tile_main_can)) idx = 2;
+                    else if (tile == id(tile_bed_can)) idx = 3;
+                    else if (tile == id(tile_led_capsule)) idx = 4;
+                    else if (tile == id(tile_exterior)) idx = 5;
+                    else if (tile == id(tile_door)) idx = 6;
+                    else if (tile == id(tile_dog_crate)) idx = 7;
+                    id(selected_light_index) = idx;
+                    auto pct_from_attr = [](float attr) -> int {
+                      if (isnan(attr)) return 0;
+                      int v = (int)roundf((attr / 255.0f) * 100.0f);
+                      if (v < 0) v = 0; if (v > 100) v = 100; return v;
+                    };
+                    int brightness = 0;
+                    switch (idx) {
+                      case 0:
+                        brightness = pct_from_attr(id(light_all_lights_brightness).state);
+                        id(dial_selected_light).publish_state("light.all_lights");
+                        id(selected_entity) = std::string("light.all_lights");
+                        break;
+                      case 1:
+                        brightness = pct_from_attr(id(light_bed_interior_lights_brightness).state);
+                        id(dial_selected_light).publish_state("light.bed_interior_lights");
+                        id(selected_entity) = std::string("light.bed_interior_lights");
+                        break;
+                      case 2:
+                        brightness = pct_from_attr(id(light_main_can_lights_brightness).state);
+                        id(dial_selected_light).publish_state("light.main_can_lights");
+                        id(selected_entity) = std::string("light.main_can_lights");
+                        break;
+                      case 3:
+                        brightness = pct_from_attr(id(light_bed_can_lights_brightness).state);
+                        id(dial_selected_light).publish_state("light.bed_can_lights");
+                        id(selected_entity) = std::string("light.bed_can_lights");
+                        break;
+                      case 4:
+                        brightness = pct_from_attr(id(light_cwww_led_capsule_lights_brightness).state);
+                        id(dial_selected_light).publish_state("light.cwww_led_capsule_lights");
+                        id(selected_entity) = std::string("light.cwww_led_capsule_lights");
+                        break;
+                      case 5:
+                        brightness = pct_from_attr(id(light_exterior_lights_brightness).state);
+                        id(dial_selected_light).publish_state("light.exterior_lights");
+                        id(selected_entity) = std::string("light.exterior_lights");
+                        break;
+                      case 6:
+                        brightness = pct_from_attr(id(light_door_light_brightness).state);
+                        id(dial_selected_light).publish_state("light.door_light");
+                        id(selected_entity) = std::string("light.door_light");
+                        break;
+                      case 7:
+                        brightness = pct_from_attr(id(light_cwww_led_dog_crate_lights_brightness).state);
+                        id(dial_selected_light).publish_state("light.cwww_led_dog_crate_lights");
+                        id(selected_entity) = std::string("light.cwww_led_dog_crate_lights");
+                        break;
+                      default:
+                        brightness = 0;
+                        break;
+                    }
+                    id(current_brightness) = brightness;
+                    ESP_LOGI("tileview", "Selected idx=%d entity=%s brightness=%d%%", id(selected_light_index), id(selected_entity).c_str(), id(current_brightness));
+                - lvgl.arc.update:
+                    id: brightness_arc
+                    value: !lambda 'return id(current_brightness);'
+                - lambda: |-
+                    // Update the visible tile percent label
+                    int idx = id(selected_light_index);
+                    char buf[8]; snprintf(buf, sizeof(buf), "%d%%", id(current_brightness));
+                    switch (idx) {
+                      case 0: id(tile_all_lights_pct).set_text(buf); break;
+                      case 1: id(tile_bed_interior_pct).set_text(buf); break;
+                      case 2: id(tile_main_can_pct).set_text(buf); break;
+                      case 3: id(tile_bed_can_pct).set_text(buf); break;
+                      case 4: id(tile_led_capsule_pct).set_text(buf); break;
+                      case 5: id(tile_exterior_pct).set_text(buf); break;
+                      case 6: id(tile_door_pct).set_text(buf); break;
+                      case 7: id(tile_dog_crate_pct).set_text(buf); break;
+                      default: break;
+                    }
 
 select:
   - platform: template
@@ -260,57 +507,54 @@ globals:
 script:
   - id: restore_roller_position
     then:
-      # - lambda: |-
-      #     // Sync roller with saved selection
-      #     auto index = id(dial_selected_light).active_index();
-      #     if (index.has_value()) {
-      #       id(light_roller).set_selected_index(index.value());
-      #     }
+      - lvgl.tileview.select:
+          id: light_tiles
+          row: 0
+          column: !lambda 'return id(selected_light_index);'
+          animated: false
       - script.execute: update_light_display
 
   - id: update_light_display
     then:
       - lambda: |-
-          // before we update the lvgl widget, we need to ensure that current_brightness
-          // we need to read the brightness of the currently selected light.
-          auto index = id(dial_selected_light).active_index();
-          if (index.has_value()) {
-
-            auto selected_option = id(dial_selected_light).at(index.value());
-
-            int brightness = 0;
-            // TODO:
-            // if (strcmp(selected_option.c_str(), "light.all_lights") == 0) {
-            //     brightness = (int)roundf((id(light_all_lights_brightness).state / 255.0f) * 100.0f);
-            // } else if (strcmp(selected_option.c_str(), "light.bed_interior_lights") == 0) {
-            //     brightness = (int)roundf((id(light_bed_interior_lights_brightness).state / 255.0f) * 100.0f);
-            // } else if (strcmp(selected_option.c_str(), "light.main_can_lights") == 0) {
-            //     brightness = (int)roundf((id(light_main_can_lights_brightness).state / 255.0f) * 100.0f);
-            // } else if (strcmp(selected_option.c_str(), "light.bed_can_lights") == 0) {
-            //     brightness = (int)roundf((id(light_bed_can_lights_brightness).state / 255.0f) * 100.0f);
-            // } else if (strcmp(selected_option.c_str(), "light.cwww_led_capsule_lights") == 0) {
-            //     brightness = (int)roundf((id(light_cwww_led_capsule_lights_brightness).state / 255.0f) * 100.0f);
-            // } else if (strcmp(selected_option.c_str(), "light.exterior_lights") == 0) {
-            //     brightness = (int)roundf((id(light_exterior_lights_brightness).state / 255.0f) * 100.0f);
-            // } else if (strcmp(selected_option.c_str(), "light.door_light") == 0) {
-            //     brightness = (int)roundf((id(light_door_light_brightness).state / 255.0f) * 100.0f);
-            // } else if (strcmp(selected_option.c_str(), "light.cwww_led_dog_crate_lights") == 0) {
-            //     brightness = (int)roundf((id(light_cwww_led_dog_crate_lights_brightness).state / 255.0f) * 100.0f);
-            // } else {
-            //     brightness = 0;
-            // }
-
-            id(current_brightness) = brightness;
-            
-            // Update the icon sensor to track the currently selected light
-            // TODO: id(selected_light_icon).set_entity_id(selected_option.c_str());
+          // Compute brightness based on currently selected tab index
+          int idx = id(selected_light_index);
+          auto pct_from_attr = [](float attr) -> int {
+            if (isnan(attr)) return 0;
+            int v = (int)roundf((attr / 255.0f) * 100.0f);
+            if (v < 0) v = 0; if (v > 100) v = 100; return v;
+          };
+          int brightness = 0;
+          switch (idx) {
+            case 0: brightness = pct_from_attr(id(light_all_lights_brightness).state); break;
+            case 1: brightness = pct_from_attr(id(light_bed_interior_lights_brightness).state); break;
+            case 2: brightness = pct_from_attr(id(light_main_can_lights_brightness).state); break;
+            case 3: brightness = pct_from_attr(id(light_bed_can_lights_brightness).state); break;
+            case 4: brightness = pct_from_attr(id(light_cwww_led_capsule_lights_brightness).state); break;
+            case 5: brightness = pct_from_attr(id(light_exterior_lights_brightness).state); break;
+            case 6: brightness = pct_from_attr(id(light_door_light_brightness).state); break;
+            case 7: brightness = pct_from_attr(id(light_cwww_led_dog_crate_lights_brightness).state); break;
+            default: brightness = 0; break;
           }
-
-          // Update LVGL widgets
-          // TODO: id(brightness_arc).set_value(id(current_brightness));
-          // char buf[8];
-          // snprintf(buf, sizeof(buf), "%d%%", id(current_brightness));
-          // id(brightness_pct_label).set_text(buf);
+          id(current_brightness) = brightness;
+          ESP_LOGI("ui", "update_light_display idx=%d -> %d%%", id(selected_light_index), id(current_brightness));
+      - lvgl.arc.update:
+          id: brightness_arc
+          value: !lambda 'return id(current_brightness);'
+      - lambda: |-
+          // Update visible tab percent label text
+          char buf[8]; snprintf(buf, sizeof(buf), "%d%%", id(current_brightness));
+          switch (id(selected_light_index)) {
+            case 0: id(tile_all_lights_pct).set_text(buf); break;
+            case 1: id(tile_bed_interior_pct).set_text(buf); break;
+            case 2: id(tile_main_can_pct).set_text(buf); break;
+            case 3: id(tile_bed_can_pct).set_text(buf); break;
+            case 4: id(tile_led_capsule_pct).set_text(buf); break;
+            case 5: id(tile_exterior_pct).set_text(buf); break;
+            case 6: id(tile_door_pct).set_text(buf); break;
+            case 7: id(tile_dog_crate_pct).set_text(buf); break;
+            default: break;
+          }
 
   - id: increase_light_brightness
     then:
@@ -334,22 +578,26 @@ script:
           condition:
             lambda: 'return id(current_brightness) == 0;'
           then:
+            - lambda: |-
+                ESP_LOGI("ha", "Calling light.turn_off on %s", id(selected_entity).c_str());
             - homeassistant.service:
                 service: light.turn_off
                 data:
                   entity_id: !lambda 'return id(selected_entity);'
-          # else:
-          #   - homeassistant.service:
-          #       service: light.turn_on
-          #       data:
-          #         entity_id: !lambda 'return id(selected_entity);'
-          #         brightness: !lambda |-
-          #           // convert 0..100 -> 0..255 and clamp
-          #           int val = id(current_brightness);
-          #           int b = (int)(val * 255.0 / 100.0 + 0.5);
-          #           if (b < 1) b = 1;   // avoid sending 0
-          #           if (b > 255) b = 255;
-          #           return b;
+          else:
+            - lambda: |-
+                ESP_LOGI("ha", "Calling light.turn_on on %s brightness=%d%%", id(selected_entity).c_str(), id(current_brightness));
+            - homeassistant.service:
+                service: light.turn_on
+                data:
+                  entity_id: !lambda 'return id(selected_entity);'
+                  brightness: !lambda |
+                    // convert 0..100 -> 1..255 and clamp
+                    int val = id(current_brightness);
+                    int b = (int)(val * 255.0f / 100.0f + 0.5f);
+                    if (b < 1) b = 1;   // avoid sending 0
+                    if (b > 255) b = 255;
+                    return b;
 
 sensor:
   - id: !extend rotary_encoder_id

@@ -3,7 +3,9 @@
 
 time:
   - platform: homeassistant
-    id: time_entity
+    id: ha_time
     on_time_sync:
       then:
-        - logger.log: "Synchronized system clock"
+        - logger.log:
+            level: INFO
+            format: "[TIME] Synchronized with Home Assistant"

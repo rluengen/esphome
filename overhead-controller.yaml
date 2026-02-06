@@ -45,14 +45,14 @@ display:
 
 # Update date label when time changes (every minute)
 time:
-  - id: !extend time_entity
+  - id: !extend ha_time
     on_time:
       - seconds: 0
         then:
           - lvgl.label.update:
               id: lbl_status_date
               text: !lambda |-
-                auto time = id(time_entity).now();
+                auto time = id(ha_time).now();
                 if (time.is_valid()) {
                   static char buf[40];
                   snprintf(buf, sizeof(buf), "%s %s %d, %d", 

@@ -9,6 +9,10 @@ substitutions:
   project_version: "1.0.0"
   log_level: DEBUG
 
+# added for debugging
+web_server:
+  port: 80
+
 packages:
   remote_packages:
     url: https://github.com/rluengen/esphome

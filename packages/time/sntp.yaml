@@ -1,11 +1,13 @@
 # settings for a Simple Network Time Protocol (SNTP) client
 time:
   - platform: sntp
-    id: time_entity
+    id: sntp_time
     servers:
       - 0.pool.ntp.org
       - 1.pool.ntp.org
       - 2.pool.ntp.org
     on_time_sync:
       then:
-        - script.execute: update_presence_state
+        - logger.log:
+            level: INFO
+            format: "[TIME] Synchronized with SNTP"
