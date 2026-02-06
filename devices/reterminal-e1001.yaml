@@ -9,6 +9,11 @@ spi:
   clk_pin: GPIO7
   mosi_pin: GPIO9
 
+i2c:
+  sda: GPIO19
+  scl: GPIO20
+  scan: false
+
 binary_sensor:
   - platform: gpio
     pin:
@@ -90,6 +95,17 @@ sensor:
       - clamp:
           min_value: 0
           max_value: 100
+
+  - platform: sht4x
+    id: sht4x_component
+    temperature:
+      name: "Temperature"
+      id: sht4x_temperature
+    humidity:
+      name: "Humidity"
+      id: sht4x_humidity
+    address: 0x44
+    update_interval:
 
 light:
   - platform: binary
