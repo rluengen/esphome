@@ -511,7 +511,7 @@ globals:
 
   - id: selected_entity
     type: std::string
-    initial_value: "light.living_room"
+    initial_value: '"light.all_lights"'
     restore_value: yes
 
   - id: screen_is_off
