@@ -77,11 +77,21 @@ number:
 lvgl:
 # https://esphome.io/cookbook/lvgl/#turn-off-screen-when-idle
   on_idle:
-    timeout: 60s
+    timeout: 720s
     then:
-      - logger.log: "LVGL is idle"
-      - light.turn_off: display_backlight_id
-      - lvgl.pause:
+      - script.execute: put_display_to_sleep
+
+  on_resume:
+    then:
+      - if:
+          condition:
+            lambda: 'return id(screen_is_off);'
+          then:
+            - logger.log: "LVGL resumed - restoring backlight"
+            - lambda: |-
+                id(screen_is_off) = false;
+                id(wake_touch) = true;
+            - light.turn_on: display_backlight_id
 
   on_boot:
     then:
@@ -451,14 +461,14 @@ lvgl:
                     int idx = id(selected_light_index);
                     char buf[8]; snprintf(buf, sizeof(buf), "%d%%", id(current_brightness));
                     switch (idx) {
-                      case 0: id(tile_all_lights_pct).set_text(buf); break;
-                      case 1: id(tile_bed_interior_pct).set_text(buf); break;
-                      case 2: id(tile_main_can_pct).set_text(buf); break;
-                      case 3: id(tile_bed_can_pct).set_text(buf); break;
-                      case 4: id(tile_led_capsule_pct).set_text(buf); break;
-                      case 5: id(tile_exterior_pct).set_text(buf); break;
-                      case 6: id(tile_door_pct).set_text(buf); break;
-                      case 7: id(tile_dog_crate_pct).set_text(buf); break;
+                      case 0: lv_label_set_text(id(tile_all_lights_pct), buf); break;
+                      case 1: lv_label_set_text(id(tile_bed_interior_pct), buf); break;
+                      case 2: lv_label_set_text(id(tile_main_can_pct), buf); break;
+                      case 3: lv_label_set_text(id(tile_bed_can_pct), buf); break;
+                      case 4: lv_label_set_text(id(tile_led_capsule_pct), buf); break;
+                      case 5: lv_label_set_text(id(tile_exterior_pct), buf); break;
+                      case 6: lv_label_set_text(id(tile_door_pct), buf); break;
+                      case 7: lv_label_set_text(id(tile_dog_crate_pct), buf); break;
                       default: break;
                     }
 
@@ -480,14 +490,14 @@ select:
 
     set_action: # The action that should be performed when the remote (like Home Assistant’s frontend) requests to set the Select option
       - logger.log:
-          format: "Selected light option (remote): %s (index %d)"
-          args: ["x.c_str()", "i"]
+          format: "Selected light option (remote): %s"
+          args: ["x.c_str()"]
 
     on_value:
       then:
         - logger.log:
-            format: "Selected light option: %s (index %d)"
-            args: ["x.c_str()", "i"]
+            format: "Selected light option: %s"
+            args: ["x.c_str()"]
 
 globals:
   - id: current_brightness
@@ -503,6 +513,14 @@ globals:
     type: std::string
     initial_value: "light.living_room"
     restore_value: yes
+
+  - id: screen_is_off
+    type: bool
+    initial_value: "false"
+
+  - id: wake_touch
+    type: bool
+    initial_value: "false"
 
 script:
   - id: restore_roller_position
@@ -545,14 +563,14 @@ script:
           // Update visible tab percent label text
           char buf[8]; snprintf(buf, sizeof(buf), "%d%%", id(current_brightness));
           switch (id(selected_light_index)) {
-            case 0: id(tile_all_lights_pct).set_text(buf); break;
-            case 1: id(tile_bed_interior_pct).set_text(buf); break;
-            case 2: id(tile_main_can_pct).set_text(buf); break;
-            case 3: id(tile_bed_can_pct).set_text(buf); break;
-            case 4: id(tile_led_capsule_pct).set_text(buf); break;
-            case 5: id(tile_exterior_pct).set_text(buf); break;
-            case 6: id(tile_door_pct).set_text(buf); break;
-            case 7: id(tile_dog_crate_pct).set_text(buf); break;
+            case 0: lv_label_set_text(id(tile_all_lights_pct), buf); break;
+            case 1: lv_label_set_text(id(tile_bed_interior_pct), buf); break;
+            case 2: lv_label_set_text(id(tile_main_can_pct), buf); break;
+            case 3: lv_label_set_text(id(tile_bed_can_pct), buf); break;
+            case 4: lv_label_set_text(id(tile_led_capsule_pct), buf); break;
+            case 5: lv_label_set_text(id(tile_exterior_pct), buf); break;
+            case 6: lv_label_set_text(id(tile_door_pct), buf); break;
+            case 7: lv_label_set_text(id(tile_dog_crate_pct), buf); break;
             default: break;
           }
 
@@ -598,6 +616,95 @@ script:
                     if (b < 1) b = 1;   // avoid sending 0
                     if (b > 255) b = 255;
                     return b;
+
+  - id: put_display_to_sleep
+    then:
+      - if:
+          condition:
+            lambda: 'return !id(screen_is_off);'
+          then:
+            - logger.log: "Putting display to sleep"
+            - lambda: 'id(screen_is_off) = true;'
+            - light.turn_off: display_backlight_id
+            - lvgl.pause:
+
+  - id: toggle_selected_light
+    then:
+      - lambda: |-
+          ESP_LOGI("touch", "Toggle light: %s", id(selected_entity).c_str());
+      - homeassistant.service:
+          service: light.toggle
+          data:
+            entity_id: !lambda 'return id(selected_entity);'
+
+  - id: turn_on_selected_light
+    then:
+      - lambda: |-
+          ESP_LOGI("touch", "Turn ON light: %s", id(selected_entity).c_str());
+      - homeassistant.service:
+          service: light.turn_on
+          data:
+            entity_id: !lambda 'return id(selected_entity);'
+
+  - id: turn_off_selected_light
+    then:
+      - lambda: |-
+          ESP_LOGI("touch", "Turn OFF light: %s", id(selected_entity).c_str());
+      - homeassistant.service:
+          service: light.turn_off
+          data:
+            entity_id: !lambda 'return id(selected_entity);'
+
+interval:
+  - interval: 1s
+    then:
+      - lambda: |-
+          if (id(screen_is_off)) return;
+          uint32_t idle_ms = lv_disp_get_inactive_time(NULL);
+          uint32_t timeout_ms = (uint32_t)(id(display_timeout).state * 1000);
+          if (idle_ms >= timeout_ms) {
+            id(put_display_to_sleep).execute();
+          }
+
+binary_sensor:
+  - id: !extend touch_input
+    on_multi_click:
+      # Single tap: toggle the selected light (ignored if this is a wake touch)
+      - timing:
+          - ON for at most 500ms
+          - OFF for at least 350ms
+        then:
+          - if:
+              condition:
+                lambda: 'return id(wake_touch);'
+              then:
+                - lambda: 'id(wake_touch) = false;'
+                - logger.log: "Wake touch consumed - no action"
+              else:
+                - script.execute: toggle_selected_light
+
+      # Double tap: turn the light on
+      - timing:
+          - ON for at most 500ms
+          - OFF for at most 300ms
+          - ON for at most 500ms
+          - OFF for at least 350ms
+        then:
+          - lambda: 'id(wake_touch) = false;'
+          - script.execute: turn_on_selected_light
+
+      # Long press (2 seconds): turn the light off
+      - timing:
+          - ON for at least 2s
+        then:
+          - if:
+              condition:
+                lambda: 'return id(wake_touch);'
+              then:
+                - lambda: 'id(wake_touch) = false;'
+                - logger.log: "Wake long-press consumed - no action"
+              else:
+                - script.execute: turn_off_selected_light
 
 sensor:
   - id: !extend rotary_encoder_id

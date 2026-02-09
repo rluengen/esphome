@@ -403,9 +403,9 @@ script:
       - lvgl.label.update:
           id: lbl_fuel_range
           text: !lambda |-
-            if (isnan(id(fuel_range).state)) return "-- mi";
+            if (isnan(id(fuel_range_calculated).state)) return "-- mi";
             static char buf[16];
-            snprintf(buf, sizeof(buf), "%.0f mi", id(fuel_range).state);
+            snprintf(buf, sizeof(buf), "%.0f mi", id(fuel_range_calculated).state);
             return buf;
       - lvgl.label.update:
           id: lbl_def_value
@@ -420,9 +420,9 @@ script:
       - lvgl.label.update:
           id: lbl_def_range
           text: !lambda |-
-            if (isnan(id(def_range).state)) return "-- mi";
+            if (isnan(id(def_range_calculated).state)) return "-- mi";
             static char buf[16];
-            snprintf(buf, sizeof(buf), "%.0f mi", id(def_range).state);
+            snprintf(buf, sizeof(buf), "%.0f mi", id(def_range_calculated).state);
             return buf;
       - lvgl.label.update:
           id: lbl_vehicle_battery_value
@@ -1369,6 +1369,22 @@ sensor:
         - lambda: |-
             ESP_LOGI("HA_SENSOR", "fuel_range updated: %.0f mi", x);
 
+  # Calculated fuel range based on local percentage and calibration
+  - platform: template
+    id: fuel_range_calculated
+    name: "${friendly_name} Fuel Range Calculated"
+    unit_of_measurement: "mi"
+    accuracy_decimals: 0
+    icon: "mdi:gas-station"
+    lambda: |-
+      if (isnan(id(fuel_level).state)) return {};
+      // Calculate gallons remaining: percentage * tank capacity
+      float gallons_remaining = (id(fuel_level).state / 100.0) * id(fuel_tank_capacity).state;
+      // Calculate miles: gallons * miles per gallon
+      float miles = gallons_remaining * id(fuel_consumption_rate).state;
+      return miles;
+    update_interval: 60s
+
   - platform: homeassistant
     id: def_range
     entity_id: sensor.def_range  # Estimated miles remaining on DEF
@@ -1376,6 +1392,22 @@ sensor:
       then:
         - lambda: |-
             ESP_LOGI("HA_SENSOR", "def_range updated: %.0f mi", x);
+
+  # Calculated DEF range based on local percentage and calibration
+  - platform: template
+    id: def_range_calculated
+    name: "${friendly_name} DEF Range Calculated"
+    unit_of_measurement: "mi"
+    accuracy_decimals: 0
+    icon: "mdi:fuel"
+    lambda: |-
+      if (isnan(id(def_level).state)) return {};
+      // Calculate gallons remaining: percentage * tank capacity
+      float gallons_remaining = (id(def_level).state / 100.0) * id(def_tank_capacity).state;
+      // Calculate miles: gallons * miles per gallon
+      float miles = gallons_remaining * id(def_consumption_rate).state;
+      return miles;
+    update_interval: 60s
 
   - platform: homeassistant
     id: battery_time_remaining
@@ -1404,6 +1436,65 @@ select:
       - "F"
     initial_option: "F"
     icon: "mdi:thermometer"
+
+number:
+  # DEF tank calibration (2025 Mercedes Sprinter)
+  - platform: template
+    id: def_tank_capacity
+    name: "${friendly_name} DEF Tank Capacity"
+    optimistic: true
+    min_value: 1.0
+    max_value: 15.0
+    step: 0.1
+    initial_value: 5.8
+    restore_value: true
+    unit_of_measurement: "gal"
+    mode: box
+    entity_category: config
+    icon: "mdi:tank"
+
+  - platform: template
+    id: def_consumption_rate
+    name: "${friendly_name} DEF Consumption Rate"
+    optimistic: true
+    min_value: 500
+    max_value: 3000
+    step: 50
+    initial_value: 1000
+    restore_value: true
+    unit_of_measurement: "mi/gal"
+    mode: box
+    entity_category: config
+    icon: "mdi:gauge"
+
+  # Fuel tank calibration (2025 Mercedes Sprinter)
+  - platform: template
+    id: fuel_tank_capacity
+    name: "${friendly_name} Fuel Tank Capacity"
+    optimistic: true
+    min_value: 10.0
+    max_value: 100.0
+    step: 0.5
+    initial_value: 45.0
+    restore_value: true
+    unit_of_measurement: "gal"
+    mode: box
+    entity_category: config
+    icon: "mdi:gas-station"
+
+  - platform: template
+    id: fuel_consumption_rate
+    name: "${friendly_name} Fuel Consumption Rate"
+    optimistic: true
+    min_value: 5.0
+    max_value: 35.0
+    step: 0.5
+    initial_value: 19.5
+    restore_value: true
+    unit_of_measurement: "mpg"
+    mode: box
+    entity_category: config
+    icon: "mdi:gauge"
 
 display:
   - id: !extend epaper_display

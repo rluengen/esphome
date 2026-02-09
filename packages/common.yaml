@@ -14,9 +14,7 @@ api:
     key: ${api_encryption_key}
   reboot_timeout: 0s  # Allow device to work without Home Assistant connected
   on_client_connected:
-    - logger.log:
-        format: "Client %s connected to API with IP %s"
-        args: ["client_info.c_str()", "client_address.c_str()"]
+    - logger.log: "Client connected to API"
     - lambda: |-
         ESP_LOGI("api", "HA client connected");
         id(ha_connected).publish_state(true);
