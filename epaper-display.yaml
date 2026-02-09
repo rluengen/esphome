@@ -554,22 +554,22 @@ binary_sensor:
       return !isnan(id(battery_voltage).state) && id(battery_voltage).state > 4.5;
 
 font:
-  - file: "fonts/segoeui.ttf"
-    id: segoeui_16
-    size: 16
-    bpp: 4
+  - file: "fonts/Roboto-Regular.ttf"
+    id: roboto_18
+    size: 18
+    bpp: 1
     glyphs: " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~°₂"
   
-  - file: "fonts/segoeui.ttf"
-    id: segoeui_20
-    size: 20
-    bpp: 4
+  - file: "fonts/Roboto-Regular.ttf"
+    id: roboto_22
+    size: 22
+    bpp: 1
     glyphs: " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~°"
   
-  - file: "fonts/segoeui.ttf"
-    id: segoeui_24
-    size: 24
-    bpp: 4
+  - file: "fonts/Roboto-Regular.ttf"
+    id: roboto_26
+    size: 26
+    bpp: 1
     glyphs: " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~°"
 
   # Small weather icons for sunrise/sunset
@@ -614,7 +614,7 @@ lvgl:
   border_width: 0
   outline_width: 0
   shadow_width: 0
-  text_font: segoeui_16
+  text_font: roboto_18
   align: center
   resume_on_input: false  # Don't auto-resume on input - we control rendering manually
 
@@ -700,7 +700,7 @@ lvgl:
                   id: lbl_status_location
                   align: LEFT_MID
                   x: 5
-                  text_font: segoeui_20
+                  text_font: roboto_22
                   text_color: 0xFFFFFF
                   text: "-"
 
@@ -710,7 +710,7 @@ lvgl:
                   align: CENTER
                   x: 0
                   y: 0
-                  text_font: segoeui_20
+                  text_font: roboto_22
                   text_color: 0xFFFFFF
                   text: "-- --, ----"
 
@@ -756,7 +756,7 @@ lvgl:
                     # Battery percentage text (leftmost)
                     - label:
                         id: lbl_battery_percent
-                        text_font: segoeui_20
+                        text_font: roboto_22
                         text_color: 0xFFFFFF
                         text: "--%"  # Static initial, updated by script
 
@@ -786,7 +786,7 @@ lvgl:
               
               - label:
                   id: lbl_weather_temp
-                  text_font: segoeui_24
+                  text_font: roboto_26
                   text_color: 0xFFFFFF
                   text: "--°"
               
@@ -848,7 +848,7 @@ lvgl:
                               text: "\U000F059C"  # mdi:weather-sunset-up
                           - label:
                               id: lbl_sunrise_time
-                              text_font: segoeui_16
+                              text_font: roboto_18
                               text_color: 0xFFFFFF
                               text: "--:--"
                     # Sunset row
@@ -871,7 +871,7 @@ lvgl:
                               text: "\U000F059B"  # mdi:weather-sunset-down
                           - label:
                               id: lbl_sunset_time
-                              text_font: segoeui_16
+                              text_font: roboto_18
                               text_color: 0xFFFFFF
                               text: "--:--"
 
@@ -910,7 +910,7 @@ lvgl:
                               text: "\U000F11D4"
                           - label:
                               id: lbl_interior_temp
-                              text_font: segoeui_20
+                              text_font: roboto_22
                               text_color: 0xFFFFFF
                               text: "--°"
                           - label:
@@ -920,7 +920,7 @@ lvgl:
                               text: "\U000F0058"
                           - label:
                               id: lbl_interior_humidity
-                              text_font: segoeui_20
+                              text_font: roboto_22
                               text_color: 0xFFFFFF
                               text: "--%"
                     # Fridge row
@@ -943,7 +943,7 @@ lvgl:
                               text: "\U000F15EE"
                           - label:
                               id: lbl_fridge_temp
-                              text_font: segoeui_20
+                              text_font: roboto_22
                               text_color: 0xFFFFFF
                               text: "--°"
 
@@ -977,17 +977,17 @@ lvgl:
                         widgets:
                           - label:
                               id: lbl_co2_label
-                              text_font: segoeui_16
+                              text_font: roboto_18
                               text_color: 0xFFFFFF
                               text: "CO₂:"
                           - label:
                               id: lbl_co2_value
-                              text_font: segoeui_16
+                              text_font: roboto_18
                               text_color: 0xFFFFFF
                               text: "--ppm"
                           - label:
                               id: lbl_co2_status
-                              text_font: segoeui_16
+                              text_font: roboto_18
                               text_color: 0x888888
                               text: ""
                     # PM2.5 row
@@ -1005,17 +1005,17 @@ lvgl:
                         widgets:
                           - label:
                               id: lbl_pm25_label
-                              text_font: segoeui_16
+                              text_font: roboto_18
                               text_color: 0xFFFFFF
                               text: "PM2.5:"
                           - label:
                               id: lbl_pm25_value
-                              text_font: segoeui_16
+                              text_font: roboto_18
                               text_color: 0xFFFFFF
                               text: "--"
                           - label:
                               id: lbl_pm25_status
-                              text_font: segoeui_16
+                              text_font: roboto_18
                               text_color: 0x888888
                               text: ""
                     # VOC row
@@ -1033,17 +1033,17 @@ lvgl:
                         widgets:
                           - label:
                               id: lbl_voc_label
-                              text_font: segoeui_16
+                              text_font: roboto_18
                               text_color: 0xFFFFFF
                               text: "VOC:"
                           - label:
                               id: lbl_voc_value
-                              text_font: segoeui_16
+                              text_font: roboto_18
                               text_color: 0xFFFFFF
                               text: "--"
                           - label:
                               id: lbl_voc_status
-                              text_font: segoeui_16
+                              text_font: roboto_18
                               text_color: 0x888888
                               text: ""
                     # NOx row
@@ -1061,17 +1061,17 @@ lvgl:
                         widgets:
                           - label:
                               id: lbl_nox_label
-                              text_font: segoeui_16
+                              text_font: roboto_18
                               text_color: 0xFFFFFF
                               text: "NOx:"
                           - label:
                               id: lbl_nox_value
-                              text_font: segoeui_16
+                              text_font: roboto_18
                               text_color: 0xFFFFFF
                               text: "--"
                           - label:
                               id: lbl_nox_status
-                              text_font: segoeui_16
+                              text_font: roboto_18
                               text_color: 0x888888
                               text: ""
 
@@ -1111,14 +1111,14 @@ lvgl:
                         id: lbl_fuel_value
                         align: CENTER
                         y: -10
-                        text_font: segoeui_24
+                        text_font: roboto_26
                         text_color: 0xFFFFFF
                         text: "-- %"
                     - label:
                         id: lbl_fuel_range
                         align: CENTER
                         y: 15
-                        text_font: segoeui_16
+                        text_font: roboto_18
                         text_color: 0xFFFFFF
                         text: "-- mi"
                     - label:
@@ -1157,7 +1157,7 @@ lvgl:
                         id: lbl_def_range
                         align: CENTER
                         y: 15
-                        text_font: segoeui_16
+                        text_font: roboto_18
                         text_color: 0xFFFFFF
                         text: "-- mi"
                     - label:
@@ -1196,7 +1196,7 @@ lvgl:
                         id: lbl_battery_time
                         align: CENTER
                         y: 15
-                        text_font: segoeui_16
+                        text_font: roboto_18
                         text_color: 0xFFFFFF
                         text: "-- hrs"
                     - label:
@@ -1225,14 +1225,14 @@ lvgl:
                         id: lbl_water_value
                         align: CENTER
                         y: -10
-                        text_font: segoeui_24
+                        text_font: roboto_26
                         text_color: 0xFFFFFF
                         text: "--%"
                     - label:
                         id: lbl_water_time
                         align: CENTER
                         y: 15
-                        text_font: segoeui_16
+                        text_font: roboto_18
                         text_color: 0xFFFFFF
                         text: "-- hrs"
                     - label:
