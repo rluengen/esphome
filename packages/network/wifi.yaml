@@ -2,7 +2,11 @@
 # Include this in your device configs with: <<: !include templates/base/wifi.yaml
 
 wifi:
-#  fast_connect: true
+  # fast_connect: Skips WiFi channel scanning, connects directly to last known BSSID/channel
+  # Benefits: Faster boot time (~3-5s savings), lower power consumption during connection
+  # Drawbacks: Won't roam between APs in mesh networks, breaks if router changes channel
+  # Recommendation: Enable for stationary devices with single AP, disable for mobile/multi-AP setups
+  fast_connect: true
   ssid: ${wifi_ssid}
   password: ${wifi_password}
   min_auth_mode: WPA2
@@ -16,18 +20,18 @@ wifi:
 # Text sensor for device information
 text_sensor:
   - platform: wifi_info
-#    ip_address:
-#      name: "${friendly_name} WiFi IP Address"
-#      entity_category: diagnostic
-#      filters:
-#        - lambda: |-
-#            static std::string last;
-#            if (last != x) {
-#              last = x;
-#              return x;
-#            } else {
-#              return {};
-#            }
+   ip_address:
+     name: "${friendly_name} WiFi IP Address"
+     entity_category: diagnostic
+     filters:
+       - lambda: |-
+           static std::string last;
+           if (last != x) {
+             last = x;
+             return x;
+           } else {
+             return {};
+           }
     ssid:
       name: "${friendly_name} SSID"
       entity_category: diagnostic
