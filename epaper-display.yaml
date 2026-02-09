@@ -29,9 +29,14 @@ packages:
           wifi_ssid: !secret wifi_ssid
           wifi_password: !secret wifi_password
       - path: packages/icons/network_icons.yaml
+        vars:
+          icon_bpp: 1
       - path: packages/icons/battery_icons.yaml
-      - path: packages/icons/weather_icons.yaml
+        vars:
+          icon_bpp: 1
       - path: packages/icons/homeassistant_icons.yaml
+        vars:
+          icon_bpp: 1
       - path: devices/reterminal-e1001.yaml
 
 
@@ -576,7 +581,7 @@ font:
   - file: "fonts/materialdesignicons-webfont.ttf"
     id: sun_icons
     size: 24
-    bpp: 4
+    bpp: 1
     glyphs: [
       "\U000F059C", # weather-sunset-up (sunrise)
       "\U000F059B", # weather-sunset-down (sunset)
@@ -586,7 +591,7 @@ font:
   - file: "fonts/materialdesignicons-webfont.ttf"
     id: climate_icons
     size: 20
-    bpp: 4
+    bpp: 1
     glyphs: [
       "\U000F11D4", # rv-truck (interior)
       "\U000F15EE", # fridge-industrial
@@ -780,7 +785,7 @@ lvgl:
             widgets:
               - label:
                   id: lbl_weather_icon
-                  text_font: weather_icons
+                  text_font: sun_icons
                   text_color: 0xFFFFFF
                   text: "\U000F0599"  # Default sunny icon
               

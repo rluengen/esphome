@@ -1,10 +1,13 @@
 # https://pictogrammers.com/library/mdi/
 
+substitutions:
+  icon_bpp: 4
+
 font:
   - file: "fonts/materialdesignicons-webfont.ttf"
     id: homeassistant_icons
     size: 20
-    bpp: 4
+    bpp: ${icon_bpp}
     glyphs: [
       "\U000F07D0", # mdi-home-assistant
       "\U000F06A1", # mdi-home-outline (connected)

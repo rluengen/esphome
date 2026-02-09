@@ -1,10 +1,13 @@
 # https://pictogrammers.com/library/mdi/
 
+substitutions:
+  icon_bpp: 4
+
 font:
   - file: "fonts/materialdesignicons-webfont.ttf"
     id: wifi_icons
     size: 20
-    bpp: 4
+    bpp: ${icon_bpp}
     glyphs: [
       "\U000F05A9", # mdi-wifi
       "\U000F16BD", # wifi-check
