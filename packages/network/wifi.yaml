@@ -20,18 +20,18 @@ wifi:
 # Text sensor for device information
 text_sensor:
   - platform: wifi_info
-   ip_address:
-     name: "${friendly_name} WiFi IP Address"
-     entity_category: diagnostic
-     filters:
-       - lambda: |-
-           static std::string last;
-           if (last != x) {
-             last = x;
-             return x;
-           } else {
-             return {};
-           }
+    ip_address:
+      name: "${friendly_name} WiFi IP Address"
+      entity_category: diagnostic
+      filters:
+        - lambda: |-
+            static std::string last;
+            if (last != x) {
+              last = x;
+              return x;
+            } else {
+              return {};
+            }
     ssid:
       name: "${friendly_name} SSID"
       entity_category: diagnostic
