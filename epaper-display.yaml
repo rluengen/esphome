@@ -1151,7 +1151,7 @@ lvgl:
                         id: lbl_def_value
                         align: CENTER
                         y: -10
-                        text_font: segoeui_24
+                        text_font: roboto_26
                         text_color: 0xFFFFFF
                         text: !lambda |-
                           if (isnan(id(def_level).state)) return "--%";
@@ -1190,7 +1190,7 @@ lvgl:
                         id: lbl_vehicle_battery_value
                         align: CENTER
                         y: -10
-                        text_font: segoeui_24
+                        text_font: roboto_26
                         text_color: 0xFFFFFF
                         text: !lambda |-
                           if (isnan(id(vehicle_battery).state)) return "--%";
