@@ -1,0 +1,206 @@
+# ESPHome configuration for Waveshare ESP32-P4-Nano with 8.8" DSI-TOUCH-A Display
+# This configuration includes WiFi via ESP32-C6, MIPI-DSI display, and LVGL "Hello World"
+
+substitutions:
+  device_name: esp32-p4-nano-dsi
+  friendly_name: ESP32-P4-Nano 8.8" DSI
+  log_level: INFO
+
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
+  min_version: 2025.8.0
+  platformio_options:
+    build_flags: "-DBOARD_HAS_PSRAM"
+    board_build.flash_mode: dio
+    board_build.flash_size: 16MB
+
+# ESP32-P4 board configuration
+esp32:
+  board: esp32-p4-evboard
+  variant: esp32p4
+  flash_size: 16MB
+  framework:
+    type: esp-idf
+
+# Required for MIPI-DSI display - use octal PSRAM mode for best performance
+psram:
+  mode: octal
+  speed: 200MHz
+
+# LDO for MIPI-DSI PHY - CRITICAL for display initialization
+esp_ldo:
+  - voltage: 2.5V
+    channel: 3
+
+# ESP32-C6 co-processor for WiFi 6/Bluetooth via SDIO
+# The C6 must be flashed with esp-hosted firmware first
+# See: https://esphome.github.io/esp-hosted-firmware/
+esp32_hosted:
+  active_high: true
+  variant: ESP32C6
+  reset_pin: GPIO54
+  cmd_pin: GPIO19
+  clk_pin: GPIO18
+  d0_pin: GPIO14
+  d1_pin: GPIO15
+  d2_pin: GPIO16
+  d3_pin: GPIO17
+
+# WiFi configuration using the ESP32-C6 co-processor
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  
+# Enable Home Assistant API
+api:
+  encryption:
+    key: !secret api_encryption_key
+
+# Enable OTA updates
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+# HTTP Request component for firmware updates
+http_request:
+
+# Automatically flash/update the ESP32-C6 co-processor firmware
+update:
+  - platform: esp32_hosted
+    name: "ESP32-C6 Firmware"
+    type: http
+    source: https://esphome.github.io/esp-hosted-firmware/manifest/esp32c6.json
+    update_interval: 6h
+
+logger:
+  level: ${log_level}
+
+# I2C for GT911 Touchscreen and display backlight controller
+i2c:
+  sda: GPIO7
+  scl: GPIO8
+  frequency: 400kHz
+  scan: true
+
+# I2C device for panel/backlight control (address 0x45)
+i2c_device:
+  - address: 0x45
+    id: display_backlight_i2c
+
+# Backlight brightness control
+output:
+  - platform: template
+    id: backlight_output
+    type: float
+    write_action:
+      - lambda: |-
+          // Write brightness to both register variants for compatibility
+          uint8_t brightness = (uint8_t)(state * 255);
+          uint8_t inverted = 255 - brightness;
+          // ESP32-P4 style (register 0x96, direct 0-255)
+          id(display_backlight_i2c).write_byte(0x96, brightness);
+          // RPi style (register 0xab inverted + 0xaa latch)
+          id(display_backlight_i2c).write_byte(0xab, inverted);
+          id(display_backlight_i2c).write_byte(0xaa, 0x01);
+
+light:
+  - platform: monochromatic
+    name: "Display Backlight"
+    id: display_backlight
+    output: backlight_output
+    default_transition_length: 250ms
+    restore_mode: ALWAYS_ON
+
+# MIPI-DSI Display - Waveshare 8.8" (480x1920 portrait, 16-bit color)
+display:
+  - platform: mipi_dsi
+    id: dsi_display
+    model: CUSTOM
+    rotation: 0
+    dimensions:
+      width: 480
+      height: 1920
+    lanes: 2
+    color_order: rgb
+    color_depth: 16
+    pixel_mode: 16bit
+    # Timing parameters - adjust if needed based on display behavior
+    hsync_front_porch: 50
+    hsync_pulse_width: 50
+    hsync_back_porch: 50
+    vsync_front_porch: 20
+    vsync_pulse_width: 20
+    vsync_back_porch: 20
+    pclk_frequency: 83333000
+    lane_bit_rate: 800Mbps
+    # Standard initialization sequence for most DSI panels
+    init_sequence:
+      - [0x11, 120]  # Sleep out + 120ms delay
+      - [0x29, 20]   # Display on + 20ms delay
+
+# GT911 Touchscreen
+touchscreen:
+  - platform: gt911
+    id: dsi_touchscreen
+    update_interval: 50ms
+
+# LVGL graphics configuration with "Hello World" display
+lvgl:
+  displays:
+    - dsi_display
+  touchscreens:
+    - dsi_touchscreen
+  color_depth: 16
+  buffer_size: 100%
+  byte_order: little_endian
+  # Main page with centered "Hello World" label
+  pages:
+    - id: main_page
+      widgets:
+        - label:
+            id: hello_label
+            text: "Hello World"
+            align: CENTER
+            text_font: roboto_48
+            text_color: 0xFFFFFF
+        - label:
+            id: status_label
+            text: "ESP32-P4-Nano + 8.8\" DSI"
+            align: BOTTOM_MID
+            text_font: roboto_24
+            text_color: 0x00FF00
+
+# Define fonts for LVGL
+font:
+  - file: "gfonts://Roboto"
+    id: roboto_48
+    size: 48
+    glyphs: "!\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~ "
+  - file: "gfonts://Roboto"
+    id: roboto_24
+    size: 24
+    glyphs: "!\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~ "
+
+# Diagnostic switch to toggle MIPI enable register
+switch:
+  - platform: template
+    name: "Panel MIPI Enable"
+    id: panel_mipi_enable
+    optimistic: true
+    turn_on_action:
+      - lambda: |-
+          bool ack = id(display_backlight_i2c).write_byte(0xad, 0x01);
+          ESP_LOGI("panel_diag", "MIPI enable (0xAD=0x01), ACK: %s", ack ? "YES" : "NO");
+    turn_off_action:
+      - lambda: |-
+          bool ack = id(display_backlight_i2c).write_byte(0xad, 0x00);
+          ESP_LOGI("panel_diag", "MIPI disable (0xAD=0x00), ACK: %s", ack ? "YES" : "NO");
+
+# Periodic diagnostics
+interval:
+  - interval: 30s
+    then:
+      - lambda: |-
+          ESP_LOGI("diagnostics", "WiFi RSSI: %.0f dB", id(${device_name}).get_wifi()->get_rssi());
+          ESP_LOGI("diagnostics", "Free heap: %d bytes", esp_get_free_heap_size());

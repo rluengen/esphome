@@ -4,13 +4,6 @@
 # Board: Seeed XIAO ESP32-S3
 #
 
-# fan header connector
-#   ??
-# 12v -> 5v converter mount
-# qwiic connector for aht20
-# power supply connector
-#   Amphenol boardlock connector
-
 # WIRING DIAGRAM
 # ==============
 #

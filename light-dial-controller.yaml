@@ -574,19 +574,40 @@ script:
             default: break;
           }
 
+  - id: update_brightness_ui
+    then:
+      - lvgl.arc.update:
+          id: brightness_arc
+          value: !lambda 'return id(current_brightness);'
+      - lambda: |-
+          char buf[8]; snprintf(buf, sizeof(buf), "%d%%", id(current_brightness));
+          switch (id(selected_light_index)) {
+            case 0: lv_label_set_text(id(tile_all_lights_pct), buf); break;
+            case 1: lv_label_set_text(id(tile_bed_interior_pct), buf); break;
+            case 2: lv_label_set_text(id(tile_main_can_pct), buf); break;
+            case 3: lv_label_set_text(id(tile_bed_can_pct), buf); break;
+            case 4: lv_label_set_text(id(tile_led_capsule_pct), buf); break;
+            case 5: lv_label_set_text(id(tile_exterior_pct), buf); break;
+            case 6: lv_label_set_text(id(tile_door_pct), buf); break;
+            case 7: lv_label_set_text(id(tile_dog_crate_pct), buf); break;
+            default: break;
+          }
+
   - id: increase_light_brightness
     then:
       - lambda: |-
           int step = 2;
           id(current_brightness) = std::min(100, id(current_brightness) + step);
-          id(publish_brightness_throttled).execute();
+      - script.execute: update_brightness_ui
+      - script.execute: publish_brightness_throttled
 
   - id: decrease_light_brightness
     then:
       - lambda: |-
           int step = 2;
           id(current_brightness) = std::max(0, id(current_brightness) - step);
-          id(publish_brightness_throttled).execute();
+      - script.execute: update_brightness_ui
+      - script.execute: publish_brightness_throttled
 
   - id: publish_brightness_throttled
     mode: restart
