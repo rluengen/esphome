@@ -74,6 +74,10 @@ packages:
         vars:
           display_id: round_display_id
           display_backlight_id: display_backlight_id
+      - path: packages/display_timeout.yaml
+        vars:
+          touchscreen_id: touch_id
+          backlight_id: display_backlight_id
 
 esphome:
   name: ${device_name}
@@ -209,19 +213,6 @@ number:
     unit_of_measurement: "Ohms"
     icon: "mdi:omega"
 
-  - platform: template
-    id: screen_timeout_minutes
-    name: "Screen Timeout"
-    min_value: 1
-    max_value: 60
-    step: 1
-    initial_value: 5
-    entity_category: config
-    optimistic: true
-    mode: box
-    unit_of_measurement: "minutes"
-    icon: "mdi:timer-outline"
-
 wifi:
   on_connect:
     - lvgl.label.update:
@@ -243,12 +234,6 @@ pcf8574:
     i2c_id: i2c_bus
     address: 0x21       # The I2C address of the driver. 0x20 is the default, bridge A0 to get 0x21 not to conflict with the board.
     pcf8575: false      # Whether this is a 16-pin PCF8575
-
-# Extend touchscreen to wake screen on touch
-touchscreen:
-  - id: !extend touch_id
-    on_touch:
-      - script.execute: wake_screen
 
 binary_sensor:
   - platform: template
@@ -521,7 +506,7 @@ valve:
     lambda: |-
       return {};
     open_action:
-      - script.execute: wake_screen
+      - script.execute: screen_timeout_timer
       - if:
           condition:
             binary_sensor.is_on: water_tank_full
@@ -543,7 +528,7 @@ valve:
                 text: "\U000F1068"
             - logger.log: "Input Selection Valve Opened"
     close_action:
-      - script.execute: wake_screen
+      - script.execute: screen_timeout_timer
       - logger.log: "Input Selection Valve Closing"
       - switch.turn_off: relay_hydrant_valve
       - valve.template.publish:
@@ -574,7 +559,7 @@ valve:
     lambda: |-
       return {};
     open_action:
-      - script.execute: wake_screen
+      - script.execute: screen_timeout_timer
       - if:
           condition:
             binary_sensor.is_on: water_tank_low
@@ -597,7 +582,7 @@ valve:
                 text: "\U000F1068"
             - logger.log: "Water Pump Source Valve Opened"
     close_action:
-      - script.execute: wake_screen
+      - script.execute: screen_timeout_timer
       - logger.log: "Water Pump Source Valve Closing"
       - switch.turn_off: relay_source_valve
       - valve.template.publish:
@@ -628,7 +613,7 @@ valve:
     lambda: |-
       return {};
     open_action:
-      - script.execute: wake_screen
+      - script.execute: screen_timeout_timer
       - if:
           condition:
             binary_sensor.is_on: water_tank_full
@@ -650,7 +635,7 @@ valve:
                 text: "\U000F1068"
             - logger.log: "Tank Fill Valve Opened"
     close_action:
-      - script.execute: wake_screen
+      - script.execute: screen_timeout_timer
       - logger.log: "Tank Fill Valve Closing"
       - switch.turn_off: relay_fill_valve
       - valve.template.publish:
@@ -676,7 +661,7 @@ switch:
     lambda: |-
       return id(relay_water_pump).state;
     turn_on_action:
-      - script.execute: wake_screen
+      - script.execute: screen_timeout_timer
       - if:
           condition:
             and:
@@ -702,7 +687,7 @@ switch:
                 else:
                   - logger.log: "ERROR: Valve failed to open - pump not started"
     turn_off_action:
-      - script.execute: wake_screen
+      - script.execute: screen_timeout_timer
       - switch.turn_off: relay_water_pump
       - delay: 250ms  # Wait for pump to stop before closing valves
       - valve.close: valve_water_pump_source
@@ -850,13 +835,6 @@ lvgl:
   bg_color: 0x000000
   buffer_size: 100%
   bg_opa: COVER
-  on_idle:
-    timeout: !lambda 'return (uint32_t)(id(screen_timeout_minutes).state * 60 * 1000);'
-    then:
-      - logger.log: "Screen timeout - turning off backlight"
-      - light.turn_off:
-          id: display_backlight_id
-          transition_length: 1s
 
   on_boot:
     then:
@@ -1119,19 +1097,6 @@ lvgl:
             clickable: false
             
 script:
-  - id: wake_screen
-    mode: restart
-    then:
-      - if:
-          condition:
-            light.is_off: display_backlight_id
-          then:
-            - logger.log: "Waking screen"
-            - light.turn_on:
-                id: display_backlight_id
-                brightness: 100%
-                transition_length: 500ms
-
   - id: dirty_water_fill
     then:
       - if:

@@ -34,6 +34,10 @@ packages:
       - path: packages/icons/network_icons.yaml
       - path: packages/icons/battery_icons.yaml
       - path: packages/icons/homeassistant_icons.yaml
+      - path: packages/display_timeout.yaml
+        vars:
+          touchscreen_id: my_touchscreen
+          backlight_id: display_backlight_id
 
 esphome:
   name: ${device_name}
@@ -60,39 +64,7 @@ font:
     bpp: 4
     glyphs: []  # Will be populated dynamically by ESPHome
 
-number:
-  - platform: template
-    name: Screen Timeout
-    optimistic: true
-    entity_category: config
-    id: display_timeout
-    unit_of_measurement: "s"
-    initial_value: 60
-    restore_value: true
-    min_value: 10
-    max_value: 720
-    step: 5
-    mode: box
-
 lvgl:
-# https://esphome.io/cookbook/lvgl/#turn-off-screen-when-idle
-  on_idle:
-    timeout: 720s
-    then:
-      - script.execute: put_display_to_sleep
-
-  on_resume:
-    then:
-      - if:
-          condition:
-            lambda: 'return id(screen_is_off);'
-          then:
-            - logger.log: "LVGL resumed - restoring backlight"
-            - lambda: |-
-                id(screen_is_off) = false;
-                id(wake_touch) = true;
-            - light.turn_on: display_backlight_id
-
   on_boot:
     then:
       - script.execute: restore_roller_position
@@ -389,7 +361,7 @@ lvgl:
             on_value:
               then:
                 - lambda: |-
-                    // Map visible tile to selected index and entity, compute brightness
+                    // Map visible tile to selected index and entity
                     int idx = 0;
                     if (tile == id(tile_all_lights)) idx = 0;
                     else if (tile == id(tile_bed_interior)) idx = 1;
@@ -400,77 +372,17 @@ lvgl:
                     else if (tile == id(tile_door)) idx = 6;
                     else if (tile == id(tile_dog_crate)) idx = 7;
                     id(selected_light_index) = idx;
-                    auto pct_from_attr = [](float attr) -> int {
-                      if (isnan(attr)) return 0;
-                      int v = (int)roundf((attr / 255.0f) * 100.0f);
-                      if (v < 0) v = 0; if (v > 100) v = 100; return v;
+                    
+                    const char* entities[] = {
+                      "light.all_lights", "light.bed_interior_lights",
+                      "light.main_can_lights", "light.bed_can_lights",
+                      "light.cwww_led_capsule_lights", "light.exterior_lights",
+                      "light.door_light", "light.cwww_led_dog_crate_lights"
                     };
-                    int brightness = 0;
-                    switch (idx) {
-                      case 0:
-                        brightness = pct_from_attr(id(light_all_lights_brightness).state);
-                        id(dial_selected_light).publish_state("light.all_lights");
-                        id(selected_entity) = std::string("light.all_lights");
-                        break;
-                      case 1:
-                        brightness = pct_from_attr(id(light_bed_interior_lights_brightness).state);
-                        id(dial_selected_light).publish_state("light.bed_interior_lights");
-                        id(selected_entity) = std::string("light.bed_interior_lights");
-                        break;
-                      case 2:
-                        brightness = pct_from_attr(id(light_main_can_lights_brightness).state);
-                        id(dial_selected_light).publish_state("light.main_can_lights");
-                        id(selected_entity) = std::string("light.main_can_lights");
-                        break;
-                      case 3:
-                        brightness = pct_from_attr(id(light_bed_can_lights_brightness).state);
-                        id(dial_selected_light).publish_state("light.bed_can_lights");
-                        id(selected_entity) = std::string("light.bed_can_lights");
-                        break;
-                      case 4:
-                        brightness = pct_from_attr(id(light_cwww_led_capsule_lights_brightness).state);
-                        id(dial_selected_light).publish_state("light.cwww_led_capsule_lights");
-                        id(selected_entity) = std::string("light.cwww_led_capsule_lights");
-                        break;
-                      case 5:
-                        brightness = pct_from_attr(id(light_exterior_lights_brightness).state);
-                        id(dial_selected_light).publish_state("light.exterior_lights");
-                        id(selected_entity) = std::string("light.exterior_lights");
-                        break;
-                      case 6:
-                        brightness = pct_from_attr(id(light_door_light_brightness).state);
-                        id(dial_selected_light).publish_state("light.door_light");
-                        id(selected_entity) = std::string("light.door_light");
-                        break;
-                      case 7:
-                        brightness = pct_from_attr(id(light_cwww_led_dog_crate_lights_brightness).state);
-                        id(dial_selected_light).publish_state("light.cwww_led_dog_crate_lights");
-                        id(selected_entity) = std::string("light.cwww_led_dog_crate_lights");
-                        break;
-                      default:
-                        brightness = 0;
-                        break;
-                    }
-                    id(current_brightness) = brightness;
-                    ESP_LOGI("tileview", "Selected idx=%d entity=%s brightness=%d%%", id(selected_light_index), id(selected_entity).c_str(), id(current_brightness));
-                - lvgl.arc.update:
-                    id: brightness_arc
-                    value: !lambda 'return id(current_brightness);'
-                - lambda: |-
-                    // Update the visible tile percent label
-                    int idx = id(selected_light_index);
-                    char buf[8]; snprintf(buf, sizeof(buf), "%d%%", id(current_brightness));
-                    switch (idx) {
-                      case 0: lv_label_set_text(id(tile_all_lights_pct), buf); break;
-                      case 1: lv_label_set_text(id(tile_bed_interior_pct), buf); break;
-                      case 2: lv_label_set_text(id(tile_main_can_pct), buf); break;
-                      case 3: lv_label_set_text(id(tile_bed_can_pct), buf); break;
-                      case 4: lv_label_set_text(id(tile_led_capsule_pct), buf); break;
-                      case 5: lv_label_set_text(id(tile_exterior_pct), buf); break;
-                      case 6: lv_label_set_text(id(tile_door_pct), buf); break;
-                      case 7: lv_label_set_text(id(tile_dog_crate_pct), buf); break;
-                      default: break;
-                    }
+                    id(selected_entity) = std::string(entities[idx]);
+                    id(dial_selected_light).publish_state(entities[idx]);
+                    ESP_LOGI("tileview", "Selected idx=%d entity=%s", idx, entities[idx]);
+                - script.execute: update_light_display
 
 select:
   - platform: template
@@ -513,14 +425,6 @@ globals:
     type: std::string
     initial_value: '"light.all_lights"'
     restore_value: yes
-
-  - id: screen_is_off
-    type: bool
-    initial_value: "false"
-
-  - id: wake_touch
-    type: bool
-    initial_value: "false"
 
 script:
   - id: restore_roller_position
@@ -574,39 +478,22 @@ script:
             default: break;
           }
 
-  - id: update_brightness_ui
-    then:
-      - lvgl.arc.update:
-          id: brightness_arc
-          value: !lambda 'return id(current_brightness);'
-      - lambda: |-
-          char buf[8]; snprintf(buf, sizeof(buf), "%d%%", id(current_brightness));
-          switch (id(selected_light_index)) {
-            case 0: lv_label_set_text(id(tile_all_lights_pct), buf); break;
-            case 1: lv_label_set_text(id(tile_bed_interior_pct), buf); break;
-            case 2: lv_label_set_text(id(tile_main_can_pct), buf); break;
-            case 3: lv_label_set_text(id(tile_bed_can_pct), buf); break;
-            case 4: lv_label_set_text(id(tile_led_capsule_pct), buf); break;
-            case 5: lv_label_set_text(id(tile_exterior_pct), buf); break;
-            case 6: lv_label_set_text(id(tile_door_pct), buf); break;
-            case 7: lv_label_set_text(id(tile_dog_crate_pct), buf); break;
-            default: break;
-          }
-
   - id: increase_light_brightness
+    mode: restart
     then:
       - lambda: |-
           int step = 2;
           id(current_brightness) = std::min(100, id(current_brightness) + step);
-      - script.execute: update_brightness_ui
+      - script.execute: update_light_display
       - script.execute: publish_brightness_throttled
 
   - id: decrease_light_brightness
+    mode: restart
     then:
       - lambda: |-
           int step = 2;
           id(current_brightness) = std::max(0, id(current_brightness) - step);
-      - script.execute: update_brightness_ui
+      - script.execute: update_light_display
       - script.execute: publish_brightness_throttled
 
   - id: publish_brightness_throttled
@@ -638,17 +525,6 @@ script:
                     if (b > 255) b = 255;
                     return b;
 
-  - id: put_display_to_sleep
-    then:
-      - if:
-          condition:
-            lambda: 'return !id(screen_is_off);'
-          then:
-            - logger.log: "Putting display to sleep"
-            - lambda: 'id(screen_is_off) = true;'
-            - light.turn_off: display_backlight_id
-            - lvgl.pause:
-
   - id: toggle_selected_light
     then:
       - lambda: |-
@@ -676,17 +552,6 @@ script:
           data:
             entity_id: !lambda 'return id(selected_entity);'
 
-interval:
-  - interval: 1s
-    then:
-      - lambda: |-
-          if (id(screen_is_off)) return;
-          uint32_t idle_ms = lv_disp_get_inactive_time(NULL);
-          uint32_t timeout_ms = (uint32_t)(id(display_timeout).state * 1000);
-          if (idle_ms >= timeout_ms) {
-            id(put_display_to_sleep).execute();
-          }
-
 binary_sensor:
   - id: !extend touch_input
     on_multi_click:
@@ -704,15 +569,21 @@ binary_sensor:
               else:
                 - script.execute: toggle_selected_light
 
-      # Double tap: turn the light on
+      # Double tap: turn the light on (ignored if this is a wake touch)
       - timing:
           - ON for at most 500ms
           - OFF for at most 300ms
           - ON for at most 500ms
           - OFF for at least 350ms
         then:
-          - lambda: 'id(wake_touch) = false;'
-          - script.execute: turn_on_selected_light
+          - if:
+              condition:
+                lambda: 'return id(wake_touch);'
+              then:
+                - lambda: 'id(wake_touch) = false;'
+                - logger.log: "Wake double-tap consumed - no action"
+              else:
+                - script.execute: turn_on_selected_light
 
       # Long press (2 seconds): turn the light off
       - timing:
@@ -732,20 +603,27 @@ sensor:
     name: "Rotary Encoder"
     on_clockwise:
       then:
+        - script.execute: screen_timeout_timer
         - script.execute: increase_light_brightness
 
     on_anticlockwise:
       then:
+        - script.execute: screen_timeout_timer
         - script.execute: decrease_light_brightness
 
   # Home Assistant brightness attribute sensors for each selectable light.
+  # Each sensor only triggers a display update when it matches the currently selected light.
   - platform: homeassistant
     id: light_all_lights_brightness
     entity_id: light.all_lights
     attribute: brightness
     internal: true
     on_value:
-      - script.execute: update_light_display
+      - if:
+          condition:
+            lambda: 'return id(selected_light_index) == 0;'
+          then:
+            - script.execute: update_light_display
 
   - platform: homeassistant
     id: light_bed_interior_lights_brightness
@@ -753,7 +631,11 @@ sensor:
     attribute: brightness
     internal: true
     on_value:
-      - script.execute: update_light_display
+      - if:
+          condition:
+            lambda: 'return id(selected_light_index) == 1;'
+          then:
+            - script.execute: update_light_display
 
   - platform: homeassistant
     id: light_main_can_lights_brightness
@@ -761,7 +643,11 @@ sensor:
     attribute: brightness
     internal: true
     on_value:
-      - script.execute: update_light_display
+      - if:
+          condition:
+            lambda: 'return id(selected_light_index) == 2;'
+          then:
+            - script.execute: update_light_display
 
   - platform: homeassistant
     id: light_bed_can_lights_brightness
@@ -769,7 +655,11 @@ sensor:
     attribute: brightness
     internal: true
     on_value:
-      - script.execute: update_light_display
+      - if:
+          condition:
+            lambda: 'return id(selected_light_index) == 3;'
+          then:
+            - script.execute: update_light_display
 
   - platform: homeassistant
     id: light_cwww_led_capsule_lights_brightness
@@ -777,7 +667,11 @@ sensor:
     attribute: brightness
     internal: true
     on_value:
-      - script.execute: update_light_display
+      - if:
+          condition:
+            lambda: 'return id(selected_light_index) == 4;'
+          then:
+            - script.execute: update_light_display
 
   - platform: homeassistant
     id: light_exterior_lights_brightness
@@ -785,7 +679,11 @@ sensor:
     attribute: brightness
     internal: true
     on_value:
-      - script.execute: update_light_display
+      - if:
+          condition:
+            lambda: 'return id(selected_light_index) == 5;'
+          then:
+            - script.execute: update_light_display
 
   - platform: homeassistant
     id: light_door_light_brightness
@@ -793,7 +691,11 @@ sensor:
     attribute: brightness
     internal: true
     on_value:
-      - script.execute: update_light_display
+      - if:
+          condition:
+            lambda: 'return id(selected_light_index) == 6;'
+          then:
+            - script.execute: update_light_display
 
   - platform: homeassistant
     id: light_cwww_led_dog_crate_lights_brightness
@@ -801,53 +703,8 @@ sensor:
     attribute: brightness
     internal: true
     on_value:
-      - script.execute: update_light_display
-
-text_sensor:
-  - platform: homeassistant
-    id: selected_light_icon
-    entity_id: light.all_lights  # Will be updated dynamically
-    attribute: icon
-    internal: true
-    on_value:
-      - lambda: |-
-          // Convert mdi:icon-name to Unicode character
-          std::string icon_name = x;
-          
-          // Remove "mdi:" prefix if present
-          if (icon_name.find("mdi:") == 0) {
-            icon_name = icon_name.substr(4);
-          }
-          
-          // Map MDI icon names to Unicode codepoints
-          // Reference: https://pictogrammers.com/library/mdi/
-          std::map<std::string, const char*> icon_map = {
-            {"lightbulb", "\U000F0335"},
-            {"lightbulb-outline", "\U000F0336"},
-            {"lightbulb-on", "\U000F06E8"},
-            {"lightbulb-on-outline", "\U000F06E9"},
-            {"floor-lamp", "\U000F08DD"},
-            {"ceiling-light", "\U000F0769"},
-            {"lamp", "\U000F06B5"},
-            {"lava-lamp", "\U000F07D5"},
-            {"led-strip", "\U000F07D6"},
-            {"led-strip-variant", "\U000F1051"},
-            {"spotlight", "\U000F0CF3"},
-            {"spotlight-beam", "\U000F0CF4"},
-            {"vanity-light", "\U000F11E1"},
-            {"wall-sconce", "\U000F091C"},
-            {"wall-sconce-flat", "\U000F091D"},
-            {"wall-sconce-round", "\U000F0748"},
-            {"outdoor-lamp", "\U000F1054"},
-          };
-          
-          // TODO: 
-          // auto it = icon_map.find(icon_name);
-          // if (it != icon_map.end()) {
-          //   id(light_icon_label).set_text(it->second);
-          // } else {
-          //   // Default to lightbulb if icon not found
-          //   id(light_icon_label).set_text("\U000F0335");
-          // }
-          
-          ESP_LOGI("icon", "Light icon changed to: %s", x.c_str());
+      - if:
+          condition:
+            lambda: 'return id(selected_light_index) == 7;'
+          then:
+            - script.execute: update_light_display
