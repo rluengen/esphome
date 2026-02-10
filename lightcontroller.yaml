@@ -143,23 +143,6 @@ light:
     icon: "mdi:light-recessed"
     default_transition_length: 500ms
     output: led_channel_1
-    on_turn_off: 
-      then:
-        - logger.log:
-            format: "Main Can Lights turned off"
-            level: INFO
-    on_turn_on: 
-      then:
-        - logger.log:
-            format: "Main Can Lights turned on"
-            level: INFO
-    on_state:
-      then:
-        - lambda: |-
-            if (id(main_can_lights).current_values.is_on()) {
-              ESP_LOGI("light", "Main Can Lights brightness: %.0f%%", 
-                       id(main_can_lights).current_values.get_brightness() * 100);
-            }
 
   - platform: monochromatic
     id: bed_can_lights
@@ -167,23 +150,6 @@ light:
     icon: "mdi:light-recessed"
     default_transition_length: 500ms
     output: led_channel_2
-    on_turn_off: 
-      then:
-        - logger.log:
-            format: "Bed Can Lights turned off"
-            level: INFO
-    on_turn_on: 
-      then:
-        - logger.log:
-            format: "Bed Can Lights turned on"
-            level: INFO
-    on_state:
-      then:
-        - lambda: |-
-            if (id(bed_can_lights).current_values.is_on()) {
-              ESP_LOGI("light", "Bed Can Lights brightness: %.0f%%", 
-                       id(bed_can_lights).current_values.get_brightness() * 100);
-            }
 
   - platform: monochromatic
     id: door_light
@@ -191,23 +157,6 @@ light:
     icon: "mdi:door_light"
     default_transition_length: 500ms
     output: led_channel_3
-    on_turn_off: 
-      then:
-        - logger.log:
-            format: "Door Light turned off"
-            level: INFO
-    on_turn_on: 
-      then:
-        - logger.log:
-            format: "Door Light turned on"
-            level: INFO
-    on_state:
-      then:
-        - lambda: |-
-            if (id(door_light).current_values.is_on()) {
-              ESP_LOGI("light", "Door Light brightness: %.0f%%", 
-                       id(door_light).current_values.get_brightness() * 100);
-            }
 
   - platform: cwww
     cold_white: led_channel_4
@@ -218,47 +167,12 @@ light:
     default_transition_length: 500ms
     cold_white_color_temperature: 6500 K
     warm_white_color_temperature: 2700 K
-    on_turn_off: 
-      then:
-        - logger.log:
-            format: "Dog Crate Lights turned off"
-            level: INFO
-    on_turn_on: 
-      then:
-        - logger.log:
-            format: "Dog Crate Lights turned on"
-            level: INFO
-    on_state:
-      then:
-        - lambda: |-
-            if (id(cwww_led_dog_crate_lights).current_values.is_on()) {
-              ESP_LOGI("light", "Dog Crate Lights - Brightness: %.0f%%, Color Temp: %.0fK", 
-                       id(cwww_led_dog_crate_lights).current_values.get_brightness() * 100,
-                       id(cwww_led_dog_crate_lights).current_values.get_color_temperature());
-            }
 
   - platform: monochromatic
     id: garage_led_lights
     name: "Garage LED Light"
     default_transition_length: 500ms
     output: led_channel_6
-    on_turn_off: 
-      then:
-        - logger.log:
-            format: "Garage LED Light turned off"
-            level: INFO
-    on_turn_on: 
-      then:
-        - logger.log:
-            format: "Garage LED Light turned on"
-            level: INFO
-    on_state:
-      then:
-        - lambda: |-
-            if (id(garage_led_lights).current_values.is_on()) {
-              ESP_LOGI("light", "Garage LED Light brightness: %.0f%%", 
-                       id(garage_led_lights).current_values.get_brightness() * 100);
-            }
 
   - platform: cwww
     cold_white: led_channel_7
@@ -269,24 +183,6 @@ light:
     default_transition_length: 500ms
     cold_white_color_temperature: 6500 K
     warm_white_color_temperature: 2700 K
-    on_turn_off: 
-      then:
-        - logger.log:
-            format: "Bed Capsule Lights turned off"
-            level: INFO
-    on_turn_on: 
-      then:
-        - logger.log:
-            format: "Bed Capsule Lights turned on"
-            level: INFO
-    on_state:
-      then:
-        - lambda: |-
-            if (id(cwww_led_capsule_lights).current_values.is_on()) {
-              ESP_LOGI("light", "Bed Capsule Lights - Brightness: %.0f%%, Color Temp: %.0fK", 
-                       id(cwww_led_capsule_lights).current_values.get_brightness() * 100,
-                       id(cwww_led_capsule_lights).current_values.get_color_temperature());
-            }
 
   - platform: monochromatic
     id: light_awning_outside_light
@@ -294,23 +190,6 @@ light:
     icon: "mdi:light-flood-down"
     default_transition_length: 500ms
     output: led_channel_9
-    on_turn_off: 
-      then:
-        - logger.log:
-            format: "Awning Outside Light Strip turned off"
-            level: INFO
-    on_turn_on: 
-      then:
-        - logger.log:
-            format: "Awning Outside Light Strip turned on"
-            level: INFO
-    on_state:
-      then:
-        - lambda: |-
-            if (id(light_awning_outside_light).current_values.is_on()) {
-              ESP_LOGI("light", "Awning Outside Light Strip brightness: %.0f%%", 
-                       id(light_awning_outside_light).current_values.get_brightness() * 100);
-            }
 
   - platform: monochromatic
     id: light_awning_inside_light
@@ -318,23 +197,6 @@ light:
     icon: "mdi:light-flood-down"
     default_transition_length: 500ms
     output: led_channel_10
-    on_turn_off: 
-      then:
-        - logger.log:
-            format: "Awning Inside Light Strip turned off"
-            level: INFO
-    on_turn_on: 
-      then:
-        - logger.log:
-            format: "Awning Inside Light Strip turned on"
-            level: INFO
-    on_state:
-      then:
-        - lambda: |-
-            if (id(light_awning_inside_light).current_values.is_on()) {
-              ESP_LOGI("light", "Awning Inside Light Strip brightness: %.0f%%", 
-                       id(light_awning_inside_light).current_values.get_brightness() * 100);
-            }
 
   - platform: monochromatic
     id: light_exterior_passenger_capsule
@@ -342,23 +204,6 @@ light:
     icon: "mdi:wall-sconce-flat"
     default_transition_length: 500ms
     output: led_channel_11
-    on_turn_off: 
-      then:
-        - logger.log:
-            format: "Exterior Capsule Passenger Flood Light turned off"
-            level: INFO
-    on_turn_on: 
-      then:
-        - logger.log:
-            format: "Exterior Capsule Passenger Flood Light turned on"
-            level: INFO
-    on_state:
-      then:
-        - lambda: |-
-            if (id(light_exterior_passenger_capsule).current_values.is_on()) {
-              ESP_LOGI("light", "Exterior Capsule Passenger Flood Light brightness: %.0f%%", 
-                       id(light_exterior_passenger_capsule).current_values.get_brightness() * 100);
-            }
 
   - platform: monochromatic
     id: light_exterior_driver_capsule
@@ -366,23 +211,6 @@ light:
     icon: "mdi:wall-sconce-flat"
     default_transition_length: 500ms
     output: led_channel_12
-    on_turn_off: 
-      then:
-        - logger.log:
-            format: "Exterior Capsule Driver Flood Light turned off"
-            level: INFO
-    on_turn_on: 
-      then:
-        - logger.log:
-            format: "Exterior Capsule Driver Flood Light turned on"
-            level: INFO
-    on_state:
-      then:
-        - lambda: |-
-            if (id(light_exterior_driver_capsule).current_values.is_on()) {
-              ESP_LOGI("light", "Exterior Capsule Driver Flood Light brightness: %.0f%%", 
-                       id(light_exterior_driver_capsule).current_values.get_brightness() * 100);
-            }
 
   - platform: monochromatic
     id: light_exterior_roof_passenger
@@ -390,23 +218,6 @@ light:
     icon: "mdi:light-flood-down"
     default_transition_length: 500ms
     output: led_channel_13
-    on_turn_off: 
-      then:
-        - logger.log:
-            format: "Exterior Roof Passenger Flood Light turned off"
-            level: INFO
-    on_turn_on: 
-      then:
-        - logger.log:
-            format: "Exterior Roof Passenger Flood Light turned on"
-            level: INFO
-    on_state:
-      then:
-        - lambda: |-
-            if (id(light_exterior_roof_passenger).current_values.is_on()) {
-              ESP_LOGI("light", "Exterior Roof Passenger Flood Light brightness: %.0f%%", 
-                       id(light_exterior_roof_passenger).current_values.get_brightness() * 100);
-            }
 
   - platform: monochromatic
     id: light_exterior_roof_driver
@@ -414,23 +225,6 @@ light:
     icon: "mdi:light-flood-down"
     default_transition_length: 500ms
     output: led_channel_14
-    on_turn_off: 
-      then:
-        - logger.log:
-            format: "Exterior Roof Driver Flood Light turned off"
-            level: INFO
-    on_turn_on: 
-      then:
-        - logger.log:
-            format: "Exterior Roof Driver Flood Light turned on"
-            level: INFO
-    on_state:
-      then:
-        - lambda: |-
-            if (id(light_exterior_roof_driver).current_values.is_on()) {
-              ESP_LOGI("light", "Exterior Roof Driver Flood Light brightness: %.0f%%", 
-                       id(light_exterior_roof_driver).current_values.get_brightness() * 100);
-            }
 
   - platform: monochromatic
     id: light_exterior_roof_rear
@@ -438,70 +232,42 @@ light:
     icon: "mdi:light-flood-down"
     default_transition_length: 500ms
     output: led_channel_15
-    on_turn_off: 
-      then:
-        - logger.log:
-            format: "Exterior Roof Rear Flood Light turned off"
-            level: INFO
-    on_turn_on: 
-      then:
-        - logger.log:
-            format: "Exterior Roof Rear Flood Light turned on"
-            level: INFO
-    on_state:
-      then:
-        - lambda: |-
-            if (id(light_exterior_roof_rear).current_values.is_on()) {
-              ESP_LOGI("light", "Exterior Roof Rear Flood Light brightness: %.0f%%", 
-                       id(light_exterior_roof_rear).current_values.get_brightness() * 100);
-            }
 
 script:
-  - id: update_color_temp_and_brightness
-    mode: single
-    then:
-      - logger.log:
-          format: "Script: update_color_temp_and_brightness called"
-          level: INFO
-      - lambda: |-
-          // Calculate color temperature based on sun elevation
-          // Elevation ranges roughly from -90° (midnight) to +90° (noon)
-          float elevation = id(sun_elevation).state;
-          
-          // Map elevation to color temperature (2700K warm to 6500K cool)
-          // During day (positive elevation): cooler/brighter
-          // During night (negative elevation): warmer/dimmer
-
-          if (elevation > 0) {
-            // Daytime: 0° to 90° elevation
-            // Color temp: 4000K to 6500K (cooler during day)
-            id(current_color_temp) = 4000 + (elevation / 90.0) * 2500;
-            id(current_brightness) = 0.8 + (elevation / 90.0) * 0.2; // 80% to 100%
-          } else if (elevation > -6) {
-            // Civil twilight: 0° to -6° (golden hour)
-            // Color temp: 3000K to 4000K (warm golden light)
-            id(current_color_temp) = 3000 + ((elevation + 6) / 6.0) * 1000;
-            id(current_brightness) = 0.6 + ((elevation + 6) / 6.0) * 0.2;  // 60% to 80%
-          } else if (elevation > -12) {
-            // Nautical twilight: -6° to -12°
-            // Color temp: 2700K to 3000K (warmer)
-            id(current_color_temp) = 2700 + ((elevation + 12) / 6.0) * 300;
-            id(current_brightness) = 0.4 + ((elevation + 12) / 6.0) * 0.2;  // 40% to 60%
-          } else {
-            // Night: < -12° elevation
-            // Color temp: 2700K (warmest)
-            id(current_brightness) = 0.3;  // 30% for nighttime
-            id(current_color_temp) = 2700;
-          }
-
   - id: adjust_light_color_temperature
     mode: restart
     then:
       - logger.log:
           format: "Script: adjust_light_color_temperature called"
           level: INFO
-      - script.execute: update_color_temp_and_brightness
       - lambda: |-
+          // Calculate color temperature based on sun elevation
+          float elevation = id(sun_elevation).state;
+          
+          if (isnan(elevation)) {
+            ESP_LOGW("color_temp", "Sun elevation is NaN - skipping color temp adjustment");
+            return;
+          }
+
+          // Map elevation to color temperature (2700K warm to 6500K cool)
+          if (elevation > 0) {
+            // Daytime: 0° to 90° elevation
+            id(current_color_temp) = 4000 + (elevation / 90.0) * 2500;
+            id(current_brightness) = 0.8 + (elevation / 90.0) * 0.2;
+          } else if (elevation > -6) {
+            // Civil twilight: 0° to -6° (golden hour)
+            id(current_color_temp) = 3000 + ((elevation + 6) / 6.0) * 1000;
+            id(current_brightness) = 0.6 + ((elevation + 6) / 6.0) * 0.2;
+          } else if (elevation > -12) {
+            // Nautical twilight: -6° to -12°
+            id(current_color_temp) = 2700 + ((elevation + 12) / 6.0) * 300;
+            id(current_brightness) = 0.4 + ((elevation + 12) / 6.0) * 0.2;
+          } else {
+            // Night: < -12° elevation
+            id(current_brightness) = 0.3;
+            id(current_color_temp) = 2700;
+          }
+
           // Only adjust lights that are currently on and auto mode is enabled
           if (id(auto_color_temp_enabled).state) {
             if (id(cwww_led_dog_crate_lights).current_values.is_on()) {
@@ -519,7 +285,7 @@ script:
             }
 
             ESP_LOGD("color_temp", "Elevation: %.1f°, Color Temp: %.0fK, Brightness: %.0f%%", 
-                   id(sun_elevation).state, id(current_color_temp), id(current_brightness) * 100);
+                   elevation, id(current_color_temp), id(current_brightness) * 100);
           }
          
   - id: turn_off_exterior_flood_lights
@@ -578,6 +344,7 @@ script:
           else:
             - script.execute: turn_off_exterior_flood_lights
   
+  # Extensible entry point for turning on lights - may include exterior lights in the future
   - id: turn_on_lights
     then:
       - logger.log:
@@ -1319,13 +1086,7 @@ binary_sensor:
             if (id(garage_led_lights).current_values.is_on()) {
               id(garage_led_lights).turn_off().perform();
             } else {
-              if (id(auto_color_temp_enabled).state) {
-                auto call = id(garage_led_lights).turn_on();
-                call.set_brightness(id(current_brightness));
-                call.perform();
-              } else {
-                id(garage_led_lights).turn_on().perform();
-              }
+              id(garage_led_lights).turn_on().perform();
             }
           } else {
             ESP_LOGI("button", "PCF8574 Button 5 long press - stopping at current brightness");
@@ -1366,6 +1127,7 @@ binary_sensor:
       - light.turn_off: main_can_lights
       - light.turn_off: door_light
       - light.turn_off: cwww_led_dog_crate_lights
+      # capsule lights intentionally left on - they can remain on in sleep mode
       - delay: 30000ms
       - light.turn_off: bed_can_lights
 
