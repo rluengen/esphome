@@ -87,17 +87,13 @@ esphome:
     name: smartvan.${project_name}
     version: ${project_version}
 
-esp32:
-  board: seeed_xiao_esp32s3
-  framework:
-    type: esp-idf
-
 packages:
   remote_packages:
     url: https://github.com/rluengen/esphome
     ref: main
     refresh: always
     files:
+      - path: devices/xiao-esp32s3.yaml
       - path: packages/common.yaml
         vars:
           api_encryption_key: !secret encryption_key
