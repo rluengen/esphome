@@ -72,6 +72,7 @@ packages:
       - path: packages/icons/network_icons.yaml
       - path: devices/waveshare-ESP32-S3-Touch-LCD-2.8C.yaml
         vars:
+          touchscreen_id: touch_id
           display_id: round_display_id
           display_backlight_id: display_backlight_id
       - path: packages/display_timeout.yaml
