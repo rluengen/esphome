@@ -607,6 +607,7 @@ script:
       - light.turn_on: 
           id: bed_can_lights
           brightness: 100%
+      # door_light intentionally omitted - not turned on with all interior lights
       - lambda: |-
           if (id(auto_color_temp_enabled).state) {
             auto call = id(cwww_led_dog_crate_lights).turn_on();
@@ -652,10 +653,13 @@ script:
               - light.is_off: cwww_led_capsule_lights
           then:
             - logger.log:
-                format: "Toggling on interior lights (main can lights)"
+                format: "Toggling on interior lights (main and bed can lights)"
                 level: INFO
             - light.turn_on:
                 id: main_can_lights
+                brightness: 100%
+            - light.turn_on:
+                id: bed_can_lights
                 brightness: 100%
           else:
             - script.execute: turn_off_interior_lights
@@ -667,6 +671,9 @@ binary_sensor:
   - id: !extend button_1
     internal: true
     name: "Button 1 - Cabin Interior Lights Up"
+    filters:
+      - delayed_on: 50ms
+      - delayed_off: 50ms
     on_press:
       - lambda: 'id(button_1_loop_count) = 0;'
       - if:
@@ -787,6 +794,9 @@ binary_sensor:
   - id: !extend button_2
     name: "Button 2 - Cabin Interior Lights Down Button"
     internal: true
+    filters:
+      - delayed_on: 50ms
+      - delayed_off: 50ms
     on_press:
       - lambda: 'id(button_2_loop_count) = 0;'
       - if:
@@ -885,6 +895,9 @@ binary_sensor:
   - id: !extend button_3
     internal: true
     name: "Button 3 - Exterior Lights Up Button"
+    filters:
+      - delayed_on: 50ms
+      - delayed_off: 50ms
     on_press:
       - lambda: 'id(button_3_loop_count) = 0;'
       - if:
@@ -1003,6 +1016,9 @@ binary_sensor:
   - id: !extend button_4
     internal: true
     name: "Button 4 - Exterior Lights Down Button"
+    filters:
+      - delayed_on: 50ms
+      - delayed_off: 50ms
     on_press:
       - lambda: 'id(button_4_loop_count) = 0;'
       - if:
@@ -1279,16 +1295,9 @@ binary_sensor:
                         - logger.log:
                             format: "PCF8574 Button 5 held - turning on garage light"
                             level: INFO
-                        - lambda: |-
-                            if (id(auto_color_temp_enabled).state) {
-                              auto call = id(garage_led_lights).turn_on();
-                              call.set_brightness(0.2);
-                              call.perform();
-                            } else {
-                              auto call = id(garage_led_lights).turn_on();
-                              call.set_brightness(0.2);
-                              call.perform();
-                            }
+                        - light.turn_on:
+                            id: garage_led_lights
+                            brightness: 20%
                   - logger.log:
                       format: "PCF8574 Button 5 held - increasing garage light brightness 5%"
                       level: INFO
@@ -1570,12 +1579,6 @@ switch:
           
           if (id(cwww_led_capsule_lights).current_values.is_on()) {
             auto call = id(cwww_led_capsule_lights).turn_on();
-            call.set_brightness(1.0);
-            call.perform();
-          }
-          
-          if (id(garage_led_lights).current_values.is_on()) {
-            auto call = id(garage_led_lights).turn_on();
             call.set_brightness(1.0);
             call.perform();
           }
