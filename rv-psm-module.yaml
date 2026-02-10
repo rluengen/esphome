@@ -6,10 +6,14 @@
 # https://www.mbvans.com/content/dam/mb-vans/us/upfitter/psm-programs/MY25_RV_Software_Specification_V4.pdf
 
 substitutions:
-  device_name: van_psm_module_controller
-  friendly_name: Mercedes Sprinter Parametric Special Module
-  project_name:  Mercedes Sprinter Parametric Special Module
+  device_name: van-psm-module
+  friendly_name: Mercedes Sprinter PSM
+  project_name: mercedes-sprinter-psm
   project_version: "1.0.0"
+
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
 
 packages:
   remote_packages:
@@ -28,6 +32,8 @@ packages:
       - path: devices/waveshare-esp32-s3-8di-8do.yaml
 
 # https://www.mbvans.com/content/dam/mb-vans/us/upfitter/psm-programs/MY25_RV_Software_Specification_V4.pdf
+# CAN B DBC reference: https://github.com/bistromath/vs30-dbc
+# PSM CAN B interface is 250kbps
 # outputs:
 # hazard warning lights
 # vehicle lock
@@ -35,99 +41,259 @@ packages:
 #inputs:
 # gear in park
 
+# ==========================================================
+# CAN Bus Frame Logger & Decoded Sensors
+# ==========================================================
+# Set can_log_enabled to true to log all raw CAN frames.
+# Disable once you've captured what you need to reduce log noise.
+
+globals:
+  - id: can_log_enabled
+    type: bool
+    initial_value: "true"
+
+canbus:
+  - id: !extend canbus0
+    on_frame:
+      # ---- Raw frame logger (all CAN IDs) ----
+      - can_id: 0
+        can_id_mask: 0
+        then:
+          - lambda: |-
+              if (!id(can_log_enabled)) return;
+              char buf[64];
+              int len = snprintf(buf, sizeof(buf), "CAN 0x%03X [%d]", can_id, x.size());
+              for (int i = 0; i < x.size() && i < 8; i++) {
+                len += snprintf(buf + len, sizeof(buf) - len, " %02X", x[i]);
+              }
+              ESP_LOGI("canbus", "%s", buf);
+
+      # ---- Decoded: Rear Wheel Speed (CAN ID 0x0A1 / 161) ----
+      - can_id: 0x0A1
+        then:
+          - lambda: |-
+              if (x.size() < 7) return;
+              // WheelSpeedRight: start_bit=16, length=14, little-endian, scale=0.068355
+              uint16_t raw_right = (x[2] | (x[3] << 8)) & 0x3FFF;
+              float speed_right = raw_right * 0.068355;
+              id(can_rear_wheel_speed_right).publish_state(speed_right);
+
+              // WheelSpeedLeft: start_bit=40, length=14, little-endian, scale=0.068355
+              uint16_t raw_left = (x[5] | (x[6] << 8)) & 0x3FFF;
+              float speed_left = raw_left * 0.068355;
+              id(can_rear_wheel_speed_left).publish_state(speed_left);
+
+              // WheelMovingRight: start_bit=54, length=2
+              uint8_t dir_right = (x[6] >> 6) & 0x03;
+              id(can_rear_wheel_dir_right).publish_state(dir_right == 2 ? "Reverse" : dir_right == 1 ? "Forward" : "Stopped");
+
+              // WheelMovingLeft: start_bit=30, length=2
+              uint8_t dir_left = (x[3] >> 6) & 0x03;
+              id(can_rear_wheel_dir_left).publish_state(dir_left == 2 ? "Reverse" : dir_left == 1 ? "Forward" : "Stopped");
+
+      # ---- Decoded: Front Wheel Speed (CAN ID 0x0A3 / 163) ----
+      - can_id: 0x0A3
+        then:
+          - lambda: |-
+              if (x.size() < 7) return;
+              uint16_t raw_right = (x[2] | (x[3] << 8)) & 0x3FFF;
+              float speed_right = raw_right * 0.068355;
+              id(can_front_wheel_speed_right).publish_state(speed_right);
+
+              uint16_t raw_left = (x[5] | (x[6] << 8)) & 0x3FFF;
+              float speed_left = raw_left * 0.068355;
+              id(can_front_wheel_speed_left).publish_state(speed_left);
+
+      # ---- Decoded: Sliding Door State (CAN ID 0x3A5 / 933) ----
+      - can_id: 0x3A5
+        then:
+          - lambda: |-
+              if (x.size() < 2) return;
+              // SlidingDoorState: start_bit=12, length=1
+              bool closed = (x[1] >> 4) & 0x01;
+              id(can_sliding_door_closed).publish_state(closed);
+
+sensor:
+  # Rear wheel speeds
+  - platform: template
+    id: can_rear_wheel_speed_right
+    name: "Rear Wheel Speed (Right)"
+    unit_of_measurement: "km/h"
+    accuracy_decimals: 1
+    icon: "mdi:tire"
+    state_class: measurement
+
+  - platform: template
+    id: can_rear_wheel_speed_left
+    name: "Rear Wheel Speed (Left)"
+    unit_of_measurement: "km/h"
+    accuracy_decimals: 1
+    icon: "mdi:tire"
+    state_class: measurement
+
+  # Front wheel speeds
+  - platform: template
+    id: can_front_wheel_speed_right
+    name: "Front Wheel Speed (Right)"
+    unit_of_measurement: "km/h"
+    accuracy_decimals: 1
+    icon: "mdi:tire"
+    state_class: measurement
+
+  - platform: template
+    id: can_front_wheel_speed_left
+    name: "Front Wheel Speed (Left)"
+    unit_of_measurement: "km/h"
+    accuracy_decimals: 1
+    icon: "mdi:tire"
+    state_class: measurement
+
+  # Average vehicle speed (all 4 wheels)
+  - platform: template
+    id: can_vehicle_speed
+    name: "Vehicle Speed (CAN)"
+    unit_of_measurement: "km/h"
+    accuracy_decimals: 1
+    icon: "mdi:speedometer"
+    state_class: measurement
+    lambda: |-
+      float sum = 0; int count = 0;
+      if (!isnan(id(can_rear_wheel_speed_right).state)) { sum += id(can_rear_wheel_speed_right).state; count++; }
+      if (!isnan(id(can_rear_wheel_speed_left).state)) { sum += id(can_rear_wheel_speed_left).state; count++; }
+      if (!isnan(id(can_front_wheel_speed_right).state)) { sum += id(can_front_wheel_speed_right).state; count++; }
+      if (!isnan(id(can_front_wheel_speed_left).state)) { sum += id(can_front_wheel_speed_left).state; count++; }
+      return count > 0 ? sum / count : NAN;
+    update_interval: 1s
+
+text_sensor:
+  - platform: template
+    id: can_rear_wheel_dir_right
+    name: "Rear Wheel Direction (Right)"
+    icon: "mdi:arrow-left-right"
+
+  - platform: template
+    id: can_rear_wheel_dir_left
+    name: "Rear Wheel Direction (Left)"
+    icon: "mdi:arrow-left-right"
+
 binary_sensor:
   - platform: template
-    id: any-door-open
+    id: can_sliding_door_closed
+    name: "Sliding Door Closed (CAN)"
+    icon: "mdi:car-door"
+    device_class: door
+
+  - platform: template
+    id: any_door_open
     name: "Any Door Open"
     icon: "mdi:car-door"
+    device_class: door
     lambda: |-
-      if (id(passenger_door_open).state || id(driver_door_open).state || id(sliding_door_open).state || id(rear_door_open).state) {
-        return true;
-      } else {
-        return false;
-      }
+      return id(di1).state || id(di2).state || id(di3).state || id(di4).state;
 
   - id: !extend di1
     name: "Passenger Door Open"
     comment: "Connector 2, Pin 7, High"
     icon: "mdi:car-door"
+    device_class: door
     mode: INPUT_PULLDOWN
     on_state:
-      - component.update: any-door-open
+      - component.update: any_door_open
 
   - id: !extend di2
     name: "Driver Door Open"
     comment: "Connector 2, Pin 1, High"
     icon: "mdi:car-door"
+    device_class: door
     mode: INPUT_PULLDOWN
     on_state:
-      - component.update: any-door-open
+      - component.update: any_door_open
 
   - id: !extend di3
     name: "Sliding Door Open"
     comment: "Connector 3, Pin 3, Low"
     icon: "mdi:car-door"
+    device_class: door
     mode: INPUT_PULLUP
     on_state:
-      - component.update: any-door-open
+      - component.update: any_door_open
 
   - id: !extend di4
     name: "Rear Door Open"
     comment: "Connector 3, Pin 13, Low"
     icon: "mdi:car-door"
+    device_class: door
     mode: INPUT_PULLUP
     on_state:
-      - component.update: any-door-open
-
+      - component.update: any_door_open
 
   - id: !extend di5
     name: "Vehicle Locked"
     comment: "Connector 3, Pin 31, High"
     icon: "mdi:car-lock"
+    device_class: lock
     mode: INPUT_PULLDOWN
+    on_state:
+      - lambda: |-
+          if (x) {
+            id(vehicle_lock).publish_state(true);
+          }
 
   - id: !extend di6
     name: "Vehicle Unlocked"
     comment: "Connector 3, Pin 32, High"
     icon: "mdi:car-lock"
+    device_class: lock
     mode: INPUT_PULLDOWN
+    on_state:
+      - lambda: |-
+          if (x) {
+            id(vehicle_lock).publish_state(false);
+          }
 
-
-  # - id: !extend di7
-  #   name: "Gear in 'P'"
-  #   comment: "Connector 2, Pin 6, High"
-  #   icon: "mdi:car-shift-pattern"
-
-  # - id: !extend di8
-  #   name: "Gear in 'R'"
-  #   comment: "Connector 2, Pin 9, High"
-  #   icon: "mdi:car-shift-pattern"
-
-  # - id: !extend di1
-  #   name: "Gear NOT in 'P'"
-  #   comment: "Connector 2, Pin 22, High"
-  #   icon: "mdi:car-shift-pattern"
-
-  - id: !extend di1
+  - id: !extend di7
     name: "Vehicle Speed > 0 mph"
     comment: "Connector 3, Pin 21, High"
     icon: "mdi:speedometer"
     mode: INPUT_PULLDOWN
 
-    # Ignition On
-    # Park Brake ON
-
-    # Brake Lights
-    # Left Turn Signal
-    # Right Turn Signal
-
-
 switch:
+  - platform: template
+    id: can_logger_switch
+    name: "CAN Bus Logger"
+    icon: "mdi:math-log"
+    entity_category: diagnostic
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+    turn_on_action:
+      - lambda: 'id(can_log_enabled) = true;'
+    turn_off_action:
+      - lambda: 'id(can_log_enabled) = false;'
+
   - id: !extend do1
-    name: "Vehicle Lock"
+    name: "Vehicle Lock Relay"
     comment: "Connector 3, Pin 30"
+    internal: true
+
+  - platform: template
+    id: vehicle_lock
+    name: "Vehicle Lock"
     icon: "mdi:car-lock"
-    device_class: lock
+    optimistic: false
+    lambda: 'return id(di5).state;'
+    turn_on_action:
+      - if:
+          condition:
+            binary_sensor.is_on: any_door_open
+          then:
+            - logger.log: "Cannot lock - one or more doors are open"
+          else:
+            - logger.log: "Sending lock pulse"
+            - switch.turn_on: do1
+            - delay: 500ms
+            - switch.turn_off: do1
+    turn_off_action:
+      - logger.log: "Lock switch is momentary - no unlock action"
 
   - id: !extend do2
     name: "Hazard Warning Lights"
