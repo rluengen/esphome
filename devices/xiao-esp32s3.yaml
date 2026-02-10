@@ -1,0 +1,26 @@
+# Seeed Studio XIAO ESP32-S3
+# https://wiki.seeedstudio.com/xiao_esp32s3_getting_started/
+#
+# Pin Mapping:
+#   D0  = GPIO1   (ADC, Touch1)
+#   D1  = GPIO2   (ADC, Touch2)
+#   D2  = GPIO3   (ADC, Touch3)
+#   D3  = GPIO4   (ADC, Touch4)
+#   D4  = GPIO5   (ADC, I2C SDA, Touch5)
+#   D5  = GPIO6   (ADC, I2C SCL, Touch6)
+#   D6  = GPIO43  (UART TX)
+#   D7  = GPIO44  (UART RX)
+#   D8  = GPIO7   (SPI SCK, ADC, Touch7)
+#   D9  = GPIO8   (SPI MISO, ADC, Touch8)
+#   D10 = GPIO9   (SPI MOSI, ADC, Touch9)
+
+esphome:
+  platformio_options:
+    board_build.flash_mode: dio
+    board_build.mcu: esp32s3
+
+esp32:
+  board: seeed_xiao_esp32s3
+  variant: esp32s3
+  framework:
+    type: esp-idf
