@@ -19,7 +19,7 @@
 # Your specific heater firmware version may differ - always verify by sniffing first.
 
 substitutions:
-  device_name: espar-heater
+  device_name: esparheater
   friendly_name: Espar Heater
   project_name: Van Espar Heater Controller
   project_version: "1.0.0"
@@ -324,3 +324,81 @@ number:
           data: !lambda |-
             uint8_t level = (uint8_t)(x * 255.0 / 100.0);
             return {0x02, level, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+
+# --- Climate: Thin wrapper that forwards mode/setpoint to the CAN bus ---
+# The heater has its own thermostat - this just sends commands when you
+# change mode or target temperature from the HA UI.
+climate:
+  - platform: thermostat
+    name: "${friendly_name} Climate"
+    id: heater_climate
+    icon: mdi:radiator
+    sensor: heater_exhaust_temp  # Display-only; the heater controls its own loop
+    visual:
+      min_temperature: 10
+      max_temperature: 35
+      temperature_step: 1.0
+    min_idle_time: 10s
+    min_heating_off_time: 60s     # Prevent rapid cycling - heater needs cooldown
+    min_heating_run_time: 120s    # Let heater run at least 2 min per cycle
+    heat_deadband: 0.5
+    heat_overrun: 0.5
+    heat_action:
+      - lambda: |-
+          if (std::string("${sniff_mode}") == "true") {
+            ESP_LOGW("espar", "Sniff mode active - not sending heat command");
+            return;
+          }
+          float setpoint = id(heater_climate).target_temperature;
+          uint8_t temp_byte = (uint8_t)clamp((int)setpoint, 0, 255);
+          ESP_LOGI("espar", "Climate HEAT: sending start + setpoint %.0f°C", setpoint);
+      - if:
+          condition:
+            lambda: 'return std::string("${sniff_mode}") != "true";'
+          then:
+            - canbus.send:
+                canbus_id: espar_can
+                can_id: ${heater_command_id}
+                data: !lambda |-
+                  float setpoint = id(heater_climate).target_temperature;
+                  uint8_t temp_byte = (uint8_t)clamp((int)setpoint, 0, 255);
+                  return {0x01, temp_byte, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+    idle_action:
+      - lambda: |-
+          if (std::string("${sniff_mode}") == "true") {
+            ESP_LOGW("espar", "Sniff mode active - not sending idle/off command");
+            return;
+          }
+          ESP_LOGI("espar", "Climate IDLE: sending stop command");
+      - if:
+          condition:
+            lambda: 'return std::string("${sniff_mode}") != "true";'
+          then:
+            - canbus.send:
+                canbus_id: espar_can
+                can_id: ${heater_command_id}
+                data: [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
+    off_mode:
+      - lambda: 'ESP_LOGI("espar", "Climate mode set to OFF");'
+    heat_mode:
+      - lambda: 'ESP_LOGI("espar", "Climate mode set to HEAT");'
+    target_temperature_change_action:
+      - lambda: |-
+          if (std::string("${sniff_mode}") == "true") return;
+          float setpoint = id(heater_climate).target_temperature;
+          ESP_LOGI("espar", "Target temperature changed to %.0f°C", setpoint);
+      - if:
+          condition:
+            lambda: 'return std::string("${sniff_mode}") != "true";'
+          then:
+            - canbus.send:
+                canbus_id: espar_can
+                can_id: ${heater_command_id}
+                data: !lambda |-
+                  float setpoint = id(heater_climate).target_temperature;
+                  uint8_t temp_byte = (uint8_t)clamp((int)setpoint, 0, 255);
+                  return {0x02, temp_byte, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+    default_preset: Home
+    preset:
+      - name: Home
+        default_target_temperature_low: 20
