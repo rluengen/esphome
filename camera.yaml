@@ -1,21 +1,43 @@
+# XIAO ESP32S3 Sense Camera
 # https://wiki.seeedstudio.com/XIAO_ESP32S3_esphome/
 
 substitutions:
   device_name: camera
-  friendly_name: Seeed Studio XIAO ESP32S3 Sense Camera
-  project_name: Van Camera
-  project_version: "1.0.0"
-  log_level: VERBOSE
+  friendly_name: Van Camera
+  log_level: INFO
 
 esphome:
-  name: camera
+  name: ${device_name}
   name_add_mac_suffix: true
-  friendly_name: Seeed Studio XIAO ESP32S3 Sense Camera
+  friendly_name: ${friendly_name}
+  on_boot:
+    priority: -100  # run after all components are initialized
+    then:
+      - lambda: |-
+          auto val = id(camera_resolution).state;
+          auto *sensor = esp_camera_sensor_get();
+          if (sensor == nullptr || val.empty()) return;
+          framesize_t fs;
+          if (val == "320x240") fs = FRAMESIZE_QVGA;
+          else if (val == "640x480") fs = FRAMESIZE_VGA;
+          else if (val == "800x600") fs = FRAMESIZE_SVGA;
+          else if (val == "1024x768") fs = FRAMESIZE_XGA;
+          else if (val == "1280x1024") fs = FRAMESIZE_SXGA;
+          else if (val == "1600x1200") fs = FRAMESIZE_UXGA;
+          else return;
+          sensor->set_framesize(sensor, fs);
+          ESP_LOGI("camera", "Restored resolution to %s", val.c_str());
+          // Restore JPEG quality
+          int q = (int)id(jpeg_quality_slider).state;
+          if (q >= 10 && q <= 63) {
+            sensor->set_quality(sensor, q);
+            ESP_LOGI("camera", "Restored JPEG quality to %d", q);
+          }
   platformio_options:
     build_flags: -DBOARD_HAS_PSRAM
     board_build.arduino.memory_type: qio_opi
     board_build.f_flash: 80000000L
-    board_build.flash_mode: qio 
+    board_build.flash_mode: qio
 
 packages:
   remote_packages:
@@ -31,26 +53,20 @@ packages:
           wifi_ssid: !secret wifi_ssid
           wifi_password: !secret wifi_password
       - path: packages/time/homeassistant.yaml
-
-esp32:
-  board: esp32-s3-devkitc-1
-  framework:
-    type: esp-idf
+      - path: devices/xiao-esp32s3.yaml
 
 psram:
   mode: octal
   speed: 80MHz
 
-# I2C for camera sensor (SCCB interface)
 i2c:
   id: camera_i2c
   sda: GPIO40
   scl: GPIO39
 
-# Configuration for the ESP32 Camera
 esp32_camera:
   id: espcam
-  name: My Camera
+  name: Camera
   external_clock:
     pin: GPIO10
     frequency: 20MHz
@@ -59,9 +75,87 @@ esp32_camera:
   vsync_pin: GPIO38
   href_pin: GPIO47
   pixel_clock_pin: GPIO13
-  resolution: 800x600
-  
-# Configuration for the ESP32 Camera Web Server
+  resolution: 1024x768
+  jpeg_quality: 10
+  frame_buffer_count: 2
+  max_framerate: 15 fps
+  idle_framerate: 0.1 fps
+  on_stream_start:
+    - light.turn_on: status_led
+    - logger.log: "Camera stream started"
+  on_stream_stop:
+    - light.turn_off: status_led
+    - logger.log: "Camera stream stopped"
+
+# Built-in LED (GPIO21, active low on XIAO ESP32S3)
+output:
+  - platform: gpio
+    id: led_output
+    pin:
+      number: GPIO21
+      inverted: true
+
+light:
+  - platform: binary
+    id: status_led
+    name: Stream Indicator
+    output: led_output
+    internal: true
+
+number:
+  - platform: template
+    name: JPEG Quality
+    id: jpeg_quality_slider
+    icon: mdi:image-quality
+    min_value: 10
+    max_value: 63
+    step: 1
+    initial_value: 10
+    optimistic: true
+    restore_value: true
+    unit_of_measurement: ""
+    on_value:
+      then:
+        - lambda: |-
+            auto *sensor = esp_camera_sensor_get();
+            if (sensor == nullptr) return;
+            sensor->set_quality(sensor, (int)x);
+            ESP_LOGI("camera", "JPEG quality set to %d", (int)x);
+
+select:
+  - platform: template
+    name: Camera Resolution
+    id: camera_resolution
+    icon: mdi:camera-outline
+    options:
+      - "320x240"
+      - "640x480"
+      - "800x600"
+      - "1024x768"
+      - "1280x1024"
+      - "1600x1200"
+    initial_option: "1024x768"
+    optimistic: true
+    restore_value: true
+    on_value:
+      then:
+        - lambda: |-
+            auto *sensor = esp_camera_sensor_get();
+            if (sensor == nullptr) {
+              ESP_LOGW("camera", "Camera sensor not available");
+              return;
+            }
+            framesize_t fs;
+            if (x == "320x240") fs = FRAMESIZE_QVGA;
+            else if (x == "640x480") fs = FRAMESIZE_VGA;
+            else if (x == "800x600") fs = FRAMESIZE_SVGA;
+            else if (x == "1024x768") fs = FRAMESIZE_XGA;
+            else if (x == "1280x1024") fs = FRAMESIZE_SXGA;
+            else if (x == "1600x1200") fs = FRAMESIZE_UXGA;
+            else return;
+            sensor->set_framesize(sensor, fs);
+            ESP_LOGI("camera", "Resolution changed to %s", x.c_str());
+
 esp32_camera_web_server:
   - port: 8080
     mode: stream
