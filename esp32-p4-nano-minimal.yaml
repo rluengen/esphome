@@ -1,0 +1,27 @@
+# Minimal ESP32-P4 test - no display, no WiFi, just boot and blink
+substitutions:
+  device_name: esp32-p4-test
+  friendly_name: ESP32-P4 Test
+
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
+
+esp32:
+  board: esp32-p4-evboard
+  variant: esp32p4
+  flash_size: 16MB
+  framework:
+    type: esp-idf
+
+logger:
+  level: VERBOSE
+  baud_rate: 115200
+  hardware_uart: UART0
+
+# Just a simple interval to prove it boots
+interval:
+  - interval: 1s
+    then:
+      - lambda: |-
+          ESP_LOGI("test", "ESP32-P4 is alive!");

@@ -23,9 +23,9 @@ esp32:
   framework:
     type: esp-idf
 
-# Required for MIPI-DSI display - use octal PSRAM mode for best performance
+# Required for MIPI-DSI display
 psram:
-  mode: octal
+  mode: hex
   speed: 200MHz
 
 # LDO for MIPI-DSI PHY - CRITICAL for display initialization
@@ -75,6 +75,7 @@ update:
 
 logger:
   level: ${log_level}
+  hardware_uart: UART0
 
 # I2C for GT911 Touchscreen and display backlight controller
 i2c:
