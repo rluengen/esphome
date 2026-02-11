@@ -119,6 +119,10 @@ globals:
     type: float
     restore_value: no
     initial_value: '-1.0'
+  - id: fan_cooldown_seconds
+    type: int
+    restore_value: no
+    initial_value: '0'
 
 # Deep sleep component
 deep_sleep:
@@ -144,7 +148,7 @@ output:
     pin: GPIO1
     frequency: 25000 Hz
 
-  # Shared power level for both Thermoelectric Coolers (and fan)
+  # Shared power level for both Thermoelectric Coolers
   - platform: template
     id: tec_power
     type: float
@@ -158,15 +162,14 @@ output:
           
           // Only update if level changed significantly
           if (fabs(level - id(last_tec_power)) < 0.01f) {
-            return;  // No significant change, skip update
+            return;
           }
           id(last_tec_power) = level;
           
           // Drive both Thermoelectric Cooler MOSFETs
           id(tec1_pwm).set_level(level);
           id(tec2_pwm).set_level(level);
-          ESP_LOGD("tec_power", "PID requested %.1f%%, clamped to %.1f%% (max %.1f%%)", 
-                   state * 100.0f, level * 100.0f, max_level * 100.0f);
+          ESP_LOGD("tec_power", "TEC power set to %.0f%%", level * 100.0f);
 
 i2c:
   sda: GPIO5   # D4
@@ -286,7 +289,7 @@ sensor:
 
   # Hot side DS18B20 (controls fan + safety)
   - platform: dallas_temp
-    address: 0x2222222222222222  # TODO: Replace with actual sensor address from logs
+    address: 0x2724010000562028
     name: "Hot Side Temperature"
     id: hot_temp
     update_interval: 5s
@@ -365,7 +368,7 @@ number:
     max_value: 10
     step: 0.5
     unit_of_measurement: "°C"
-    initial_value: 2
+    initial_value: 3
     optimistic: true
     restore_value: true
     entity_category: config
@@ -432,21 +435,23 @@ number:
 
 switch:
   - platform: template
+    name: "Dehumidifier"
+    id: dehumidifier_enable
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+    icon: "mdi:water-off"
+    turn_off_action:
+      - climate.control:
+          id: tec_climate
+          mode: "OFF"
+
+  - platform: template
     name: "Deep Sleep Enable"
     id: deep_sleep_enable
     optimistic: true
     restore_mode: RESTORE_DEFAULT_OFF
     entity_category: config
     icon: "mdi:sleep"
-
-  - platform: template
-    name: "Prevent Sleep"
-    id: prevent_sleep
-    optimistic: true
-    restore_mode: ALWAYS_OFF
-    entity_category: config
-    icon: "mdi:sleep-off"
-    # Use this to temporarily prevent sleep (e.g., during OTA updates)
 
 fan:
   - platform: speed
@@ -461,26 +466,55 @@ interval:
     then:
       - lambda: |-
           float level = 0.0f;
+          const float TEMP_THRESHOLD = 3.0f;  // Min degrees above ambient to start fan
+          const int COOLDOWN_MAX_SECONDS = 180;  // 3 minutes cooldown when TEC off
+          
           if (id(hot_temp).has_state() && id(box_air_temp).has_state()) {
             float hot = id(hot_temp).state;
             float ambient = id(box_air_temp).state;
             float max_temp = id(fan_max_temp).state;
-
-            // Fan off when hot side equals ambient, ramps to 100% at max_temp
-            // Linear interpolation: 0% at ambient, 100% at max_temp
-            if (hot > ambient && ambient < max_temp) {
-              level = (hot - ambient) / (max_temp - ambient);
-              if (level > 1.0f) level = 1.0f;
-              if (level < 0.0f) level = 0.0f;
-            }
-
-            // Overtemp forces full fan
+            float temp_diff = hot - ambient;
+            
+            // Check if TEC is actively cooling (PID in COOL mode with power > 0)
+            bool tec_active = (id(tec_climate).mode == CLIMATE_MODE_COOL && 
+                               id(last_tec_power) > 0.01f);
+            
+            // Overtemp always forces full fan
             if (id(hot_overtemp).state) {
               level = 1.0f;
+              id(fan_cooldown_seconds) = COOLDOWN_MAX_SECONDS;  // Reset cooldown
               ESP_LOGW("fan", "Overtemp! Forcing fan to 100%%");
             }
-            
-            ESP_LOGD("fan", "Hot: %.1fC, Ambient: %.1fC, Fan speed: %.0f%%", hot, ambient, level * 100.0f);
+            // TEC is actively cooling - run fan based on temp difference
+            else if (tec_active) {
+              // Only turn on fan if hot side is TEMP_THRESHOLD degrees above ambient
+              if (temp_diff >= TEMP_THRESHOLD) {
+                // Ramp from 0% at threshold to 100% at max_temp
+                float ramp_range = max_temp - ambient - TEMP_THRESHOLD;
+                if (ramp_range > 0) {
+                  level = (temp_diff - TEMP_THRESHOLD) / ramp_range;
+                  if (level > 1.0f) level = 1.0f;
+                  if (level < 0.0f) level = 0.0f;
+                }
+              }
+              id(fan_cooldown_seconds) = COOLDOWN_MAX_SECONDS;  // Reset cooldown timer
+              ESP_LOGD("fan", "TEC active - Hot: %.1fC, Ambient: %.1fC, Diff: %.1fC, Fan: %.0f%%", 
+                       hot, ambient, temp_diff, level * 100.0f);
+            }
+            // TEC is off - run cooldown fan if heatsink still warm
+            else if (id(fan_cooldown_seconds) > 0 && temp_diff >= TEMP_THRESHOLD) {
+              // Run fan at reduced speed during cooldown
+              level = 0.5f;  // 50% fan during cooldown
+              id(fan_cooldown_seconds) -= 15;  // Subtract interval time
+              ESP_LOGD("fan", "Cooldown - Hot: %.1fC, Ambient: %.1fC, Remaining: %ds, Fan: 50%%", 
+                       hot, ambient, id(fan_cooldown_seconds));
+            }
+            // TEC off and cooldown expired or heatsink cool
+            else {
+              level = 0.0f;
+              id(fan_cooldown_seconds) = 0;
+              ESP_LOGD("fan", "TEC off, heatsink cool - Fan: 0%%");
+            }
           } else {
             ESP_LOGD("fan", "Sensors not ready, fan speed: 0%%");
           }
@@ -489,6 +523,11 @@ interval:
   - interval: 30s
     then:
       - lambda: |-
+          // Check if dehumidifier is enabled
+          if (!id(dehumidifier_enable).state) {
+            return;  // Dehumidifier disabled, skip control logic
+          }
+          
           if (!id(dew_point).has_state() || !id(box_humidity).has_state()) return;
 
           float current_humidity = id(box_humidity).state;
@@ -536,7 +575,7 @@ interval:
             ESP_LOGD("dehumidifier", "Low humidity count: %d", id(low_humidity_count));
             
             // Enter deep sleep after 2 consecutive low humidity checks (1 minute)
-            if (id(deep_sleep_enable).state && !id(prevent_sleep).state && id(low_humidity_count) >= 2) {
+            if (id(deep_sleep_enable).state && id(low_humidity_count) >= 2) {
               int sleep_mins = (int)id(sleep_duration_min).state;
               ESP_LOGI("dehumidifier", "Entering deep sleep for %d minutes", sleep_mins);
 
