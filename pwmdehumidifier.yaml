@@ -72,7 +72,7 @@
 substitutions:
   device_name: pwmdehumidifier
   friendly_name: Dehumidifier
-  project_name: Van Dehumidifier
+  project_name: pwm-dehumidifier
   project_version: "1.0.0"
   log_level: VERBOSE
 
@@ -81,7 +81,7 @@ web_server:
   port: 80
 
 esphome:
-  name: pwmdehumidifier
+  name: ${device_name}
   friendly_name: ${friendly_name}
   project:
     name: smartvan.${project_name}
@@ -184,6 +184,7 @@ sensor:
     name: "Exterior Temperature"
     id: exterior_temp
     entity_id: sensor.outdoor_temperature  # Change to your HA outdoor temp sensor
+    internal: true
     unit_of_measurement: "°C"
     filters:
       - filter_out: nan
@@ -198,6 +199,7 @@ sensor:
     id: fan_rpm
     unit_of_measurement: 'RPM'
     accuracy_decimals: 0
+    state_class: measurement
     filters:
       - multiply: 0.5  # 2 pulses per revolution, counter gives pulses/min
       - delta: 1.0     # Only publish when RPM changes by at least 1
@@ -215,6 +217,7 @@ sensor:
     temperature:
       name: "Temperature"
       id: box_air_temp
+      state_class: measurement
       filters:
          - exponential_moving_average:  
              alpha: 0.1
@@ -222,6 +225,7 @@ sensor:
     humidity:
       name: "Humidity"
       id: box_humidity
+      state_class: measurement
       filters:
          - exponential_moving_average:  
              alpha: 0.1
@@ -233,6 +237,7 @@ sensor:
     name: "Dew Point"
     unit_of_measurement: "°C"
     accuracy_decimals: 1
+    state_class: measurement
     lambda: |-
       if (!id(box_air_temp).has_state()) {
         ESP_LOGW("dew_point", "[dew_point] box_air_temp has no state yet");
@@ -271,6 +276,7 @@ sensor:
     name: "Cold Side Temperature"
     id: cold_temp
     update_interval: 5s
+    state_class: measurement
     filters:
       - filter_out: nan  # Ignore failed readings
       - exponential_moving_average:
@@ -284,6 +290,7 @@ sensor:
     name: "Hot Side Temperature"
     id: hot_temp
     update_interval: 5s
+    state_class: measurement
     filters:
       - filter_out: nan  # Ignore failed readings
       - exponential_moving_average:

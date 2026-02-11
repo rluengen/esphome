@@ -8,9 +8,9 @@
 # automatically turn off the display after a period of inactivity.
 
 substitutions:
-  device_name: light_dial_controller
+  device_name: light-dial-controller
   friendly_name: Light Dial Controller
-  project_name:  Mercedes Sprinter Control Modules
+  project_name: light-dial-controller
   project_version: "1.0.0"
   log_level: DEBUG
 

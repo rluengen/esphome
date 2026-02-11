@@ -50,7 +50,7 @@
 substitutions:
   device_name: water
   friendly_name: Water Tank Display
-  project_name:  Mercedes Sprinter Control Modules
+  project_name: water-tank-display
   project_version: "1.0.0"
   log_level: DEBUG
 
@@ -336,6 +336,7 @@ sensor:
     configuration: DOWNSTREAM # Position of unknown resistor in divider
     resistor: 5.6kOhm # (Required, float): The value of the resistor with a constant value.
     reference_voltage: 3.3 V # (Optional, float): The reference voltage. Defaults to 3.3V.
+    state_class: measurement
 
     filters:
       - median:
@@ -352,6 +353,7 @@ sensor:
     name: "Fresh Water Tank Level (%)"
     unit_of_measurement: "%"
     accuracy_decimals: 0
+    state_class: measurement
     
     # Calibrate non-linear tank by mapping resistance (ohms) to percentage
     # Measure resistance at different fill levels and add points here
@@ -435,6 +437,7 @@ sensor:
     name: "Tank Gallons Remaining"
     unit_of_measurement: "gal"
     accuracy_decimals: 1
+    state_class: measurement
     on_value:
       then:
         - lvgl.label.update:
@@ -456,6 +459,7 @@ sensor:
     name: "Estimated Time to Fill"
     unit_of_measurement: "min"
     accuracy_decimals: 1
+    state_class: measurement
     lambda: |-
       if (id(fill_rate_gpm) <= 0.0 || isnan(id(tank_percent).state)) return NAN;
       

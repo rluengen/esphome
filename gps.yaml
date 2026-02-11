@@ -1,7 +1,7 @@
 substitutions:
   device_name: gps
   friendly_name: Global Positioning System
-  project_name:  Mercedes Sprinter Control Modules
+  project_name: gps-receiver
   project_version: "1.0.0"
   log_level: DEBUG
 
@@ -132,6 +132,7 @@ sensor:
     id: stabilized_latitude
     accuracy_decimals: 6
     update_interval: never
+    state_class: measurement
     lambda: |-
       float raw_lat = id(gps_latitude).state;
       float raw_lon = id(raw_longitude);
@@ -173,6 +174,7 @@ sensor:
     id: stabilized_longitude
     accuracy_decimals: 6
     update_interval: never
+    state_class: measurement
     lambda: |-
       if (id(is_position_locked)) {
         return id(locked_lon);

@@ -7,13 +7,13 @@
 substitutions:
   device_name: controller
   friendly_name: Display Controller
-  project_name: Display Controller
+  project_name: display-controller
   project_version: "1.0.0"
   log_level: VERBOSE
 
 esphome:
-  name: esp32p4-dsi-88
-  friendly_name: ESP32-P4 DSI 8.8
+  name: ${device_name}
+  friendly_name: ${friendly_name}
   on_boot:
     # VERY EARLY (priority 900) - Full panel init sequence BEFORE DSI bus init
     # Following EXACT order from Waveshare esp_lcd_dsi component

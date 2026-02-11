@@ -1,9 +1,9 @@
 # https://docs.m5stack.com/en/homeassistant/kit/tab5_ha_hmi
 
 substitutions:
-  device_name: van_tablet
+  device_name: van-tablet
   friendly_name: Van Tablet Controller
-  project_name: Van Tab5 Tablet Controller
+  project_name: van-tablet
   project_version: "1.0.0"
   log_level: DEBUG
 

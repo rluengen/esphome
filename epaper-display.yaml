@@ -9,6 +9,7 @@
 substitutions:
   device_name: terminal
   friendly_name: "Terminal Display"
+  project_name: terminal-display
   project_version: "1.0.0"
   log_level: DEBUG
   sleep_duration: 15min
@@ -44,6 +45,9 @@ esphome:
   name: ${device_name}
   friendly_name: ${friendly_name}
   comment: "Terminal Dashboard Display"
+  project:
+    name: smartvan.${project_name}
+    version: ${project_version}
   on_boot:
     priority: -100  # Run after all components are initialized (including SPI)
     then:
@@ -1276,6 +1280,7 @@ sensor:
   - platform: homeassistant
     id: location_latitude
     entity_id: sensor.location_latitude
+    internal: true
     on_value:
       then:
         - lambda: |-
@@ -1284,6 +1289,7 @@ sensor:
   - platform: homeassistant
     id: location_longitude
     entity_id: sensor.location_longitude
+    internal: true
     on_value:
       then:
         - lambda: |-
@@ -1292,6 +1298,7 @@ sensor:
   - platform: homeassistant
     id: fuel_level
     entity_id: sensor.fuel_level
+    internal: true
     on_value:
       then:
         - lambda: |-
@@ -1300,6 +1307,7 @@ sensor:
   - platform: homeassistant
     id: def_level
     entity_id: sensor.def_level
+    internal: true
     on_value:
       then:
         - lambda: |-
@@ -1308,6 +1316,7 @@ sensor:
   - platform: homeassistant
     id: vehicle_battery
     entity_id: sensor.vehicle_battery
+    internal: true
     on_value:
       then:
         - lambda: |-
@@ -1316,6 +1325,7 @@ sensor:
   - platform: homeassistant
     id: air_co2
     entity_id: sensor.air_quality_co2  # TODO: Change to your actual CO2 entity
+    internal: true
     on_value:
       then:
         - lambda: |-
@@ -1324,6 +1334,7 @@ sensor:
   - platform: homeassistant
     id: air_pm25
     entity_id: sensor.air_quality_pm25  # TODO: Change to your actual PM2.5 entity
+    internal: true
     on_value:
       then:
         - lambda: |-
@@ -1332,6 +1343,7 @@ sensor:
   - platform: homeassistant
     id: air_voc
     entity_id: sensor.air_quality_voc  # TODO: Change to your actual VOC entity
+    internal: true
     on_value:
       then:
         - lambda: |-
@@ -1340,6 +1352,7 @@ sensor:
   - platform: homeassistant
     id: air_nox
     entity_id: sensor.air_quality_nox  # TODO: Change to your actual NOx entity
+    internal: true
     on_value:
       then:
         - lambda: |-
@@ -1348,6 +1361,7 @@ sensor:
   - platform: homeassistant
     id: fridge_temp
     entity_id: sensor.fridge_temperature  # TODO: Change to your actual fridge temp entity
+    internal: true
     on_value:
       then:
         - lambda: |-
@@ -1356,6 +1370,7 @@ sensor:
   - platform: homeassistant
     id: water_level
     entity_id: sensor.water_level  # TODO: Change to your actual water level entity
+    internal: true
     on_value:
       then:
         - lambda: |-
@@ -1364,6 +1379,7 @@ sensor:
   - platform: homeassistant
     id: fuel_range
     entity_id: sensor.fuel_range  # Estimated miles remaining on fuel
+    internal: true
     on_value:
       then:
         - lambda: |-
@@ -1376,6 +1392,7 @@ sensor:
     unit_of_measurement: "mi"
     accuracy_decimals: 0
     icon: "mdi:gas-station"
+    state_class: measurement
     lambda: |-
       if (isnan(id(fuel_level).state)) return {};
       // Calculate gallons remaining: percentage * tank capacity
@@ -1388,6 +1405,7 @@ sensor:
   - platform: homeassistant
     id: def_range
     entity_id: sensor.def_range  # Estimated miles remaining on DEF
+    internal: true
     on_value:
       then:
         - lambda: |-
@@ -1400,6 +1418,7 @@ sensor:
     unit_of_measurement: "mi"
     accuracy_decimals: 0
     icon: "mdi:fuel"
+    state_class: measurement
     lambda: |-
       if (isnan(id(def_level).state)) return {};
       // Calculate gallons remaining: percentage * tank capacity
@@ -1412,6 +1431,7 @@ sensor:
   - platform: homeassistant
     id: battery_time_remaining
     entity_id: sensor.battery_time_remaining  # Estimated hours remaining on battery
+    internal: true
     on_value:
       then:
         - lambda: |-
@@ -1420,6 +1440,7 @@ sensor:
   - platform: homeassistant
     id: water_time_remaining
     entity_id: sensor.water_time_remaining  # Estimated hours remaining on water
+    internal: true
     on_value:
       then:
         - lambda: |-
@@ -1507,6 +1528,7 @@ text_sensor:
     id: weather_condition
     entity_id: weather.forecast_home
     attribute: condition
+    internal: true
     on_value:
       then:
         - lambda: |-
@@ -1516,6 +1538,7 @@ text_sensor:
     id: weather_temp
     entity_id: weather.forecast_home
     attribute: temperature
+    internal: true
     on_value:
       then:
         - lambda: |-
@@ -1524,6 +1547,7 @@ text_sensor:
   - platform: homeassistant
     id: location_city
     entity_id: sensor.location_city
+    internal: true
     on_value:
       then:
         - lambda: |-
@@ -1532,6 +1556,7 @@ text_sensor:
   - platform: homeassistant
     id: location_state
     entity_id: sensor.location_state
+    internal: true
     on_value:
       then:
         - lambda: |-
@@ -1540,6 +1565,7 @@ text_sensor:
   - platform: homeassistant
     id: sunrise_time
     entity_id: sensor.sun_next_rising  # TODO: Change to your actual sunrise entity
+    internal: true
     on_value:
       then:
         - lambda: |-
@@ -1548,6 +1574,7 @@ text_sensor:
   - platform: homeassistant
     id: sunset_time
     entity_id: sensor.sun_next_setting  # TODO: Change to your actual sunset entity
+    internal: true
     on_value:
       then:
         - lambda: |-
