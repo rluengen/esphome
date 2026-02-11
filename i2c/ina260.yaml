@@ -17,5 +17,6 @@ sensor:
     current:
       id: ${ina260_current_sensor_id}
       name: ${ina260_current_sensor_name}
+      state_class: measurement
       filters:
         - lambda: return abs(x);  # Convert negative current to positive for threshold detection

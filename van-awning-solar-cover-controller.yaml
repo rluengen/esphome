@@ -1,17 +1,15 @@
 # The Van Awning and Solar cover controller uses a BEVRLink 4 Relay + 4 Button
 # controller to control the cover states for two awnings.
 
-# TODO: hook up in/out switches for awning controller to GPIO pins.
-
 substitutions:
-  device_name: awningcontroller
-  friendly_name: Cover Controller
-  project_name: Van Cover Controller
+  device_name: awning-controller
+  friendly_name: Van Cover Controller
+  project_name: van-cover-controller
   project_version: "1.0.0"
   log_level: DEBUG
 
 esphome:
-  name: awningcontroller
+  name: ${device_name}
   friendly_name: ${friendly_name}
   project:
     name: smartvan.${project_name}
@@ -83,10 +81,13 @@ switch:
     internal: true
 
 # GPIO buttons to control the awning covers.
+# Press to open/close. If moving in the opposite direction, stops first;
+# press again to reverse.
 binary_sensor:
   - platform: gpio
-    name: Open Nomadic Awning Button
+    name: "Open Nomadic Awning Button"
     id: button1
+    internal: true
     pin:
       number: 4
       inverted: true
@@ -97,12 +98,20 @@ binary_sensor:
       - delayed_on: 10ms
       - delayed_off: 10ms
     on_press:
-       then:
-         - cover.open: nomadic_awning_cover
+      then:
+        - lambda: |-
+            auto op = id(nomadic_awning_cover).current_operation;
+            if (op == COVER_OPERATION_CLOSING) {
+              // Moving in opposite direction — stop first
+              id(nomadic_awning_cover).make_call().set_command_stop().perform();
+            } else if (op == COVER_OPERATION_IDLE) {
+              id(nomadic_awning_cover).make_call().set_command_open().perform();
+            }
 
   - platform: gpio
-    name: Close Nomadic Awning Button
+    name: "Close Nomadic Awning Button"
     id: button2
+    internal: true
     pin:
       number: 5
       inverted: true
@@ -113,5 +122,12 @@ binary_sensor:
       - delayed_on: 10ms
       - delayed_off: 10ms
     on_press:
-       then:
-         - cover.close: nomadic_awning_cover
+      then:
+        - lambda: |-
+            auto op = id(nomadic_awning_cover).current_operation;
+            if (op == COVER_OPERATION_OPENING) {
+              // Moving in opposite direction — stop first
+              id(nomadic_awning_cover).make_call().set_command_stop().perform();
+            } else if (op == COVER_OPERATION_IDLE) {
+              id(nomadic_awning_cover).make_call().set_command_close().perform();
+            }
