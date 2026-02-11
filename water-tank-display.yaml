@@ -87,7 +87,7 @@ esphome:
     name: smartvan.${project_name}
     version: ${project_version}
   on_boot:
-    # ensure that all the valves are closed on first start
+    # ensure that all the valves are closed on first start (should be the default)
     - valve.close: valve_input_output_hydrant
     - valve.close: valve_water_pump_source
     - valve.close: valve_fill
