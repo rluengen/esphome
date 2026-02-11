@@ -37,13 +37,13 @@ pca9554:
   - id: tca9554_hub
     address: 0x20
 
-### CANbus
-##canbus:
-##  - platform: esp32_can
-##    tx_pin: GPIO2
-##    rx_pin: GPIO3
-##    can_id: 4
-##    bit_rate: 125kbps
+canbus:
+  - platform: esp32_can
+    id: canbus0
+    tx_pin: GPIO2
+    rx_pin: GPIO3
+    can_id: 4
+    bit_rate: 250kbps
 
 # ==========================================================
 # Accessories
