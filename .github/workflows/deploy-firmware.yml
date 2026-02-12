@@ -1,0 +1,103 @@
+name: Deploy Firmware to GitHub Pages
+
+# Triggers when you create a Release with a .ota.bin attached
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to deploy (e.g. v1.0.0)'
+        required: true
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: firmware-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Determine release tag
+        id: tag
+        run: |
+          if [ -n "${{ inputs.tag }}" ]; then
+            echo "tag=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.tag.outputs.tag }}"
+          VERSION="${TAG#v}"
+          echo "version=${VERSION}" >> "$GITHUB_ENV"
+
+          mkdir -p site/firmware
+
+          # Download all .ota.bin files from the release
+          gh release download "$TAG" --pattern "*.ota.bin" --dir tmp
+
+          # Process each firmware binary
+          # Expected naming: <device-name>.ota.bin (e.g. led-van-controller.ota.bin)
+          for bin in tmp/*.ota.bin; do
+            DEVICE=$(basename "$bin" .ota.bin)
+            mkdir -p "site/firmware/${DEVICE}"
+            cp "$bin" "site/firmware/${DEVICE}/firmware.ota.bin"
+
+            MD5=$(md5sum "site/firmware/${DEVICE}/firmware.ota.bin" | cut -d' ' -f1)
+
+            cat > "site/firmware/${DEVICE}/manifest.json" << EOF
+          {
+            "name": "${DEVICE}",
+            "version": "${VERSION}",
+            "builds": [
+              {
+                "chipFamily": "ESP32",
+                "ota": {
+                  "md5": "${MD5}",
+                  "path": "firmware.ota.bin",
+                  "summary": "Firmware update ${VERSION}"
+                }
+              }
+            ]
+          }
+          EOF
+            echo "✅ Processed ${DEVICE} (md5: ${MD5})"
+          done
+
+      - name: Generate firmware index
+        run: |
+          echo '{"devices":[' > site/firmware/index.json
+          FIRST=true
+          for manifest in site/firmware/*/manifest.json; do
+            DEVICE_DIR=$(basename "$(dirname "$manifest")")
+            if [ "$FIRST" = true ]; then FIRST=false; else echo ',' >> site/firmware/index.json; fi
+            echo "{\"device\":\"${DEVICE_DIR}\",\"manifest\":\"${DEVICE_DIR}/manifest.json\"}" >> site/firmware/index.json
+          done
+          echo ']}' >> site/firmware/index.json
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload to Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -62,16 +62,13 @@ ota:
   - platform: esphome
     password: !secret ota_password
 
-# HTTP Request component for firmware updates
-http_request:
-
-# Automatically flash/update the ESP32-C6 co-processor firmware
+# Flash ESP32-C6 co-processor firmware from local binary (no network needed)
 update:
   - platform: esp32_hosted
     name: "ESP32-C6 Firmware"
-    type: http
-    source: https://esphome.github.io/esp-hosted-firmware/manifest/esp32c6.json
-    update_interval: 6h
+    type: embedded
+    path: network_adapter_esp32c6.bin
+    sha256: 2aa46dbcd18f5b2046f58b82cdc62bdf21af137930e67c4b3b114f6e3e0daf15
 
 logger:
   level: ${log_level}

@@ -32,6 +32,18 @@ packages:
       - path: i2c/pcf8574.yaml
       - path: packages/wizmote.yaml
 
+# Pull-based OTA firmware updates from GitHub Pages
+http_request:
+
+ota:
+  - platform: http_request
+
+update:
+  - platform: http_request
+    name: "${friendly_name} Firmware Update"
+    source: https://rluengen.github.io/esphome/firmware/${device_name}/manifest.json
+    update_interval: 6h
+
 esphome:
   name: ${device_name}
   friendly_name: ${friendly_name}
@@ -1242,7 +1254,7 @@ switch:
     name: "Auto Color Temperature"
     id: auto_color_temp_enabled
     optimistic: true
-    restore_mode: RESTORE
+    restore_mode: RESTORE_DEFAULT_OFF
     entity_category: config
     icon: "mdi:theme-light-dark"
     on_turn_on:
@@ -1255,7 +1267,7 @@ switch:
     name: "Auto Brightness"
     id: auto_brightness_enabled
     optimistic: true
-    restore_mode: RESTORE
+    restore_mode: RESTORE_DEFAULT_OFF
     entity_category: config
     icon: "mdi:brightness-auto"
     on_turn_on:

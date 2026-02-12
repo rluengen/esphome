@@ -56,6 +56,6 @@ sensor:
 # Text sensor for device information
 text_sensor:
   - platform: version
-    id: ${device_name}_version
+    id: esphome_version
     name: "${friendly_name} ESPHome Version"
     hide_timestamp: true
