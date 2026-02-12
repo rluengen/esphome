@@ -10,7 +10,9 @@ esp32:
 
 i2c:
   id: i2c_bus
-  sda: 15
+  sda:
+    number: 15
+    ignore_strapping_warning: true
   scl: 16
   scan: true
 
@@ -71,12 +73,16 @@ output:
     id: led_channel_11
 
   - platform: ledc
-    pin: 12
+    pin:
+      number: 12
+      ignore_strapping_warning: true
     frequency: 19531Hz
     id: led_channel_12
 
   - platform: ledc
-    pin: 5
+    pin:
+      number: 5
+      ignore_strapping_warning: true
     frequency: 19531Hz
     id: led_channel_13
 
@@ -86,7 +92,9 @@ output:
     id: led_channel_14
 
   - platform: ledc
-    pin: 2
+    pin:
+      number: 2
+      ignore_strapping_warning: true
     frequency: 19531Hz
     id: led_channel_15
 
