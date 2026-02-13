@@ -69,14 +69,14 @@ function Update-ProjectVersion($config, $newVersion) {
 
 # Determine version: explicit > auto-increment > prompt
 function Get-CurrentVersion {
-    # Try latest git tag first
-    $latestTag = git --no-pager tag --sort=-v:refname 2>$null | Select-Object -First 1
-    if ($latestTag -match "^v?(\d+\.\d+\.\d+)") {
-        return $Matches[1]
-    }
-    # Fall back to project_version from first config
+    # Read project_version from first config (most up-to-date source)
     $content = Get-Content (Join-Path $RepoRoot $Configs[0]) -Raw
     if ($content -match "project_version:\s*[`"']?([\d\.]+)[`"']?") {
+        return $Matches[1]
+    }
+    # Fall back to latest git tag
+    $latestTag = git --no-pager tag --sort=-v:refname 2>$null | Select-Object -First 1
+    if ($latestTag -match "^v?(\d+\.\d+\.\d+)") {
         return $Matches[1]
     }
     return "0.0.0"
