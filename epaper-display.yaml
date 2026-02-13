@@ -10,7 +10,7 @@ substitutions:
   device_name: terminal
   friendly_name: "Terminal Display"
   project_name: terminal-display
-  project_version: "1.0.1"
+  project_version: "1.0.2"
   log_level: DEBUG
   sleep_duration: 15min
 
@@ -636,12 +636,22 @@ font:
     bpp: 1
     glyphs: " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~°"
 
+  # Large weather icon for main display
+  - file: "fonts/materialdesignicons-webfont.ttf"
+    id: weather_icon_large
+    size: 48
+    bpp: 1
+    glyphs: [
+      "\U000F0599", # weather-sunny
+      ]
+
   # Small weather icons for sunrise/sunset
   - file: "fonts/materialdesignicons-webfont.ttf"
     id: sun_icons
     size: 24
     bpp: 1
     glyphs: [
+      "\U000F0599", # weather-sunny
       "\U000F059C", # weather-sunset-up (sunrise)
       "\U000F059B", # weather-sunset-down (sunset)
       ]
@@ -844,7 +854,7 @@ lvgl:
             widgets:
               - label:
                   id: lbl_weather_icon
-                  text_font: sun_icons
+                  text_font: weather_icon_large
                   text_color: 0xFFFFFF
                   text: "\U000F0599"  # Default sunny icon
               
