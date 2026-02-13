@@ -9,6 +9,22 @@ ota:
 
 update:
   - platform: http_request
+    id: firmware_update
     name: "${friendly_name} Firmware Update"
     source: https://rluengen.github.io/esphome/firmware/${device_name}/manifest.json
     update_interval: 6h
+
+button:
+  - platform: template
+    name: "${friendly_name} Check Firmware Update"
+    icon: "mdi:update"
+    entity_category: config
+    on_press:
+      - update.check: firmware_update
+
+  - platform: template
+    name: "${friendly_name} Install Firmware Update"
+    icon: "mdi:download"
+    entity_category: config
+    on_press:
+      - update.perform: firmware_update
