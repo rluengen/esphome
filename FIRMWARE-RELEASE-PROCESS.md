@@ -40,6 +40,33 @@ Secrets (WiFi credentials, API keys) never leave your local machine. Compilation
 
 ## Releasing Firmware
 
+### Quick Release (Recommended)
+
+Use the included script to compile, build, and create a GitHub Release in one step:
+
+```powershell
+# Compile and release (will prompt for version)
+.\release-firmware.ps1
+
+# Specify version upfront
+.\release-firmware.ps1 -Version 1.2.0
+
+# Compile multiple devices
+.\release-firmware.ps1 -Configs lightcontroller.yaml, other-device.yaml
+
+# Compile only, no release
+.\release-firmware.ps1 -SkipRelease
+```
+
+The script will:
+1. Compile the ESPHome config(s) locally using your `secrets.yaml`
+2. Extract and rename the `.ota.bin` file(s)
+3. Push any unpushed commits
+4. Create a GitHub Release with the binaries attached
+5. Clean up local binary files
+
+### Manual Release
+
 ### 1. Compile locally
 
 Run the ESPHome compiler on your local machine where `secrets.yaml` is present:
