@@ -43,41 +43,27 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="${{ steps.tag.outputs.tag }}"
-          # Tags are device-prefixed: e.g. gps-v1.0.5, lightcontroller-v1.2.0
-          VERSION="${TAG#*-v}"
-          echo "version=${VERSION}" >> "$GITHUB_ENV"
 
-          mkdir -p site/firmware
+          mkdir -p site/firmware tmp
 
-          # Download all .ota.bin files from the release
+          # Download firmware binaries and pre-built manifests from the release
           gh release download "$TAG" --pattern "*.ota.bin" --dir tmp
+          gh release download "$TAG" --pattern "*.manifest.json" --dir tmp
 
           # Process each firmware binary
-          # Expected naming: <device-name>.ota.bin (e.g. led-van-controller.ota.bin)
+          # Expected naming: <device-name>.ota.bin + <device-name>.manifest.json
           for bin in tmp/*.ota.bin; do
             DEVICE=$(basename "$bin" .ota.bin)
             mkdir -p "site/firmware/${DEVICE}"
             cp "$bin" "site/firmware/${DEVICE}/firmware.ota.bin"
 
-            MD5=$(md5sum "site/firmware/${DEVICE}/firmware.ota.bin" | cut -d' ' -f1)
-
-            cat > "site/firmware/${DEVICE}/manifest.json" << EOF
-          {
-            "name": "${DEVICE}",
-            "version": "${VERSION}",
-            "builds": [
-              {
-                "chipFamily": "ESP32",
-                "ota": {
-                  "md5": "${MD5}",
-                  "path": "firmware.ota.bin",
-                  "summary": "Firmware update ${VERSION}"
-                }
-              }
-            ]
-          }
-          EOF
-            echo "✅ Processed ${DEVICE} (md5: ${MD5})"
+            MANIFEST="tmp/${DEVICE}.manifest.json"
+            if [ -f "$MANIFEST" ]; then
+              cp "$MANIFEST" "site/firmware/${DEVICE}/manifest.json"
+              echo "✅ Deployed ${DEVICE} with pre-built manifest"
+            else
+              echo "❌ Missing manifest for ${DEVICE} — skipping"
+            fi
           done
 
       - name: Generate firmware index

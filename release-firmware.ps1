@@ -53,6 +53,30 @@ function Get-DeviceName($config) {
     throw "Could not find device_name substitution in $config"
 }
 
+# Detect chip family from ESPHome build output (sdkconfig)
+# Maps IDF target names to ESP-Web-Tools chipFamily values
+function Get-ChipFamily($deviceName) {
+    $sdkconfig = Join-Path $RepoRoot ".esphome\build\$deviceName\sdkconfig.$deviceName"
+    if (Test-Path $sdkconfig) {
+        $content = Get-Content $sdkconfig -Raw
+        if ($content -match 'CONFIG_IDF_TARGET="([^"]+)"') {
+            $target = $Matches[1].ToUpper()
+            switch ($target) {
+                "ESP32"   { return "ESP32" }
+                "ESP32S2" { return "ESP32-S2" }
+                "ESP32S3" { return "ESP32-S3" }
+                "ESP32C3" { return "ESP32-C3" }
+                "ESP32C6" { return "ESP32-C6" }
+                "ESP32H2" { return "ESP32-H2" }
+                "ESP32P4" { return "ESP32-P4" }
+                default   { return $target }
+            }
+        }
+    }
+    Write-Host "⚠️  Could not detect chip family for $deviceName, defaulting to ESP32" -ForegroundColor Yellow
+    return "ESP32"
+}
+
 # Update project_version in a YAML config file
 function Update-ProjectVersion($config, $newVersion) {
     $configPath = Join-Path $RepoRoot $config
@@ -184,15 +208,38 @@ foreach ($config in $Configs) {
     Copy-Item $srcBin $destBin -Force
     $size = [math]::Round((Get-Item $destBin).Length / 1KB, 1)
     $md5 = (Get-FileHash $destBin -Algorithm MD5).Hash.ToLower()
-    Write-Host "✅ $deviceName.ota.bin ($size KB, md5: $md5)" -ForegroundColor Green
 
-    $artifacts += @{ Name = $deviceName; Path = $destBin }
+    # Detect chip family and generate manifest.json
+    $chipFamily = Get-ChipFamily $deviceName
+    $manifest = @{
+        name = $deviceName
+        version = $Version
+        builds = @(
+            @{
+                chipFamily = $chipFamily
+                ota = @{
+                    md5 = $md5
+                    path = "firmware.ota.bin"
+                    summary = "Firmware update $Version"
+                }
+            }
+        )
+    } | ConvertTo-Json -Depth 4
+
+    $manifestPath = Join-Path $RepoRoot "$deviceName.manifest.json"
+    Set-Content $manifestPath $manifest -NoNewline
+    Write-Host "✅ $deviceName.ota.bin ($size KB, md5: $md5, chip: $chipFamily)" -ForegroundColor Green
+
+    $artifacts += @{ Name = $deviceName; BinPath = $destBin; ManifestPath = $manifestPath }
 }
 
 if ($SkipRelease) {
     Write-Host "`n📦 Firmware compiled. Skipping release creation." -ForegroundColor Yellow
-    Write-Host "Binaries:"
-    $artifacts | ForEach-Object { Write-Host "  $($_.Path)" }
+    Write-Host "Artifacts:"
+    $artifacts | ForEach-Object {
+        Write-Host "  $($_.BinPath)"
+        Write-Host "  $($_.ManifestPath)"
+    }
     exit 0
 }
 
@@ -200,8 +247,8 @@ if ($SkipRelease) {
 Write-Host "`n📤 Pushing latest commits..." -ForegroundColor Cyan
 git push origin main
 
-# Create the release with all firmware binaries attached
-$assetArgs = $artifacts | ForEach-Object { $_.Path }
+# Create the release with all firmware binaries and manifests attached
+$assetArgs = $artifacts | ForEach-Object { $_.BinPath; $_.ManifestPath }
 Write-Host "`n🚀 Creating release $tag..." -ForegroundColor Cyan
 
 $deviceList = ($artifacts | ForEach-Object { "- ``$($_.Name).ota.bin``" }) -join "`n"
@@ -224,6 +271,9 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host "`n✅ Release $tag created successfully!" -ForegroundColor Green
 Write-Host "View at: https://github.com/rluengen/esphome/releases/tag/$tag" -ForegroundColor DarkGray
 
-# Clean up local .ota.bin files
-$artifacts | ForEach-Object { Remove-Item $_.Path -Force }
-Write-Host "🧹 Cleaned up local .ota.bin files" -ForegroundColor DarkGray
+# Clean up local build artifacts
+$artifacts | ForEach-Object {
+    Remove-Item $_.BinPath -Force
+    Remove-Item $_.ManifestPath -Force
+}
+Write-Host "🧹 Cleaned up local build artifacts" -ForegroundColor DarkGray
