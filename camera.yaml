@@ -54,6 +54,7 @@ packages:
           wifi_password: !secret wifi_password
       - path: packages/time/homeassistant.yaml
       - path: devices/xiao-esp32s3.yaml
+      - path: packages/ota/http_update.yaml
 
 psram:
   mode: octal

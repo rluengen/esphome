@@ -79,6 +79,7 @@ packages:
         vars:
           touchscreen_id: touch_id
           backlight_id: display_backlight_id
+      - path: packages/ota/http_update.yaml
 
 esphome:
   name: ${device_name}
