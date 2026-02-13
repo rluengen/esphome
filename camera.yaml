@@ -4,12 +4,17 @@
 substitutions:
   device_name: camera
   friendly_name: Van Camera
+  project_name: van-camera
+  project_version: "1.0.6"
   log_level: INFO
 
 esphome:
   name: ${device_name}
   name_add_mac_suffix: true
   friendly_name: ${friendly_name}
+  project:
+    name: smartvan.${project_name}
+    version: ${project_version}
   on_boot:
     priority: -100  # run after all components are initialized
     then:
