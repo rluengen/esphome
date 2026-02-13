@@ -1,6 +1,8 @@
 # Pull-based OTA firmware updates from GitHub Pages
 # Include this package to enable automatic firmware updates.
 # Requires device_name and friendly_name substitutions.
+# The update entity appears in Home Assistant with built-in
+# check and install controls.
 
 http_request:
 
@@ -13,18 +15,3 @@ update:
     name: "${friendly_name} Firmware Update"
     source: https://rluengen.github.io/esphome/firmware/${device_name}/manifest.json
     update_interval: never
-
-button:
-  - platform: template
-    name: "${friendly_name} Check Firmware Update"
-    icon: "mdi:update"
-    entity_category: config
-    on_press:
-      - update.check: firmware_update
-
-  - platform: template
-    name: "${friendly_name} Install Firmware Update"
-    icon: "mdi:download"
-    entity_category: config
-    on_press:
-      - update.perform: firmware_update
