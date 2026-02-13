@@ -22,7 +22,7 @@ substitutions:
   device_name: esparheater
   friendly_name: Espar Heater
   project_name: Van Espar Heater Controller
-  project_version: "1.0.1"
+  project_version: "1.0.2"
   log_level: DEBUG
 
   # --- CAN Bus Configuration ---
