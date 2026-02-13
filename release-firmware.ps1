@@ -41,6 +41,51 @@ function Get-DeviceName($config) {
     throw "Could not find device_name substitution in $config"
 }
 
+# Update project_version in a YAML config file
+function Update-ProjectVersion($config, $newVersion) {
+    $configPath = Join-Path $RepoRoot $config
+    $content = Get-Content $configPath -Raw
+    if ($content -match "project_version:\s*[`"']?[\d\.]+[`"']?") {
+        $updated = $content -replace "(project_version:\s*)[`"']?[\d\.]+[`"']?", "`${1}`"$newVersion`""
+        Set-Content $configPath $updated -NoNewline
+        Write-Host "📝 Updated project_version to $newVersion in $config" -ForegroundColor Cyan
+        return $true
+    }
+    Write-Host "⚠️  No project_version found in $config, skipping version update" -ForegroundColor Yellow
+    return $false
+}
+
+# Prompt for version if not provided
+if (-not $Version) {
+    $latestTag = git --no-pager tag --sort=-v:refname | Select-Object -First 1
+    if ($latestTag) {
+        Write-Host "`nLatest tag: $latestTag" -ForegroundColor DarkGray
+    }
+    $Version = Read-Host "`nEnter version for this release (e.g. 1.2.0)"
+    if (-not $Version) {
+        Write-Error "Version is required"
+        exit 1
+    }
+}
+
+$tag = "v$Version"
+
+# Update version numbers in config files and commit
+$versionUpdated = $false
+foreach ($config in $Configs) {
+    if (Update-ProjectVersion $config $Version) {
+        $versionUpdated = $true
+    }
+}
+
+if ($versionUpdated) {
+    Write-Host "`n📦 Committing version bump..." -ForegroundColor Cyan
+    Push-Location $RepoRoot
+    git add -A
+    git commit -m "Bump firmware version to $Version"
+    Pop-Location
+}
+
 # Compile and extract firmware
 $artifacts = @()
 foreach ($config in $Configs) {
@@ -84,22 +129,6 @@ if ($SkipRelease) {
     exit 0
 }
 
-# Prompt for version if not provided
-if (-not $Version) {
-    # Show latest tag for reference
-    $latestTag = git --no-pager tag --sort=-v:refname | Select-Object -First 1
-    if ($latestTag) {
-        Write-Host "`nLatest tag: $latestTag" -ForegroundColor DarkGray
-    }
-    $Version = Read-Host "`nEnter version for this release (e.g. 1.2.0)"
-    if (-not $Version) {
-        Write-Error "Version is required"
-        exit 1
-    }
-}
-
-$tag = "v$Version"
-
 # Verify gh CLI is available and authenticated
 $ghPath = Get-Command gh -ErrorAction SilentlyContinue
 if (-not $ghPath) {
@@ -131,7 +160,7 @@ $notes = @"
 $deviceList
 
 ### Update
-Devices with ``update: platform: http_request`` will automatically pick up this release within 6 hours.
+Devices with ``update: platform: http_request`` can check for and install this release via the Check/Install Firmware Update buttons in Home Assistant.
 "@
 
 gh release create $tag $assetArgs --title "Firmware $Version" --notes $notes
