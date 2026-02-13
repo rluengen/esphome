@@ -2,7 +2,7 @@ substitutions:
   device_name: gps
   friendly_name: Global Positioning System
   project_name: gps-receiver
-  project_version: "1.0.0"
+  project_version: "1.0.1"
   log_level: DEBUG
 
 packages:
