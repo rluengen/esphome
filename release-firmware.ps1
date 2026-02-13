@@ -97,6 +97,26 @@ function Increment-Version($current, $bumpMajor, $bumpMinor) {
     }
 }
 
+# Verify gh CLI is available and authenticated (before doing any work)
+if (-not $SkipRelease) {
+    $ghPath = Get-Command gh -ErrorAction SilentlyContinue
+    if (-not $ghPath) {
+        Write-Error "GitHub CLI (gh) is not installed. Install with: winget install GitHub.cli"
+        exit 1
+    }
+
+    $authStatus = gh auth status 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "`n⚠️  GitHub CLI is not authenticated. Launching login..." -ForegroundColor Yellow
+        gh auth login --web --git-protocol https
+        if ($LASTEXITCODE -ne 0) {
+            Write-Error "❌ GitHub authentication failed"
+            exit 1
+        }
+    }
+    Write-Host "✅ GitHub CLI authenticated" -ForegroundColor Green
+}
+
 if (-not $Version) {
     $currentVersion = Get-CurrentVersion
     if ($Major -or $Minor -or -not $PSBoundParameters.ContainsKey('Version')) {
@@ -172,21 +192,6 @@ if ($SkipRelease) {
     Write-Host "Binaries:"
     $artifacts | ForEach-Object { Write-Host "  $($_.Path)" }
     exit 0
-}
-
-# Verify gh CLI is available and authenticated
-$ghPath = Get-Command gh -ErrorAction SilentlyContinue
-if (-not $ghPath) {
-    Write-Error "GitHub CLI (gh) is not installed. Install with: winget install GitHub.cli"
-    exit 1
-}
-
-$authStatus = gh auth status 2>&1
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "`n⚠️  GitHub CLI is not authenticated." -ForegroundColor Yellow
-    Write-Host "Run: gh auth login --web --git-protocol https" -ForegroundColor Yellow
-    Write-Host "Then open https://github.com/login/device and enter the code shown." -ForegroundColor Yellow
-    exit 1
 }
 
 # Ensure latest commits are pushed
