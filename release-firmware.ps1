@@ -134,7 +134,7 @@ $deviceList
 Devices with ``update: platform: http_request`` will automatically pick up this release within 6 hours.
 "@
 
-gh release create $tag @assetArgs --title "Firmware $Version" --notes $notes
+gh release create $tag $assetArgs --title "Firmware $Version" --notes $notes
 if ($LASTEXITCODE -ne 0) {
     Write-Error "❌ Failed to create release"
     exit 1
