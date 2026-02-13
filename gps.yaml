@@ -244,3 +244,6 @@ esphome:
 logger:
   level: ${log_level}
   hardware_uart: USB_CDC
+
+web_server:
+  port: 80
