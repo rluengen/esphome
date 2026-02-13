@@ -107,6 +107,14 @@ if (-not $ghPath) {
     exit 1
 }
 
+$authStatus = gh auth status 2>&1
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "`n⚠️  GitHub CLI is not authenticated." -ForegroundColor Yellow
+    Write-Host "Run: gh auth login --web --git-protocol https" -ForegroundColor Yellow
+    Write-Host "Then open https://github.com/login/device and enter the code shown." -ForegroundColor Yellow
+    exit 1
+}
+
 # Ensure latest commits are pushed
 Write-Host "`n📤 Pushing latest commits..." -ForegroundColor Cyan
 git push origin main
