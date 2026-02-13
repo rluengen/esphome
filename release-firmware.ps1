@@ -133,7 +133,9 @@ if (-not $Version) {
     }
 }
 
-$tag = "v$Version"
+# Build device-scoped tag (e.g. gps-v1.0.4, lightcontroller-v1.2.0)
+$primaryDevice = Get-DeviceName $Configs[0]
+$tag = "$primaryDevice-v$Version"
 
 # Update version numbers in config files and commit
 $versionUpdated = $false
@@ -204,7 +206,7 @@ Write-Host "`n🚀 Creating release $tag..." -ForegroundColor Cyan
 
 $deviceList = ($artifacts | ForEach-Object { "- ``$($_.Name).ota.bin``" }) -join "`n"
 $notes = @"
-## Firmware Release $Version
+## $primaryDevice Firmware Release $Version
 
 ### Devices
 $deviceList
@@ -213,7 +215,7 @@ $deviceList
 Devices with ``update: platform: http_request`` can check for and install this release via the Check/Install Firmware Update buttons in Home Assistant.
 "@
 
-gh release create $tag $assetArgs --title "Firmware $Version" --notes $notes
+gh release create $tag $assetArgs --title "$primaryDevice Firmware $Version" --notes $notes
 if ($LASTEXITCODE -ne 0) {
     Write-Error "❌ Failed to create release"
     exit 1
