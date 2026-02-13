@@ -1,4 +1,4 @@
-﻿# https://jnan.co/tools/esphomelvglsim/
+# https://jnan.co/tools/esphomelvglsim/
 
 # Dashboard to display home assistant status and weather information.
 
@@ -10,7 +10,7 @@ substitutions:
   device_name: terminal
   friendly_name: "Terminal Display"
   project_name: terminal-display
-  project_version: "1.0.0"
+  project_version: "1.0.1"
   log_level: DEBUG
   sleep_duration: 15min
 
@@ -77,6 +77,7 @@ esphome:
       #     format: "[BOOT] Pausing LVGL"
       # - lvgl.pause:
       - script.execute: update_display
+      - script.execute: daily_ota_check
       - logger.log:
           level: INFO
           format: "[BOOT] Boot sequence complete"
@@ -96,6 +97,10 @@ globals:
     type: bool
     restore_value: no
     initial_value: 'false'
+  - id: last_update_check
+    type: uint32_t
+    restore_value: yes
+    initial_value: '0'
 
 # Script to update display - called from boot and interval
 script:
@@ -494,6 +499,55 @@ script:
           level: INFO
           format: "[DISPLAY] Pausing LVGL"
       - lvgl.pause:
+
+  - id: daily_ota_check
+    mode: single
+    then:
+      # Wait for network + time before checking
+      - wait_until:
+          condition:
+            wifi.connected:
+          timeout: 30s
+      - wait_until:
+          condition:
+            lambda: 'return id(ha_time).now().is_valid() || id(sntp_time).now().is_valid();'
+          timeout: 30s
+      - lambda: |-
+          auto time = id(ha_time).now();
+          if (!time.is_valid()) time = id(sntp_time).now();
+          if (!time.is_valid()) {
+            ESP_LOGW("OTA", "No valid time - skipping update check");
+            return;
+          }
+          uint32_t now_epoch = time.timestamp;
+          uint32_t last = id(last_update_check);
+          uint32_t elapsed = now_epoch - last;
+          ESP_LOGI("OTA", "Last update check: %us ago (threshold: 86400s)", elapsed);
+          if (last == 0 || elapsed >= 86400) {
+            ESP_LOGI("OTA", "24h elapsed - checking for firmware update");
+            id(last_update_check) = now_epoch;
+            id(daily_ota_check_run).execute();
+          } else {
+            ESP_LOGI("OTA", "Skipping update check - next in %us", 86400 - elapsed);
+          }
+
+  - id: daily_ota_check_run
+    mode: single
+    then:
+      - update.check: firmware_update
+      - delay: 10s
+      - if:
+          condition:
+            lambda: 'return id(firmware_update).state == update::UPDATE_STATE_AVAILABLE;'
+          then:
+            - logger.log:
+                level: INFO
+                format: "[OTA] Update available - installing automatically"
+            - update.perform: firmware_update
+          else:
+            - logger.log:
+                level: INFO
+                format: "[OTA] Firmware is up to date"
 
   - id: page_previous
     mode: single

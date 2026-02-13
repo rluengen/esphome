@@ -22,6 +22,9 @@ packages:
 esphome:
   name: ${device_name}
   friendly_name: ${friendly_name}
+  project:
+    name: smartvan.${project_name}
+    version: ${project_version}
   on_boot:
     # VERY EARLY (priority 900) - Full panel init sequence BEFORE DSI bus init
     # Following EXACT order from Waveshare esp_lcd_dsi component
