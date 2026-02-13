@@ -43,7 +43,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="${{ steps.tag.outputs.tag }}"
-          VERSION="${TAG#v}"
+          # Tags are device-prefixed: e.g. gps-v1.0.5, lightcontroller-v1.2.0
+          VERSION="${TAG#*-v}"
           echo "version=${VERSION}" >> "$GITHUB_ENV"
 
           mkdir -p site/firmware

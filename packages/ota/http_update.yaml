@@ -15,3 +15,18 @@ update:
     name: "${friendly_name} Firmware Update"
     source: https://rluengen.github.io/esphome/firmware/${device_name}/manifest.json
     update_interval: never
+
+esphome:
+  on_boot:
+    priority: -10
+    then:
+      - delay: 10s
+      - update.check: firmware_update
+
+button:
+  - platform: template
+    name: "Check for Update"
+    icon: mdi:update
+    entity_category: config
+    on_press:
+      - update.check: firmware_update
