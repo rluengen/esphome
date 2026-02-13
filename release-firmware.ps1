@@ -5,20 +5,30 @@
 .DESCRIPTION
     Compiles one or more ESPHome device configs, extracts the OTA firmware
     binaries, and optionally creates a GitHub Release with the binaries attached.
-    Devices automatically pick up new releases via the http_request update platform.
+    Devices pick up new releases via the Check/Install Firmware Update buttons
+    in Home Assistant.
 
 .PARAMETER Configs
     One or more YAML config files to compile. Defaults to lightcontroller.yaml.
 
 .PARAMETER Version
-    Semantic version for the release tag (e.g. 1.2.0). Prompted if not provided.
+    Semantic version for the release tag (e.g. 1.2.0). If omitted, auto-increments
+    the patch version from the latest git tag (or from the config's project_version).
+
+.PARAMETER Major
+    Auto-increment the major version (e.g. 1.2.3 → 2.0.0).
+
+.PARAMETER Minor
+    Auto-increment the minor version (e.g. 1.2.3 → 1.3.0).
 
 .PARAMETER SkipRelease
     Compile only — don't create a GitHub Release.
 
 .EXAMPLE
-    .\release-firmware.ps1
-    .\release-firmware.ps1 -Version 1.2.0
+    .\release-firmware.ps1                    # auto-increment patch
+    .\release-firmware.ps1 -Minor             # auto-increment minor
+    .\release-firmware.ps1 -Major             # auto-increment major
+    .\release-firmware.ps1 -Version 1.2.0     # explicit version
     .\release-firmware.ps1 -Configs lightcontroller.yaml, other-device.yaml
     .\release-firmware.ps1 -SkipRelease
 #>
@@ -26,6 +36,8 @@
 param(
     [string[]]$Configs = @("lightcontroller.yaml"),
     [string]$Version,
+    [switch]$Major,
+    [switch]$Minor,
     [switch]$SkipRelease
 )
 
@@ -55,16 +67,49 @@ function Update-ProjectVersion($config, $newVersion) {
     return $false
 }
 
-# Prompt for version if not provided
-if (-not $Version) {
-    $latestTag = git --no-pager tag --sort=-v:refname | Select-Object -First 1
-    if ($latestTag) {
-        Write-Host "`nLatest tag: $latestTag" -ForegroundColor DarkGray
+# Determine version: explicit > auto-increment > prompt
+function Get-CurrentVersion {
+    # Try latest git tag first
+    $latestTag = git --no-pager tag --sort=-v:refname 2>$null | Select-Object -First 1
+    if ($latestTag -match "^v?(\d+\.\d+\.\d+)") {
+        return $Matches[1]
     }
-    $Version = Read-Host "`nEnter version for this release (e.g. 1.2.0)"
-    if (-not $Version) {
-        Write-Error "Version is required"
-        exit 1
+    # Fall back to project_version from first config
+    $content = Get-Content (Join-Path $RepoRoot $Configs[0]) -Raw
+    if ($content -match "project_version:\s*[`"']?([\d\.]+)[`"']?") {
+        return $Matches[1]
+    }
+    return "0.0.0"
+}
+
+function Increment-Version($current, $bumpMajor, $bumpMinor) {
+    $parts = $current.Split('.')
+    $maj = [int]$parts[0]
+    $min = [int]$parts[1]
+    $pat = [int]$parts[2]
+
+    if ($bumpMajor) {
+        return "$($maj + 1).0.0"
+    } elseif ($bumpMinor) {
+        return "$maj.$($min + 1).0"
+    } else {
+        return "$maj.$min.$($pat + 1)"
+    }
+}
+
+if (-not $Version) {
+    $currentVersion = Get-CurrentVersion
+    if ($Major -or $Minor -or -not $PSBoundParameters.ContainsKey('Version')) {
+        $Version = Increment-Version $currentVersion $Major $Minor
+        $bumpType = if ($Major) { "major" } elseif ($Minor) { "minor" } else { "patch" }
+        Write-Host "`n📌 Auto-incrementing $bumpType version: $currentVersion → $Version" -ForegroundColor Cyan
+    } else {
+        Write-Host "`nCurrent version: $currentVersion" -ForegroundColor DarkGray
+        $Version = Read-Host "Enter version for this release (e.g. 1.2.0)"
+        if (-not $Version) {
+            Write-Error "Version is required"
+            exit 1
+        }
     }
 }
 
