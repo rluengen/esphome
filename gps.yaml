@@ -2,7 +2,7 @@ substitutions:
   device_name: gps
   friendly_name: Global Positioning System
   project_name: gps-receiver
-  project_version: "1.0.2"
+  project_version: "1.0.3"
   log_level: DEBUG
 
 packages:
@@ -240,3 +240,7 @@ esphome:
           ESP_LOGI("gps", "Applied GPS rate: %s", rate.c_str());
       - lambda: |-
           id(gps_uart).write_str("\x24PCAS06,1*1D\r\n");  // Enable SBAS
+
+logger:
+  level: ${log_level}
+  hardware_uart: USB_CDC
