@@ -6,7 +6,7 @@ substitutions:
   device_name: led-van-controller
   friendly_name: Light Controller
   project_name: van-light-controller
-  project_version: "1.0.4"
+  project_version: "1.0.6"
   log_level: DEBUG
   default_transition: 500ms
 
