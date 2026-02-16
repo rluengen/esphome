@@ -18,6 +18,15 @@
 # assignments below are typical starting points based on community findings.
 # Your specific heater firmware version may differ - always verify by sniffing first.
 
+# https://romheat.romcomm.com/images/uploaded/Espar_CANBUS_Instructions.pdf
+
+# From the Eberspächer troubleshooting manual (Krueger.co.uk), the external air inlet temperature sensor connects to:
+# Grey/Red (GYRD) wire
+# Brown/White (BNWH) wire
+# This is an NTC thermistor sensor — the heater auto-detects it during startup. You can buy the Eberspächer 
+# OEM sensor or use a matching NTC component (the same part that works on the D2/D4/D5 also works on the 
+# S2/S3/M3 series per community testing). The sensor is not polarity dependent.
+
 substitutions:
   device_name: esparheater
   friendly_name: Espar Heater
