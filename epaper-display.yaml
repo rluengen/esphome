@@ -78,6 +78,7 @@ esphome:
       # - lvgl.pause:
       - script.execute: update_display
       - script.execute: daily_ota_check
+      - script.execute: validate_ha_sensors
       - logger.log:
           level: INFO
           format: "[BOOT] Boot sequence complete"
@@ -535,7 +536,10 @@ script:
     mode: single
     then:
       - update.check: firmware_update
-      - delay: 10s
+      - wait_until:
+          condition:
+            lambda: 'return id(firmware_update).state != update::UPDATE_STATE_UNKNOWN;'
+          timeout: 30s
       - if:
           condition:
             lambda: 'return id(firmware_update).state == update::UPDATE_STATE_AVAILABLE;'
@@ -548,6 +552,64 @@ script:
             - logger.log:
                 level: INFO
                 format: "[OTA] Firmware is up to date"
+
+  - id: validate_ha_sensors
+    mode: single
+    then:
+      - logger.log:
+          level: INFO
+          format: "[HA_VALIDATE] Waiting for Home Assistant API connection..."
+      - wait_until:
+          condition:
+            api.connected:
+          timeout: 60s
+      - if:
+          condition:
+            not:
+              api.connected:
+          then:
+            - logger.log:
+                level: ERROR
+                format: "[HA_VALIDATE] Timed out waiting for Home Assistant API connection. Cannot validate sensors."
+          else:
+            - logger.log:
+                level: INFO
+                format: "[HA_VALIDATE] API connected. Waiting for initial state sync..."
+            - delay: 5s  # Brief delay for HA to push initial entity states after API connects
+            - logger.log:
+                level: INFO
+                format: "[HA_VALIDATE] Checking Home Assistant sensor availability..."
+      - lambda: |-
+          int missing = 0;
+          // Numeric sensors
+          if (isnan(id(location_latitude).state)) { ESP_LOGW("HA_VALIDATE", "MISSING: sensor.global_positioning_system_latitude (id: location_latitude)"); missing++; }
+          if (isnan(id(location_longitude).state)) { ESP_LOGW("HA_VALIDATE", "MISSING: sensor.global_positioning_system_longitude (id: location_longitude)"); missing++; }
+          if (isnan(id(fuel_level).state)) { ESP_LOGW("HA_VALIDATE", "MISSING: sensor.fuel_level (id: fuel_level)"); missing++; }
+          if (isnan(id(def_level).state)) { ESP_LOGW("HA_VALIDATE", "MISSING: sensor.def_level (id: def_level)"); missing++; }
+          if (isnan(id(vehicle_battery).state)) { ESP_LOGW("HA_VALIDATE", "MISSING: sensor.vehicle_battery (id: vehicle_battery)"); missing++; }
+          if (isnan(id(air_co2).state)) { ESP_LOGW("HA_VALIDATE", "MISSING: sensor.airgradient_carbon_dioxide (id: air_co2)"); missing++; }
+          if (isnan(id(air_pm25).state)) { ESP_LOGW("HA_VALIDATE", "MISSING: sensor.airgradient_pm2_5 (id: air_pm25)"); missing++; }
+          if (isnan(id(air_voc).state)) { ESP_LOGW("HA_VALIDATE", "MISSING: sensor.airgradient_voc_index (id: air_voc)"); missing++; }
+          if (isnan(id(air_nox).state)) { ESP_LOGW("HA_VALIDATE", "MISSING: sensor.airgradient_nox_index (id: air_nox)"); missing++; }
+          if (isnan(id(fridge_temp).state)) { ESP_LOGW("HA_VALIDATE", "MISSING: sensor.fridge_temperature (id: fridge_temp)"); missing++; }
+          if (isnan(id(water_level).state)) { ESP_LOGW("HA_VALIDATE", "MISSING: sensor.water_level (id: water_level)"); missing++; }
+          if (isnan(id(fuel_range).state)) { ESP_LOGW("HA_VALIDATE", "MISSING: sensor.fuel_range (id: fuel_range)"); missing++; }
+          if (isnan(id(def_range).state)) { ESP_LOGW("HA_VALIDATE", "MISSING: sensor.def_range (id: def_range)"); missing++; }
+          if (isnan(id(battery_time_remaining).state)) { ESP_LOGW("HA_VALIDATE", "MISSING: sensor.battery_time_remaining (id: battery_time_remaining)"); missing++; }
+          if (isnan(id(water_time_remaining).state)) { ESP_LOGW("HA_VALIDATE", "MISSING: sensor.water_time_remaining (id: water_time_remaining)"); missing++; }
+          // Text sensors
+          if (id(weather_condition).state.empty()) { ESP_LOGW("HA_VALIDATE", "MISSING: weather.forecast_home attribute:condition (id: weather_condition)"); missing++; }
+          if (id(weather_temp).state.empty()) { ESP_LOGW("HA_VALIDATE", "MISSING: weather.forecast_home attribute:temperature (id: weather_temp)"); missing++; }
+          if (id(location_city).state.empty()) { ESP_LOGW("HA_VALIDATE", "MISSING: sensor.location_city (id: location_city)"); missing++; }
+          if (id(location_state).state.empty()) { ESP_LOGW("HA_VALIDATE", "MISSING: sensor.location_state (id: location_state)"); missing++; }
+          if (id(sunrise_time).state.empty()) { ESP_LOGW("HA_VALIDATE", "MISSING: sensor.sunrise (id: sunrise_time)"); missing++; }
+          if (id(sunset_time).state.empty()) { ESP_LOGW("HA_VALIDATE", "MISSING: sensor.sunset (id: sunset_time)"); missing++; }
+          // Summary
+          if (missing > 0) {
+            ESP_LOGW("HA_VALIDATE", "==> %d sensor(s) not found in Home Assistant. Update the entity_id values in epaper-display.yaml to match your HA entities.", missing);
+          } else {
+            ESP_LOGI("HA_VALIDATE", "All Home Assistant sensors connected successfully!");
+          }
 
   - id: page_previous
     mode: single
@@ -727,6 +789,35 @@ lvgl:
     - lambda: |-
         ESP_LOGI("LVGL", "Battery charging: %s, voltage: %.2fV", 
           id(battery_charging).state ? "YES" : "NO", id(battery_voltage).state);
+    # Wait for background scripts to finish before sleeping
+    - if:
+        condition:
+          lambda: 'return id(daily_ota_check).is_running() || id(daily_ota_check_run).is_running();'
+        then:
+          - logger.log:
+              level: INFO
+              format: "[LVGL] Waiting for OTA check to complete before sleep..."
+          - wait_until:
+              condition:
+                lambda: 'return !id(daily_ota_check).is_running() && !id(daily_ota_check_run).is_running();'
+              timeout: 120s
+          - logger.log:
+              level: INFO
+              format: "[LVGL] OTA check complete"
+    - if:
+        condition:
+          lambda: 'return id(validate_ha_sensors).is_running();'
+        then:
+          - logger.log:
+              level: INFO
+              format: "[LVGL] Waiting for sensor validation to complete before sleep..."
+          - wait_until:
+              condition:
+                lambda: 'return !id(validate_ha_sensors).is_running();'
+              timeout: 90s
+          - logger.log:
+              level: INFO
+              format: "[LVGL] Sensor validation complete"
     - if:
         condition:
           binary_sensor.is_off: battery_charging
@@ -1344,7 +1435,7 @@ sensor:
 
   - platform: homeassistant
     id: location_latitude
-    entity_id: sensor.location_latitude
+    entity_id: sensor.global_positioning_system_latitude
     internal: true
     on_value:
       then:
@@ -1353,7 +1444,7 @@ sensor:
 
   - platform: homeassistant
     id: location_longitude
-    entity_id: sensor.location_longitude
+    entity_id: sensor.global_positioning_system_longitude
     internal: true
     on_value:
       then:
@@ -1389,7 +1480,7 @@ sensor:
 
   - platform: homeassistant
     id: air_co2
-    entity_id: sensor.air_quality_co2  # TODO: Change to your actual CO2 entity
+    entity_id: sensor.airgradient_carbon_dioxide
     internal: true
     on_value:
       then:
@@ -1398,7 +1489,7 @@ sensor:
 
   - platform: homeassistant
     id: air_pm25
-    entity_id: sensor.air_quality_pm25  # TODO: Change to your actual PM2.5 entity
+    entity_id: sensor.airgradient_pm2_5
     internal: true
     on_value:
       then:
@@ -1407,7 +1498,7 @@ sensor:
 
   - platform: homeassistant
     id: air_voc
-    entity_id: sensor.air_quality_voc  # TODO: Change to your actual VOC entity
+    entity_id: sensor.airgradient_voc_index
     internal: true
     on_value:
       then:
@@ -1416,7 +1507,7 @@ sensor:
 
   - platform: homeassistant
     id: air_nox
-    entity_id: sensor.air_quality_nox  # TODO: Change to your actual NOx entity
+    entity_id: sensor.airgradient_nox_index
     internal: true
     on_value:
       then:
@@ -1629,7 +1720,7 @@ text_sensor:
 
   - platform: homeassistant
     id: sunrise_time
-    entity_id: sensor.sun_next_rising  # TODO: Change to your actual sunrise entity
+    entity_id: sensor.sunrise
     internal: true
     on_value:
       then:
@@ -1638,7 +1729,7 @@ text_sensor:
 
   - platform: homeassistant
     id: sunset_time
-    entity_id: sensor.sun_next_setting  # TODO: Change to your actual sunset entity
+    entity_id: sensor.sunset
     internal: true
     on_value:
       then:
