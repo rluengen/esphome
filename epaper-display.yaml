@@ -822,6 +822,15 @@ lvgl:
         condition:
           binary_sensor.is_off: battery_charging
         then:
+          - if:
+              condition:
+                not:
+                  api.connected:
+              then:
+                - logger.log:
+                    level: WARN
+                    format: "[LVGL] Not connected to HA - waiting 60s before deep sleep to allow connection..."
+                - delay: 60s
           - logger.log:
               level: INFO
               format: "[LVGL] Not charging - entering deep sleep for ${sleep_duration}"
