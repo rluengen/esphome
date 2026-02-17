@@ -216,7 +216,7 @@ canbus:
 # --- Sensors ---
 sensor:
   - platform: template
-    name: "${friendly_name} Exhaust Temperature"
+    name: "Exhaust Temperature"
     id: heater_exhaust_temp
     unit_of_measurement: "°C"
     device_class: temperature
@@ -225,7 +225,7 @@ sensor:
     icon: mdi:thermometer-high
 
   - platform: template
-    name: "${friendly_name} Supply Voltage"
+    name: "Supply Voltage"
     id: heater_voltage
     unit_of_measurement: "V"
     device_class: voltage
@@ -234,7 +234,7 @@ sensor:
     icon: mdi:car-battery
 
   - platform: template
-    name: "${friendly_name} Fan Speed"
+    name: "Fan Speed"
     id: heater_fan_speed
     unit_of_measurement: "RPM"
     state_class: measurement
@@ -242,7 +242,7 @@ sensor:
     icon: mdi:fan
 
   - platform: template
-    name: "${friendly_name} Power Level"
+    name: "Power Level"
     id: heater_power
     unit_of_measurement: "%"
     state_class: measurement
@@ -250,7 +250,7 @@ sensor:
     icon: mdi:fire
 
   - platform: template
-    name: "${friendly_name} Error Code"
+    name: "Error Code"
     id: heater_error_code
     accuracy_decimals: 0
     icon: mdi:alert-circle
@@ -258,14 +258,14 @@ sensor:
 # --- Text Sensors ---
 text_sensor:
   - platform: template
-    name: "${friendly_name} State"
+    name: "State"
     id: heater_state
     icon: mdi:radiator
 
 # --- Binary Sensors ---
 binary_sensor:
   - platform: template
-    name: "${friendly_name} Running"
+    name: "Running"
     id: heater_running
     device_class: running
     icon: mdi:fire-circle
@@ -273,7 +273,7 @@ binary_sensor:
 # --- Controls ---
 switch:
   - platform: template
-    name: "${friendly_name} Power"
+    name: "Power"
     id: heater_switch
     icon: mdi:radiator
     optimistic: true
@@ -293,7 +293,7 @@ switch:
 # --- Buttons ---
 button:
   - platform: template
-    name: "${friendly_name} Start"
+    name: "Start"
     icon: mdi:play
     on_press:
       - logger.log: "Sending heater START command"
@@ -303,7 +303,7 @@ button:
           data: [0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
 
   - platform: template
-    name: "${friendly_name} Stop"
+    name: "Stop"
     icon: mdi:stop
     on_press:
       - logger.log: "Sending heater STOP command"
@@ -315,7 +315,7 @@ button:
 # --- Number: Heat level adjustment ---
 number:
   - platform: template
-    name: "${friendly_name} Heat Level"
+    name: "Heat Level"
     id: heater_heat_level
     icon: mdi:thermometer-lines
     min_value: 0
@@ -340,7 +340,7 @@ number:
 # change mode or target temperature from the HA UI.
 climate:
   - platform: thermostat
-    name: "${friendly_name} Climate"
+    name: "Climate"
     id: heater_climate
     icon: mdi:radiator
     sensor: heater_exhaust_temp  # Display-only; the heater controls its own loop

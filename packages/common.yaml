@@ -33,7 +33,7 @@ ota:
 # Binary sensors for device status
 binary_sensor:
   - platform: status
-    name: "${friendly_name} Status"
+    name: "Status"
 
   - platform: template
     id: ha_connected
@@ -44,18 +44,18 @@ binary_sensor:
 switch:
   - platform: restart
     id: switch_restart
-    name: "${friendly_name} Restart"
+    name: "Restart"
 
 # Uptime sensor
 sensor:
   - platform: uptime
     id: uptime_id
-    name: "${friendly_name} Uptime"
+    name: "Uptime"
     update_interval: 60s
 
 # Text sensor for device information
 text_sensor:
   - platform: version
     id: esphome_version
-    name: "${friendly_name} ESPHome Version"
+    name: "ESPHome Version"
     hide_timestamp: true

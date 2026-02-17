@@ -21,7 +21,7 @@ wifi:
 text_sensor:
   - platform: wifi_info
     ip_address:
-      name: "${friendly_name} WiFi IP Address"
+      name: "WiFi IP Address"
       entity_category: diagnostic
       filters:
         - lambda: |-
@@ -33,16 +33,16 @@ text_sensor:
               return {};
             }
     ssid:
-      name: "${friendly_name} SSID"
+      name: "SSID"
       entity_category: diagnostic
     bssid:
-      name: "${friendly_name} BSSID"
+      name: "BSSID"
       entity_category: diagnostic
 
 sensor:
   - platform: wifi_signal
     id: wifi_rssi
-    name: "${friendly_name} WiFi Signal"
+    name: "WiFi Signal"
     update_interval: 60s
     filters:
       - throttle: 5min

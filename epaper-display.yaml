@@ -1583,7 +1583,7 @@ sensor:
   # Calculated fuel range based on local percentage and calibration
   - platform: template
     id: fuel_range_calculated
-    name: "${friendly_name} Fuel Range Calculated"
+    name: "Fuel Range Calculated"
     unit_of_measurement: "mi"
     accuracy_decimals: 0
     icon: "mdi:gas-station"
@@ -1609,7 +1609,7 @@ sensor:
   # Calculated DEF range based on local percentage and calibration
   - platform: template
     id: def_range_calculated
-    name: "${friendly_name} DEF Range Calculated"
+    name: "DEF Range Calculated"
     unit_of_measurement: "mi"
     accuracy_decimals: 0
     icon: "mdi:fuel"
@@ -1667,7 +1667,7 @@ number:
   # DEF tank calibration (2025 Mercedes Sprinter)
   - platform: template
     id: def_tank_capacity
-    name: "${friendly_name} DEF Tank Capacity"
+    name: "DEF Tank Capacity"
     optimistic: true
     min_value: 1.0
     max_value: 15.0
@@ -1681,7 +1681,7 @@ number:
 
   - platform: template
     id: def_consumption_rate
-    name: "${friendly_name} DEF Consumption Rate"
+    name: "DEF Consumption Rate"
     optimistic: true
     min_value: 500
     max_value: 3000
@@ -1696,7 +1696,7 @@ number:
   # Fuel tank calibration (2025 Mercedes Sprinter)
   - platform: template
     id: fuel_tank_capacity
-    name: "${friendly_name} Fuel Tank Capacity"
+    name: "Fuel Tank Capacity"
     optimistic: true
     min_value: 10.0
     max_value: 100.0
@@ -1710,7 +1710,7 @@ number:
 
   - platform: template
     id: fuel_consumption_rate
-    name: "${friendly_name} Fuel Consumption Rate"
+    name: "Fuel Consumption Rate"
     optimistic: true
     min_value: 5.0
     max_value: 35.0
@@ -1725,7 +1725,7 @@ number:
   # Fill tracking inputs
   - platform: template
     id: fuel_gallons_added
-    name: "${friendly_name} Fuel Gallons Added"
+    name: "Fuel Gallons Added"
     optimistic: true
     min_value: 0.0
     max_value: 100.0
@@ -1738,7 +1738,7 @@ number:
 
   - platform: template
     id: def_gallons_added
-    name: "${friendly_name} DEF Gallons Added"
+    name: "DEF Gallons Added"
     optimistic: true
     min_value: 0.0
     max_value: 15.0
@@ -1753,7 +1753,7 @@ number:
 button:
   - platform: template
     id: record_fuel_fill
-    name: "${friendly_name} Record Fuel Fill"
+    name: "Record Fuel Fill"
     icon: "mdi:gas-station"
     entity_category: config
     on_press:
@@ -1833,7 +1833,7 @@ button:
 
   - platform: template
     id: record_def_fill
-    name: "${friendly_name} Record DEF Fill"
+    name: "Record DEF Fill"
     icon: "mdi:fuel"
     entity_category: config
     on_press:
