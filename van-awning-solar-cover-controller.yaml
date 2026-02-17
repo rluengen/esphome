@@ -5,7 +5,7 @@ substitutions:
   device_name: awning-controller
   friendly_name: Van Cover Controller
   project_name: van-cover-controller
-  project_version: "1.0.0"
+  project_version: "1.0.1"
   log_level: DEBUG
 
 esphome:
