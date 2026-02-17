@@ -12,7 +12,7 @@ ota:
 update:
   - platform: http_request
     id: firmware_update
-    name: "${friendly_name} Firmware Update"
+    name: "Firmware Update"
     source: https://rluengen.github.io/esphome/firmware/${device_name}/manifest.json
     update_interval: never
 
