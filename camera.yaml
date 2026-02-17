@@ -5,7 +5,7 @@ substitutions:
   device_name: camera
   friendly_name: Van Camera
   project_name: van-camera
-  project_version: "1.0.6"
+  project_version: "1.0.7"
   log_level: INFO
 
 esphome:
