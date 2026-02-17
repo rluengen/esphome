@@ -102,6 +102,24 @@ globals:
     type: uint32_t
     restore_value: yes
     initial_value: '0'
+  # Fill tracking - fuel
+  - id: fuel_last_fill_odometer
+    type: float
+    restore_value: yes
+    initial_value: '0.0'
+  - id: fuel_last_fill_level
+    type: float
+    restore_value: yes
+    initial_value: '0.0'
+  # Fill tracking - DEF
+  - id: def_last_fill_odometer
+    type: float
+    restore_value: yes
+    initial_value: '0.0'
+  - id: def_last_fill_level
+    type: float
+    restore_value: yes
+    initial_value: '0.0'
 
 # Script to update display - called from boot and interval
 script:
@@ -274,7 +292,9 @@ script:
           id: lbl_weather_temp
           text: !lambda |-
             if (!id(weather_temp).state.empty()) {
-              return id(weather_temp).state.c_str();
+              static char buf[16];
+              snprintf(buf, sizeof(buf), "%s°", id(weather_temp).state.c_str());
+              return buf;
             }
             return "--°";
       - lvgl.label.update:
@@ -587,11 +607,12 @@ script:
           if (isnan(id(fuel_level).state)) { ESP_LOGW("HA_VALIDATE", "MISSING: sensor.fuel_level (id: fuel_level)"); missing++; }
           if (isnan(id(def_level).state)) { ESP_LOGW("HA_VALIDATE", "MISSING: sensor.def_level (id: def_level)"); missing++; }
           if (isnan(id(vehicle_battery).state)) { ESP_LOGW("HA_VALIDATE", "MISSING: sensor.vehicle_battery (id: vehicle_battery)"); missing++; }
+          if (isnan(id(vehicle_odometer).state)) { ESP_LOGW("HA_VALIDATE", "MISSING: sensor.vehicle_odometer (id: vehicle_odometer)"); missing++; }
           if (isnan(id(air_co2).state)) { ESP_LOGW("HA_VALIDATE", "MISSING: sensor.airgradient_carbon_dioxide (id: air_co2)"); missing++; }
           if (isnan(id(air_pm25).state)) { ESP_LOGW("HA_VALIDATE", "MISSING: sensor.airgradient_pm2_5 (id: air_pm25)"); missing++; }
           if (isnan(id(air_voc).state)) { ESP_LOGW("HA_VALIDATE", "MISSING: sensor.airgradient_voc_index (id: air_voc)"); missing++; }
           if (isnan(id(air_nox).state)) { ESP_LOGW("HA_VALIDATE", "MISSING: sensor.airgradient_nox_index (id: air_nox)"); missing++; }
-          if (isnan(id(fridge_temp).state)) { ESP_LOGW("HA_VALIDATE", "MISSING: sensor.fridge_temperature (id: fridge_temp)"); missing++; }
+          if (isnan(id(fridge_temp).state)) { ESP_LOGW("HA_VALIDATE", "MISSING: sensor.fridge_ruuvitag_temperature (id: fridge_temp)"); missing++; }
           if (isnan(id(water_level).state)) { ESP_LOGW("HA_VALIDATE", "MISSING: sensor.water_level (id: water_level)"); missing++; }
           if (isnan(id(fuel_range).state)) { ESP_LOGW("HA_VALIDATE", "MISSING: sensor.fuel_range (id: fuel_range)"); missing++; }
           if (isnan(id(def_range).state)) { ESP_LOGW("HA_VALIDATE", "MISSING: sensor.def_range (id: def_range)"); missing++; }
@@ -669,15 +690,17 @@ binary_sensor:
       return !isnan(id(wifi_signal_db).state) && id(wifi_signal_db).state < 0;
 
   # Battery charging status (USB/external power connected)
-  # Per Seeed wiki: voltage > 4.5V indicates USB power is connected
+  # The voltage divider on GPIO1 reads battery terminal voltage, which maxes at ~4.15V
+  # on battery alone. When USB is connected, the charge controller raises voltage
+  # above the battery's resting full-charge level (~4.15V).
   - platform: template
     id: battery_charging
     name: "Battery Charging"
     lambda: |-
-      // Returns true if USB/external power is connected
-      // When on battery alone, voltage maxes out around 4.15-4.2V
-      // When USB is connected, voltage reading exceeds 4.5V
-      return !isnan(id(battery_voltage).state) && id(battery_voltage).state > 4.5;
+      // When USB is connected, battery voltage reads above the full-charge resting
+      // voltage of ~4.15V. A reading above 4.18V indicates active charging/USB power.
+      // Note: bsp_battery_enable (GPIO21) must be ON for a valid reading.
+      return !isnan(id(battery_voltage).state) && id(battery_voltage).state > 4.18;
 
 font:
   - file: "fonts/Roboto-Regular.ttf"
@@ -786,9 +809,16 @@ lvgl:
     - logger.log:
         level: INFO
         format: "[LVGL] on_pause triggered"
+    # Take a fresh battery reading to accurately detect USB/charging
+    - output.turn_on: bsp_battery_enable
+    - delay: 200ms
+    - component.update: battery_voltage
+    - delay: 100ms
     - lambda: |-
-        ESP_LOGI("LVGL", "Battery charging: %s, voltage: %.2fV", 
-          id(battery_charging).state ? "YES" : "NO", id(battery_voltage).state);
+        ESP_LOGI("LVGL", "Fresh battery voltage: %.3fV, Charging: %s", 
+          id(battery_voltage).state,
+          (!isnan(id(battery_voltage).state) && id(battery_voltage).state > 4.18) ? "YES" : "NO");
+    - output.turn_off: bsp_battery_enable
     # Wait for background scripts to finish before sleeping
     - if:
         condition:
@@ -1525,7 +1555,7 @@ sensor:
 
   - platform: homeassistant
     id: fridge_temp
-    entity_id: sensor.fridge_temperature  # TODO: Change to your actual fridge temp entity
+    entity_id: sensor.fridge_ruuvitag_temperature
     internal: true
     on_value:
       then:
@@ -1611,6 +1641,16 @@ sensor:
         - lambda: |-
             ESP_LOGI("HA_SENSOR", "water_time_remaining updated: %.1f hrs", x);
 
+  - platform: homeassistant
+    id: vehicle_odometer
+    entity_id: sensor.vehicle_odometer  # TODO: Change to your actual odometer entity
+    unit_of_measurement: "mi"
+    internal: true
+    on_value:
+      then:
+        - lambda: |-
+            ESP_LOGI("HA_SENSOR", "vehicle_odometer updated: %.1f mi", x);
+
 select:
   - platform: template
     id: temp_unit_select
@@ -1681,6 +1721,189 @@ number:
     mode: box
     entity_category: config
     icon: "mdi:gauge"
+
+  # Fill tracking inputs
+  - platform: template
+    id: fuel_gallons_added
+    name: "${friendly_name} Fuel Gallons Added"
+    optimistic: true
+    min_value: 0.0
+    max_value: 100.0
+    step: 0.1
+    initial_value: 0.0
+    restore_value: false
+    unit_of_measurement: "gal"
+    mode: box
+    icon: "mdi:gas-station"
+
+  - platform: template
+    id: def_gallons_added
+    name: "${friendly_name} DEF Gallons Added"
+    optimistic: true
+    min_value: 0.0
+    max_value: 15.0
+    step: 0.1
+    initial_value: 0.0
+    restore_value: false
+    unit_of_measurement: "gal"
+    mode: box
+    icon: "mdi:fuel"
+
+# Fill event buttons - press after entering gallons added to recalculate consumption rate
+button:
+  - platform: template
+    id: record_fuel_fill
+    name: "${friendly_name} Record Fuel Fill"
+    icon: "mdi:gas-station"
+    entity_category: config
+    on_press:
+      then:
+        - lambda: |-
+            float gallons = id(fuel_gallons_added).state;
+            float odometer = id(vehicle_odometer).state;
+            float current_level = id(fuel_level).state;
+            float last_odometer = id(fuel_last_fill_odometer);
+            float last_level = id(fuel_last_fill_level);
+
+            if (gallons <= 0 || isnan(gallons)) {
+              ESP_LOGW("FILL", "Fuel fill: no gallons entered");
+              return;
+            }
+            if (isnan(odometer)) {
+              ESP_LOGW("FILL", "Fuel fill: odometer not available");
+              return;
+            }
+            if (isnan(current_level)) {
+              ESP_LOGW("FILL", "Fuel fill: fuel level not available");
+              return;
+            }
+
+            ESP_LOGI("FILL", "=== FUEL FILL RECORDED ===");
+            ESP_LOGI("FILL", "Gallons added: %.1f", gallons);
+            ESP_LOGI("FILL", "Odometer: %.1f mi", odometer);
+            ESP_LOGI("FILL", "Current level: %.1f%%", current_level);
+            ESP_LOGI("FILL", "Previous fill odometer: %.1f mi", last_odometer);
+            ESP_LOGI("FILL", "Previous fill level: %.1f%%", last_level);
+
+            // Calculate new consumption rate if we have a previous fill record
+            if (last_odometer > 0 && last_level > 0) {
+              float miles_driven = odometer - last_odometer;
+              // Gallons consumed = what we had at last fill minus what's left before this fill
+              // Level before fill = current_level - (gallons / tank_capacity * 100)
+              float level_before_fill = current_level - (gallons / id(fuel_tank_capacity).state * 100.0f);
+              float pct_consumed = last_level - level_before_fill;
+              float gallons_consumed = (pct_consumed / 100.0f) * id(fuel_tank_capacity).state;
+
+              if (miles_driven > 0 && gallons_consumed > 0) {
+                float new_mpg = miles_driven / gallons_consumed;
+                ESP_LOGI("FILL", "Miles driven: %.1f", miles_driven);
+                ESP_LOGI("FILL", "Level before fill: %.1f%%", level_before_fill);
+                ESP_LOGI("FILL", "Percent consumed: %.1f%%", pct_consumed);
+                ESP_LOGI("FILL", "Gallons consumed: %.2f", gallons_consumed);
+                ESP_LOGI("FILL", "Calculated MPG: %.1f", new_mpg);
+
+                // Sanity check - only update if MPG is reasonable (5-35)
+                if (new_mpg >= 5.0f && new_mpg <= 35.0f) {
+                  // Exponential moving average: 70% new, 30% old
+                  float old_mpg = id(fuel_consumption_rate).state;
+                  float blended_mpg = (new_mpg * 0.7f) + (old_mpg * 0.3f);
+                  ESP_LOGI("FILL", "Updated fuel consumption: %.1f -> %.1f MPG (blended)", old_mpg, blended_mpg);
+                  auto call = id(fuel_consumption_rate).make_call();
+                  call.set_value(blended_mpg);
+                  call.perform();
+                } else {
+                  ESP_LOGW("FILL", "Calculated MPG %.1f out of range (5-35) - not updating", new_mpg);
+                }
+              } else {
+                ESP_LOGW("FILL", "Invalid calculation: miles=%.1f gallons_consumed=%.2f", miles_driven, gallons_consumed);
+              }
+            } else {
+              ESP_LOGI("FILL", "First fill recorded - will calculate consumption on next fill");
+            }
+
+            // Save current state for next fill calculation
+            id(fuel_last_fill_odometer) = odometer;
+            id(fuel_last_fill_level) = current_level;
+            ESP_LOGI("FILL", "Saved: odometer=%.1f, level=%.1f%%", odometer, current_level);
+
+            // Reset gallons input
+            auto call = id(fuel_gallons_added).make_call();
+            call.set_value(0.0f);
+            call.perform();
+
+  - platform: template
+    id: record_def_fill
+    name: "${friendly_name} Record DEF Fill"
+    icon: "mdi:fuel"
+    entity_category: config
+    on_press:
+      then:
+        - lambda: |-
+            float gallons = id(def_gallons_added).state;
+            float odometer = id(vehicle_odometer).state;
+            float current_level = id(def_level).state;
+            float last_odometer = id(def_last_fill_odometer);
+            float last_level = id(def_last_fill_level);
+
+            if (gallons <= 0 || isnan(gallons)) {
+              ESP_LOGW("FILL", "DEF fill: no gallons entered");
+              return;
+            }
+            if (isnan(odometer)) {
+              ESP_LOGW("FILL", "DEF fill: odometer not available");
+              return;
+            }
+            if (isnan(current_level)) {
+              ESP_LOGW("FILL", "DEF fill: DEF level not available");
+              return;
+            }
+
+            ESP_LOGI("FILL", "=== DEF FILL RECORDED ===");
+            ESP_LOGI("FILL", "Gallons added: %.1f", gallons);
+            ESP_LOGI("FILL", "Odometer: %.1f mi", odometer);
+            ESP_LOGI("FILL", "Current level: %.1f%%", current_level);
+            ESP_LOGI("FILL", "Previous fill odometer: %.1f mi", last_odometer);
+            ESP_LOGI("FILL", "Previous fill level: %.1f%%", last_level);
+
+            if (last_odometer > 0 && last_level > 0) {
+              float miles_driven = odometer - last_odometer;
+              float level_before_fill = current_level - (gallons / id(def_tank_capacity).state * 100.0f);
+              float pct_consumed = last_level - level_before_fill;
+              float gallons_consumed = (pct_consumed / 100.0f) * id(def_tank_capacity).state;
+
+              if (miles_driven > 0 && gallons_consumed > 0) {
+                float new_rate = miles_driven / gallons_consumed;
+                ESP_LOGI("FILL", "Miles driven: %.1f", miles_driven);
+                ESP_LOGI("FILL", "Level before fill: %.1f%%", level_before_fill);
+                ESP_LOGI("FILL", "Percent consumed: %.1f%%", pct_consumed);
+                ESP_LOGI("FILL", "Gallons consumed: %.3f", gallons_consumed);
+                ESP_LOGI("FILL", "Calculated mi/gal: %.0f", new_rate);
+
+                // Sanity check - DEF consumption is typically 500-3000 mi/gal
+                if (new_rate >= 500.0f && new_rate <= 3000.0f) {
+                  float old_rate = id(def_consumption_rate).state;
+                  float blended_rate = (new_rate * 0.7f) + (old_rate * 0.3f);
+                  ESP_LOGI("FILL", "Updated DEF consumption: %.0f -> %.0f mi/gal (blended)", old_rate, blended_rate);
+                  auto call = id(def_consumption_rate).make_call();
+                  call.set_value(blended_rate);
+                  call.perform();
+                } else {
+                  ESP_LOGW("FILL", "Calculated rate %.0f out of range (500-3000) - not updating", new_rate);
+                }
+              } else {
+                ESP_LOGW("FILL", "Invalid calculation: miles=%.1f gallons_consumed=%.3f", miles_driven, gallons_consumed);
+              }
+            } else {
+              ESP_LOGI("FILL", "First DEF fill recorded - will calculate consumption on next fill");
+            }
+
+            id(def_last_fill_odometer) = odometer;
+            id(def_last_fill_level) = current_level;
+            ESP_LOGI("FILL", "Saved: odometer=%.1f, level=%.1f%%", odometer, current_level);
+
+            auto call = id(def_gallons_added).make_call();
+            call.set_value(0.0f);
+            call.perform();
 
 display:
   - id: !extend epaper_display

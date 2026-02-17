@@ -27,7 +27,7 @@ packages:
       - path: devices/xiao-esp32c3.yaml
       - path: packages/ota/http_update.yaml
 
-# GPS sensorsneed to reference the component's internal sensors
+# GPS sensors need to reference the component's internal sensors
 # Configurable thresholds for stationary lock (adjustable from Home Assistant)
 # Values are stored internally in metric, but HA will auto-convert display based on your unit system
 number:
