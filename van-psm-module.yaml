@@ -116,19 +116,6 @@ canbus:
               bool closed = (x[1] >> 4) & 0x01;
               id(can_sliding_door_closed).publish_state(closed);
 
-switch:
-  - platform: template
-    id: can_logger_switch
-    name: "CAN Bus Logger"
-    icon: "mdi:math-log"
-    entity_category: diagnostic
-    optimistic: true
-    restore_mode: RESTORE_DEFAULT_ON
-    turn_on_action:
-      - lambda: 'id(can_log_enabled) = true;'
-    turn_off_action:
-      - lambda: 'id(can_log_enabled) = false;'
-
 sensor:
   # Rear wheel speeds
   - platform: template
