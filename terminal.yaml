@@ -10,7 +10,7 @@ substitutions:
   device_name: terminal
   friendly_name: "Terminal Display"
   project_name: terminal-display
-  project_version: "1.0.4"
+  project_version: "1.0.5"
   log_level: DEBUG
   sleep_duration: 15min
 
