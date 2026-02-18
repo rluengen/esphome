@@ -300,10 +300,27 @@ script:
       - lvgl.label.update:
           id: lbl_weather_condition
           text: !lambda |-
-            if (!id(weather_condition).state.empty()) {
-              return id(weather_condition).state.c_str();
-            }
-            return "Unknown";
+            if (id(weather_condition).state.empty()) return "Unknown";
+            static const std::map<std::string, std::string> conditions = {
+              {"clear-night", "Clear"},
+              {"cloudy", "Cloudy"},
+              {"exceptional", "Exceptional"},
+              {"fog", "Foggy"},
+              {"hail", "Hail"},
+              {"lightning", "Lightning"},
+              {"lightning-rainy", "Thunderstorm"},
+              {"partlycloudy", "Partly Cloudy"},
+              {"pouring", "Pouring"},
+              {"rainy", "Rainy"},
+              {"snowy", "Snowy"},
+              {"snowy-rainy", "Sleet"},
+              {"sunny", "Sunny"},
+              {"windy", "Windy"},
+              {"windy-variant", "Windy"},
+            };
+            auto it = conditions.find(id(weather_condition).state);
+            if (it != conditions.end()) return it->second.c_str();
+            return id(weather_condition).state.c_str();
       # Sunrise/Sunset widgets
       - lvgl.label.update:
           id: lbl_sunrise_time
@@ -1915,7 +1932,6 @@ text_sensor:
   - platform: homeassistant
     id: weather_condition
     entity_id: weather.forecast_home
-    attribute: condition
     internal: true
     on_value:
       then:
