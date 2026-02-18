@@ -1,0 +1,380 @@
+# =============================================================================
+# Van Lighting Automations for Home Assistant
+# =============================================================================
+#
+# Copy these automations into your Home Assistant configuration.
+# You can either:
+#   1. Paste into configuration.yaml under the 'automation:' key
+#   2. Place this file in your automations directory and include it
+#   3. Import via the HA UI (Settings > Automations > ⋮ > Import from YAML)
+#
+# IMPORTANT: Verify entity IDs match your Home Assistant instance.
+#   Go to Settings > Devices & Services > Entities to confirm.
+#   Entity IDs are derived from ESPHome friendly_name + entity name.
+#
+# Entity ID reference (based on your ESPHome configs):
+#   Light Controller (friendly_name: "Light Controller")
+#     light.light_controller_main_can_lights
+#     light.light_controller_bed_can_lights
+#     light.light_controller_door_light
+#     light.light_controller_dog_crate_lights
+#     light.light_controller_garage_led_light
+#     light.light_controller_bed_capsule_lights
+#     light.light_controller_awning_outside_light_strip
+#     light.light_controller_awning_inside_light_strip
+#     light.light_controller_exterior_capsule_passenger_flood_light
+#     light.light_controller_exterior_capsule_driver_flood_light
+#     light.light_controller_exterior_roof_passenger_flood_light
+#     light.light_controller_exterior_roof_driver_flood_light
+#     light.light_controller_exterior_roof_rear_flood_light
+#
+#   PSM Module (friendly_name: "Mercedes Sprinter PSM")
+#     binary_sensor.mercedes_sprinter_psm_sliding_door_open
+#     binary_sensor.mercedes_sprinter_psm_rear_door_open
+#     binary_sensor.mercedes_sprinter_psm_driver_door_open
+#     binary_sensor.mercedes_sprinter_psm_passenger_door_open
+#     binary_sensor.mercedes_sprinter_psm_any_door_open
+#     binary_sensor.mercedes_sprinter_psm_vehicle_locked
+#     binary_sensor.mercedes_sprinter_psm_vehicle_unlocked
+#     binary_sensor.mercedes_sprinter_psm_vehicle_speed_0_mph
+#     switch.mercedes_sprinter_psm_vehicle_lock
+#
+#   Espar Heater (friendly_name: "Espar Heater")
+#     climate.espar_heater_espar_heater_climate
+#
+#   Awning Controller (friendly_name: "Van Cover Controller")
+#     cover.van_cover_controller_nomadic_awning
+#     cover.van_cover_controller_solar_panel
+# =============================================================================
+
+# =============================================================================
+# 1. AUTO EXTERIOR LIGHTS AT DUSK / DAWN
+# =============================================================================
+# Turns on all exterior flood lights when the sun drops below the horizon,
+# and turns them off at sunrise. Uses the sun.sun entity's elevation attribute.
+
+- id: van_exterior_lights_on_at_dusk
+  alias: "Van - Exterior Lights On at Dusk"
+  description: >
+    Turn on exterior flood lights when sun elevation drops below -3°.
+    Only activates when the van is parked (vehicle speed is 0).
+  mode: single
+  trigger:
+    - platform: numeric_state
+      entity_id: sun.sun
+      attribute: elevation
+      below: -3
+  condition:
+    # Only turn on if van is parked
+    - condition: state
+      entity_id: binary_sensor.mercedes_sprinter_psm_vehicle_speed_0_mph
+      state: "off"
+  action:
+    - service: light.turn_on
+      target:
+        entity_id:
+          - light.light_controller_exterior_capsule_passenger_flood_light
+          - light.light_controller_exterior_capsule_driver_flood_light
+          - light.light_controller_exterior_roof_passenger_flood_light
+          - light.light_controller_exterior_roof_driver_flood_light
+          - light.light_controller_exterior_roof_rear_flood_light
+          - light.light_controller_awning_outside_light_strip
+      data:
+        brightness_pct: 75
+        transition: 5
+
+- id: van_exterior_lights_off_at_dawn
+  alias: "Van - Exterior Lights Off at Dawn"
+  description: >
+    Turn off exterior flood lights when sun elevation rises above 0°.
+  mode: single
+  trigger:
+    - platform: numeric_state
+      entity_id: sun.sun
+      attribute: elevation
+      above: 0
+  action:
+    - service: light.turn_off
+      target:
+        entity_id:
+          - light.light_controller_exterior_capsule_passenger_flood_light
+          - light.light_controller_exterior_capsule_driver_flood_light
+          - light.light_controller_exterior_roof_passenger_flood_light
+          - light.light_controller_exterior_roof_driver_flood_light
+          - light.light_controller_exterior_roof_rear_flood_light
+          - light.light_controller_awning_outside_light_strip
+      data:
+        transition: 10
+
+# =============================================================================
+# 2. DOOR-ACTIVATED LIGHTS
+# =============================================================================
+# Turns on relevant lights when doors open, turns off after they close + delay.
+
+- id: van_sliding_door_light_on
+  alias: "Van - Door Light On When Sliding Door Opens"
+  description: >
+    Turn on the door light when the sliding door is opened.
+    Works day or night — always useful to illuminate the entry.
+  mode: restart
+  trigger:
+    - platform: state
+      entity_id: binary_sensor.mercedes_sprinter_psm_sliding_door_open
+      to: "on"
+  action:
+    - service: light.turn_on
+      target:
+        entity_id: light.light_controller_door_light
+      data:
+        brightness_pct: 100
+        transition: 1
+
+- id: van_sliding_door_light_off
+  alias: "Van - Door Light Off When Sliding Door Closes"
+  description: >
+    Turn off the door light 30 seconds after the sliding door closes.
+    Uses 'restart' mode so reopening the door resets the timer.
+  mode: restart
+  trigger:
+    - platform: state
+      entity_id: binary_sensor.mercedes_sprinter_psm_sliding_door_open
+      to: "off"
+  action:
+    - delay:
+        seconds: 30
+    - service: light.turn_off
+      target:
+        entity_id: light.light_controller_door_light
+      data:
+        transition: 3
+
+- id: van_rear_door_garage_light
+  alias: "Van - Garage Light On When Rear Doors Open"
+  description: >
+    Turn on the garage LED light when rear doors are opened.
+  mode: restart
+  trigger:
+    - platform: state
+      entity_id: binary_sensor.mercedes_sprinter_psm_rear_door_open
+      to: "on"
+  action:
+    - service: light.turn_on
+      target:
+        entity_id: light.light_controller_garage_led_light
+      data:
+        brightness_pct: 100
+        transition: 1
+
+- id: van_rear_door_garage_light_off
+  alias: "Van - Garage Light Off When Rear Doors Close"
+  description: >
+    Turn off the garage light 30 seconds after rear doors close.
+  mode: restart
+  trigger:
+    - platform: state
+      entity_id: binary_sensor.mercedes_sprinter_psm_rear_door_open
+      to: "off"
+  action:
+    - delay:
+        seconds: 30
+    - service: light.turn_off
+      target:
+        entity_id: light.light_controller_garage_led_light
+      data:
+        transition: 3
+
+# =============================================================================
+# 3. DRIVING MODE
+# =============================================================================
+# When the vehicle starts moving, turn off all exterior lights and close
+# awning/solar covers. Dim interior lights to avoid driver distraction.
+
+- id: van_driving_mode_activate
+  alias: "Van - Driving Mode Activate"
+  description: >
+    Safety automation: When the vehicle starts moving, turn off exterior lights,
+    retract awning and solar cover, and dim interior lights.
+  mode: single
+  trigger:
+    - platform: state
+      entity_id: binary_sensor.mercedes_sprinter_psm_vehicle_speed_0_mph
+      to: "on"
+      for:
+        seconds: 3
+  action:
+    # Turn off all exterior lights
+    - service: light.turn_off
+      target:
+        entity_id:
+          - light.light_controller_exterior_capsule_passenger_flood_light
+          - light.light_controller_exterior_capsule_driver_flood_light
+          - light.light_controller_exterior_roof_passenger_flood_light
+          - light.light_controller_exterior_roof_driver_flood_light
+          - light.light_controller_exterior_roof_rear_flood_light
+          - light.light_controller_awning_outside_light_strip
+          - light.light_controller_awning_inside_light_strip
+          - light.light_controller_door_light
+      data:
+        transition: 2
+
+    # Close awning if open
+    - service: cover.close_cover
+      target:
+        entity_id:
+          - cover.van_cover_controller_nomadic_awning
+          - cover.van_cover_controller_solar_panel
+
+    # Dim interior lights to a low level (not off — passengers may need light)
+    - service: light.turn_on
+      target:
+        entity_id:
+          - light.light_controller_main_can_lights
+      data:
+        brightness_pct: 20
+        transition: 3
+
+    # Send a notification
+    - service: persistent_notification.create
+      data:
+        title: "Driving Mode Activated"
+        message: >
+          Exterior lights off, awning retracted, interior lights dimmed.
+
+- id: van_driving_mode_deactivate
+  alias: "Van - Driving Mode Deactivate (Parked)"
+  description: >
+    When the vehicle stops and is parked for 2 minutes, restore interior lights
+    to a comfortable level.
+  mode: single
+  trigger:
+    - platform: state
+      entity_id: binary_sensor.mercedes_sprinter_psm_vehicle_speed_0_mph
+      to: "off"
+      for:
+        minutes: 2
+  action:
+    - service: light.turn_on
+      target:
+        entity_id:
+          - light.light_controller_main_can_lights
+      data:
+        brightness_pct: 80
+        transition: 3
+
+# =============================================================================
+# 4. GOODNIGHT SCENE
+# =============================================================================
+# Triggered via a Home Assistant script/button. Fades all lights off,
+# sets heater to a comfortable sleeping temperature, and locks the vehicle.
+# To use: create a button on your dashboard that calls script.van_goodnight.
+
+- id: van_goodnight
+  alias: "Van - Goodnight Scene"
+  description: >
+    Wind-down scene: fade all lights off over 10 seconds, set heater to
+    a comfortable night temp, and lock the vehicle.
+    Trigger this from a dashboard button or voice command.
+  mode: single
+  trigger:
+    # No automatic trigger — activate manually via UI, script, or voice
+    - platform: event
+      event_type: van_goodnight_activated
+  action:
+    # Fade off all interior lights
+    - service: light.turn_off
+      target:
+        entity_id:
+          - light.light_controller_main_can_lights
+          - light.light_controller_bed_can_lights
+          - light.light_controller_door_light
+          - light.light_controller_dog_crate_lights
+          - light.light_controller_garage_led_light
+          - light.light_controller_bed_capsule_lights
+      data:
+        transition: 10
+
+    # Fade off exterior lights
+    - service: light.turn_off
+      target:
+        entity_id:
+          - light.light_controller_exterior_capsule_passenger_flood_light
+          - light.light_controller_exterior_capsule_driver_flood_light
+          - light.light_controller_exterior_roof_passenger_flood_light
+          - light.light_controller_exterior_roof_driver_flood_light
+          - light.light_controller_exterior_roof_rear_flood_light
+          - light.light_controller_awning_outside_light_strip
+          - light.light_controller_awning_inside_light_strip
+      data:
+        transition: 10
+
+    # Set heater to a comfortable sleeping temperature
+    - service: climate.set_temperature
+      target:
+        entity_id: climate.espar_heater_espar_heater_climate
+      data:
+        temperature: 16
+        hvac_mode: heat
+
+    # Lock the vehicle (only if doors are closed)
+    - condition: state
+      entity_id: binary_sensor.mercedes_sprinter_psm_any_door_open
+      state: "off"
+    - service: switch.turn_on
+      target:
+        entity_id: switch.mercedes_sprinter_psm_vehicle_lock
+
+# --- Helper script to fire the goodnight event (add to scripts.yaml) ---
+# van_goodnight:
+#   alias: "Van Goodnight"
+#   icon: mdi:weather-night
+#   sequence:
+#     - event: van_goodnight_activated
+
+# =============================================================================
+# 5. WELCOME HOME (VEHICLE UNLOCKED)
+# =============================================================================
+# When the vehicle is unlocked, turn on cabin and door lights to greet you.
+
+- id: van_welcome_home
+  alias: "Van - Welcome Home"
+  description: >
+    When the vehicle is unlocked, turn on cabin lights and door light
+    at a warm, welcoming brightness.
+  mode: single
+  trigger:
+    - platform: state
+      entity_id: binary_sensor.mercedes_sprinter_psm_vehicle_unlocked
+      to: "on"
+  condition:
+    # Only run at night / dusk for a visual welcome
+    - condition: numeric_state
+      entity_id: sun.sun
+      attribute: elevation
+      below: 0
+  action:
+    # Turn on main cabin lights at a warm level
+    - service: light.turn_on
+      target:
+        entity_id:
+          - light.light_controller_main_can_lights
+      data:
+        brightness_pct: 60
+        transition: 2
+
+    # Turn on door light to illuminate entry
+    - service: light.turn_on
+      target:
+        entity_id:
+          - light.light_controller_door_light
+      data:
+        brightness_pct: 100
+        transition: 1
+
+    # Turn on dog crate lights at a low level
+    - service: light.turn_on
+      target:
+        entity_id:
+          - light.light_controller_dog_crate_lights
+      data:
+        brightness_pct: 30
+        transition: 2

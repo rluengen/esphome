@@ -168,6 +168,7 @@ script:
           format: "[DISPLAY] Updating battery sensors"
       - component.update: battery_voltage
       - component.update: sht4x_component
+      - component.update: wifi_rssi
       - delay: 200ms
       # Wait for battery voltage to be valid
       - wait_until:
@@ -247,7 +248,7 @@ script:
             if (!id(wifi_connected).state) {
               return "\U000F05AA";
             }
-            int rssi = (int)id(wifi_signal_db).state;
+            int rssi = (int)id(wifi_rssi).state;
             if (rssi >= -50) return "\U000F0928";
             else if (rssi >= -60) return "\U000F0925";
             else if (rssi >= -70) return "\U000F0922";
@@ -704,7 +705,7 @@ binary_sensor:
     id: wifi_connected
     name: "WiFi Connected"
     lambda: |-
-      return !isnan(id(wifi_signal_db).state) && id(wifi_signal_db).state < 0;
+      return !isnan(id(wifi_rssi).state) && id(wifi_rssi).state < 0;
 
   # Battery charging status (USB/external power connected)
   # The voltage divider on GPIO1 reads battery terminal voltage, which maxes at ~4.15V
@@ -1478,11 +1479,6 @@ sensor:
 
   - id: !extend battery_level
     update_interval: never
-
-  - platform: wifi_signal
-    id: wifi_signal_db
-    name: "WiFi Signal"
-    update_interval: 60s
 
   - platform: template
     name: "Wakeup Cause"
