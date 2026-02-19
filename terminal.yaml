@@ -364,14 +364,7 @@ script:
           text: !lambda |-
             if (isnan(id(fridge_temp).state)) return "--°";
             static char buf[16];
-            float temp = id(fridge_temp).state;
-            bool use_f = (id(temp_unit_select).current_option() == "F");
-            if (use_f) {
-              temp = temp * 9.0f / 5.0f + 32.0f;
-              snprintf(buf, sizeof(buf), "%.1f°F", temp);
-            } else {
-              snprintf(buf, sizeof(buf), "%.1f°C", temp);
-            }
+            snprintf(buf, sizeof(buf), "%.1f°", id(fridge_temp).state);
             return buf;
       # Air quality widgets
       - lvgl.label.update:
