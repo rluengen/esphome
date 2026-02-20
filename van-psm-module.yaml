@@ -194,71 +194,64 @@ binary_sensor:
     lambda: |-
       return id(di1).state || id(di2).state || id(di3).state || id(di4).state;
 
+  # Connector 2, Pin 7, High
   - id: !extend di1
     name: "Passenger Door Open"
-    comment: "Connector 2, Pin 7, High"
     icon: "mdi:car-door"
     device_class: door
-    mode: INPUT_PULLDOWN
     on_state:
       - component.update: any_door_open
 
+  # Connector 2, Pin 1, High
   - id: !extend di2
     name: "Driver Door Open"
-    comment: "Connector 2, Pin 1, High"
     icon: "mdi:car-door"
     device_class: door
-    mode: INPUT_PULLDOWN
     on_state:
       - component.update: any_door_open
 
+  # Connector 3, Pin 3, Low
   - id: !extend di3
     name: "Sliding Door Open"
-    comment: "Connector 3, Pin 3, Low"
     icon: "mdi:car-door"
     device_class: door
-    mode: INPUT_PULLUP
     on_state:
       - component.update: any_door_open
 
+  # Connector 3, Pin 13, Low
   - id: !extend di4
     name: "Rear Door Open"
-    comment: "Connector 3, Pin 13, Low"
     icon: "mdi:car-door"
     device_class: door
-    mode: INPUT_PULLUP
     on_state:
       - component.update: any_door_open
 
+  # Connector 3, Pin 31, High
   - id: !extend di5
     name: "Vehicle Locked"
-    comment: "Connector 3, Pin 31, High"
     icon: "mdi:car-lock"
     device_class: lock
-    mode: INPUT_PULLDOWN
     on_state:
       - lambda: |-
           if (x) {
             id(vehicle_lock).publish_state(true);
           }
 
+  # Connector 3, Pin 32, High
   - id: !extend di6
     name: "Vehicle Unlocked"
-    comment: "Connector 3, Pin 32, High"
     icon: "mdi:car-lock"
     device_class: lock
-    mode: INPUT_PULLDOWN
     on_state:
       - lambda: |-
           if (x) {
             id(vehicle_lock).publish_state(false);
           }
 
+  # Connector 3, Pin 21, High
   - id: !extend di7
     name: "Vehicle Speed > 0 mph"
-    comment: "Connector 3, Pin 21, High"
     icon: "mdi:speedometer"
-    mode: INPUT_PULLDOWN
 
 switch:
   - platform: template
@@ -273,9 +266,9 @@ switch:
     turn_off_action:
       - lambda: 'id(can_log_enabled) = false;'
 
+  # Connector 3, Pin 30
   - id: !extend do1
     name: "Vehicle Lock Relay"
-    comment: "Connector 3, Pin 30"
     internal: true
 
   - platform: template
@@ -298,9 +291,9 @@ switch:
     turn_off_action:
       - logger.log: "Lock switch is momentary - no unlock action"
 
+  # Connector 3, Pin 23
   - id: !extend do2
     name: "Hazard Warning Lights"
-    comment: "Connector 3, Pin 23"
     icon: "mdi:car-hazard"
     device_class: safety
 
