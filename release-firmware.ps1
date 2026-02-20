@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Compile ESPHome firmware and create a GitHub Release.
 
