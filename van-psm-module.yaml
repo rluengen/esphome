@@ -31,7 +31,6 @@ packages:
         vars:
           wifi_ssid: !secret wifi_ssid
           wifi_password: !secret wifi_password
-      - path: packages/time/homeassistant.yaml
       - path: devices/waveshare-esp32-s3-8di-8do.yaml
 
 # https://www.mbvans.com/content/dam/mb-vans/us/upfitter/psm-programs/MY25_RV_Software_Specification_V4.pdf
