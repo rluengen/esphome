@@ -295,7 +295,7 @@ switch:
   - id: !extend do2
     name: "Hazard Warning Lights"
     icon: "mdi:car-hazard"
-    device_class: safety
+    device_class: switch
 
   - id: !extend do3
     disabled_by_default: true
