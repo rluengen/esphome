@@ -9,7 +9,7 @@ substitutions:
   device_name: van-psm-module
   friendly_name: Mercedes Sprinter PSM
   project_name: mercedes-sprinter-psm
-  project_version: "1.0.1"
+  project_version: "1.0.2"
 
 esphome:
   name: ${device_name}
