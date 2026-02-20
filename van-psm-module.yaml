@@ -74,7 +74,10 @@ canbus:
       - can_id: 0x0A1
         then:
           - lambda: |-
-              if (x.size() < 7) return;
+              if (x.size() < 7) {
+                ESP_LOGW("CAN", "0x0A1 Rear Wheel: frame too short (%d bytes, need 7)", x.size());
+                return;
+              }
               // WheelSpeedRight: start_bit=16, length=14, little-endian, scale=0.068355
               uint16_t raw_right = (x[2] | (x[3] << 8)) & 0x3FFF;
               float speed_right = raw_right * 0.068355;
@@ -87,17 +90,25 @@ canbus:
 
               // WheelMovingRight: start_bit=54, length=2
               uint8_t dir_right = (x[6] >> 6) & 0x03;
-              id(can_rear_wheel_dir_right).publish_state(dir_right == 2 ? "Reverse" : dir_right == 1 ? "Forward" : "Stopped");
+              const char* dir_right_str = dir_right == 2 ? "Reverse" : dir_right == 1 ? "Forward" : "Stopped";
+              id(can_rear_wheel_dir_right).publish_state(dir_right_str);
 
               // WheelMovingLeft: start_bit=30, length=2
               uint8_t dir_left = (x[3] >> 6) & 0x03;
-              id(can_rear_wheel_dir_left).publish_state(dir_left == 2 ? "Reverse" : dir_left == 1 ? "Forward" : "Stopped");
+              const char* dir_left_str = dir_left == 2 ? "Reverse" : dir_left == 1 ? "Forward" : "Stopped";
+              id(can_rear_wheel_dir_left).publish_state(dir_left_str);
+
+              ESP_LOGI("CAN", "0x0A1 Rear Wheels: R=%.1f km/h (%s) L=%.1f km/h (%s)",
+                speed_right, dir_right_str, speed_left, dir_left_str);
 
       # ---- Decoded: Front Wheel Speed (CAN ID 0x0A3 / 163) ----
       - can_id: 0x0A3
         then:
           - lambda: |-
-              if (x.size() < 7) return;
+              if (x.size() < 7) {
+                ESP_LOGW("CAN", "0x0A3 Front Wheel: frame too short (%d bytes, need 7)", x.size());
+                return;
+              }
               uint16_t raw_right = (x[2] | (x[3] << 8)) & 0x3FFF;
               float speed_right = raw_right * 0.068355;
               id(can_front_wheel_speed_right).publish_state(speed_right);
@@ -106,13 +117,19 @@ canbus:
               float speed_left = raw_left * 0.068355;
               id(can_front_wheel_speed_left).publish_state(speed_left);
 
+              ESP_LOGI("CAN", "0x0A3 Front Wheels: R=%.1f km/h L=%.1f km/h", speed_right, speed_left);
+
       # ---- Decoded: Sliding Door State (CAN ID 0x3A5 / 933) ----
       - can_id: 0x3A5
         then:
           - lambda: |-
-              if (x.size() < 2) return;
+              if (x.size() < 2) {
+                ESP_LOGW("CAN", "0x3A5 Sliding Door: frame too short (%d bytes, need 2)", x.size());
+                return;
+              }
               // SlidingDoorState: start_bit=12, length=1
               bool closed = (x[1] >> 4) & 0x01;
+              ESP_LOGI("CAN", "0x3A5 Sliding Door (CAN): %s", closed ? "CLOSED" : "OPEN");
               id(can_sliding_door_closed).publish_state(closed);
 
 sensor:
@@ -197,7 +214,11 @@ binary_sensor:
     icon: "mdi:car-door"
     device_class: door
     on_state:
-      - lambda: 'id(any_door_open).publish_state(id(di1).state || id(di2).state || id(di3).state || id(di4).state);'
+      - lambda: |-
+          ESP_LOGI("DOOR", "Passenger door: %s", x ? "OPEN" : "CLOSED");
+          bool any = id(di1).state || id(di2).state || id(di3).state || id(di4).state;
+          ESP_LOGI("DOOR", "Any door open: %s", any ? "YES" : "NO");
+          id(any_door_open).publish_state(any);
 
   # Connector 2, Pin 1, High
   - id: !extend di2
@@ -205,7 +226,11 @@ binary_sensor:
     icon: "mdi:car-door"
     device_class: door
     on_state:
-      - lambda: 'id(any_door_open).publish_state(id(di1).state || id(di2).state || id(di3).state || id(di4).state);'
+      - lambda: |-
+          ESP_LOGI("DOOR", "Driver door: %s", x ? "OPEN" : "CLOSED");
+          bool any = id(di1).state || id(di2).state || id(di3).state || id(di4).state;
+          ESP_LOGI("DOOR", "Any door open: %s", any ? "YES" : "NO");
+          id(any_door_open).publish_state(any);
 
   # Connector 3, Pin 3, Low
   - id: !extend di3
@@ -213,7 +238,11 @@ binary_sensor:
     icon: "mdi:car-door"
     device_class: door
     on_state:
-      - lambda: 'id(any_door_open).publish_state(id(di1).state || id(di2).state || id(di3).state || id(di4).state);'
+      - lambda: |-
+          ESP_LOGI("DOOR", "Sliding door: %s", x ? "OPEN" : "CLOSED");
+          bool any = id(di1).state || id(di2).state || id(di3).state || id(di4).state;
+          ESP_LOGI("DOOR", "Any door open: %s", any ? "YES" : "NO");
+          id(any_door_open).publish_state(any);
 
   # Connector 3, Pin 13, Low
   - id: !extend di4
@@ -221,7 +250,11 @@ binary_sensor:
     icon: "mdi:car-door"
     device_class: door
     on_state:
-      - lambda: 'id(any_door_open).publish_state(id(di1).state || id(di2).state || id(di3).state || id(di4).state);'
+      - lambda: |-
+          ESP_LOGI("DOOR", "Rear door: %s", x ? "OPEN" : "CLOSED");
+          bool any = id(di1).state || id(di2).state || id(di3).state || id(di4).state;
+          ESP_LOGI("DOOR", "Any door open: %s", any ? "YES" : "NO");
+          id(any_door_open).publish_state(any);
 
   # Connector 3, Pin 31, High
   - id: !extend di5
@@ -230,7 +263,9 @@ binary_sensor:
     device_class: lock
     on_state:
       - lambda: |-
+          ESP_LOGI("LOCK", "Lock signal (di5): %s", x ? "HIGH (locked)" : "LOW");
           if (x) {
+            ESP_LOGI("LOCK", "Publishing vehicle_lock = LOCKED");
             id(vehicle_lock).publish_state(true);
           }
 
@@ -241,7 +276,9 @@ binary_sensor:
     device_class: lock
     on_state:
       - lambda: |-
+          ESP_LOGI("LOCK", "Unlock signal (di6): %s", x ? "HIGH (unlocked)" : "LOW");
           if (x) {
+            ESP_LOGI("LOCK", "Publishing vehicle_lock = UNLOCKED");
             id(vehicle_lock).publish_state(false);
           }
 
@@ -279,14 +316,20 @@ switch:
           condition:
             binary_sensor.is_on: any_door_open
           then:
-            - logger.log: "Cannot lock - one or more doors are open"
+            - lambda: |-
+                ESP_LOGW("LOCK", "Cannot lock - doors open: Passenger=%s Driver=%s Sliding=%s Rear=%s",
+                  id(di1).state ? "OPEN" : "closed",
+                  id(di2).state ? "OPEN" : "closed",
+                  id(di3).state ? "OPEN" : "closed",
+                  id(di4).state ? "OPEN" : "closed");
           else:
-            - logger.log: "Sending lock pulse"
+            - lambda: 'ESP_LOGI("LOCK", "Sending lock pulse via relay (do1) for 500ms");'
             - switch.turn_on: do1
             - delay: 500ms
             - switch.turn_off: do1
+            - lambda: 'ESP_LOGI("LOCK", "Lock pulse complete - relay off");'
     turn_off_action:
-      - logger.log: "Lock switch is momentary - no unlock action"
+      - lambda: 'ESP_LOGI("LOCK", "Lock switch is momentary - no unlock action available");'
 
   # Connector 3, Pin 23
   - id: !extend do2
