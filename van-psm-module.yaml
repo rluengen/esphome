@@ -191,8 +191,6 @@ binary_sensor:
     name: "Any Door Open"
     icon: "mdi:car-door"
     device_class: door
-    lambda: |-
-      return id(di1).state || id(di2).state || id(di3).state || id(di4).state;
 
   # Connector 2, Pin 7, High
   - id: !extend di1
@@ -200,7 +198,7 @@ binary_sensor:
     icon: "mdi:car-door"
     device_class: door
     on_state:
-      - component.update: any_door_open
+      - lambda: 'id(any_door_open).publish_state(id(di1).state || id(di2).state || id(di3).state || id(di4).state);'
 
   # Connector 2, Pin 1, High
   - id: !extend di2
@@ -208,7 +206,7 @@ binary_sensor:
     icon: "mdi:car-door"
     device_class: door
     on_state:
-      - component.update: any_door_open
+      - lambda: 'id(any_door_open).publish_state(id(di1).state || id(di2).state || id(di3).state || id(di4).state);'
 
   # Connector 3, Pin 3, Low
   - id: !extend di3
@@ -216,7 +214,7 @@ binary_sensor:
     icon: "mdi:car-door"
     device_class: door
     on_state:
-      - component.update: any_door_open
+      - lambda: 'id(any_door_open).publish_state(id(di1).state || id(di2).state || id(di3).state || id(di4).state);'
 
   # Connector 3, Pin 13, Low
   - id: !extend di4
@@ -224,7 +222,7 @@ binary_sensor:
     icon: "mdi:car-door"
     device_class: door
     on_state:
-      - component.update: any_door_open
+      - lambda: 'id(any_door_open).publish_state(id(di1).state || id(di2).state || id(di3).state || id(di4).state);'
 
   # Connector 3, Pin 31, High
   - id: !extend di5
