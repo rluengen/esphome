@@ -13,6 +13,17 @@ substitutions:
 esphome:
   name: ${device_name}
   friendly_name: ${friendly_name}
+  on_boot:
+    priority: 600
+    then:
+      - lambda: |-
+          // Panel MCU init (register 0x95) per Waveshare OTA7290B driver
+          id(display_backlight_i2c).write_byte(0x95, 0x11);
+          id(display_backlight_i2c).write_byte(0x95, 0x17);
+          // Backlight off, wait, then full brightness
+          id(display_backlight_i2c).write_byte(0x96, 0x00);
+          delay(100);
+          id(display_backlight_i2c).write_byte(0x96, 0xFF);
 
 # ESP32-C6 co-processor for WiFi via SDIO
 # DISABLED until C6 is flashed with esp-hosted firmware
@@ -152,8 +163,8 @@ display:
     vsync_front_porch: 20
     vsync_pulse_width: 20
     vsync_back_porch: 20
-    pclk_frequency: 83333000
-    lane_bit_rate: 800Mbps
+    pclk_frequency: 75000000
+    lane_bit_rate: 1300Mbps
     color_depth: 16
     pixel_mode: 16bit
     init_sequence:
