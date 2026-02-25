@@ -1,6 +1,7 @@
 # ESPHome
 secrets.yaml
 *.bin
+!network_adapter_esp32c6.bin
 *.bin.gz
 
 # OS
