@@ -72,9 +72,11 @@ switch:
     turn_on_action:
       - lambda: |-
           id(keep_display_awake) = true;
+      - script.execute: exit_screen_off
     turn_off_action:
       - lambda: |-
           id(keep_display_awake) = false;
+      - script.execute: screen_bump_activity
 
 button:
   - platform: template

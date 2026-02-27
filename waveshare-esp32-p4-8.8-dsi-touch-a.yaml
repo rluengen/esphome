@@ -2,8 +2,8 @@
 # Uses MIPI-DSI display with LVGL and a centered "hello world" label
 
 substitutions:
-  device_name: wavesharedsi
-  friendly_name: Waveshare 8.8" DSI
+  device_name: touchpanel
+  friendly_name: Waveshare 8.8" Touch Panel Controller
   log_level: DEBUG
 
 # Local external component for DSI display init with BSP-correct order
@@ -172,10 +172,417 @@ touchscreen:
   - platform: gt911
     id: dsi_touchscreen
     update_interval: 200ms
+    transform:
+      swap_xy: true
+      mirror_x: true
     on_touch:
       - script.execute: screen_bump_activity
+      - lambda: |-
+          for (auto &tp : touches) {
+            ESP_LOGI("touch", "x=%d y=%d (display: 1920x480)", tp.x, tp.y);
+          }
 
-# LVGL with centered "hello world" label
+# ---- Home Assistant Sensors ----
+
+# Pending brightness globals for slider debounce
+globals:
+  - id: pending_bright_main_cans
+    type: int
+    initial_value: '0'
+  - id: pending_bright_bed_cans
+    type: int
+    initial_value: '0'
+  - id: pending_bright_door
+    type: int
+    initial_value: '0'
+  - id: pending_bright_dog_crate
+    type: int
+    initial_value: '0'
+  - id: pending_bright_bed_capsule
+    type: int
+    initial_value: '0'
+  - id: pending_bright_awning_out
+    type: int
+    initial_value: '0'
+  - id: pending_bright_awning_in
+    type: int
+    initial_value: '0'
+  - id: pending_bright_exterior
+    type: int
+    initial_value: '0'
+
+# Debounce scripts: mode restart + 300ms delay = only fires after user stops dragging
+script:
+  - id: debounce_main_cans
+    mode: restart
+    then:
+      - delay: 300ms
+      - homeassistant.service:
+          service: light.turn_on
+          data:
+            entity_id: light.light_controller_main_can_lights
+          data_template:
+            brightness: !lambda 'return id(pending_bright_main_cans);'
+
+  - id: debounce_bed_cans
+    mode: restart
+    then:
+      - delay: 300ms
+      - homeassistant.service:
+          service: light.turn_on
+          data:
+            entity_id: light.light_controller_bed_can_lights
+          data_template:
+            brightness: !lambda 'return id(pending_bright_bed_cans);'
+
+  - id: debounce_door
+    mode: restart
+    then:
+      - delay: 300ms
+      - homeassistant.service:
+          service: light.turn_on
+          data:
+            entity_id: light.light_controller_door_light
+          data_template:
+            brightness: !lambda 'return id(pending_bright_door);'
+
+  - id: debounce_dog_crate
+    mode: restart
+    then:
+      - delay: 300ms
+      - homeassistant.service:
+          service: light.turn_on
+          data:
+            entity_id: light.light_controller_dog_crate_lights
+          data_template:
+            brightness: !lambda 'return id(pending_bright_dog_crate);'
+
+  - id: debounce_bed_capsule
+    mode: restart
+    then:
+      - delay: 300ms
+      - homeassistant.service:
+          service: light.turn_on
+          data:
+            entity_id: light.light_controller_bed_capsule_lights
+          data_template:
+            brightness: !lambda 'return id(pending_bright_bed_capsule);'
+
+  - id: debounce_awning_out
+    mode: restart
+    then:
+      - delay: 300ms
+      - homeassistant.service:
+          service: light.turn_on
+          data:
+            entity_id: light.light_controller_awning_outside_light_strip
+          data_template:
+            brightness: !lambda 'return id(pending_bright_awning_out);'
+
+  - id: debounce_awning_in
+    mode: restart
+    then:
+      - delay: 300ms
+      - homeassistant.service:
+          service: light.turn_on
+          data:
+            entity_id: light.light_controller_awning_inside_light_strip
+          data_template:
+            brightness: !lambda 'return id(pending_bright_awning_in);'
+
+  - id: debounce_exterior
+    mode: restart
+    then:
+      - delay: 300ms
+      - homeassistant.service:
+          service: light.turn_on
+          data:
+            entity_id: light.light_controller_exterior_capsule_passenger_flood_light
+          data_template:
+            brightness: !lambda 'return id(pending_bright_exterior);'
+      - homeassistant.service:
+          service: light.turn_on
+          data:
+            entity_id: light.light_controller_exterior_capsule_driver_flood_light
+          data_template:
+            brightness: !lambda 'return id(pending_bright_exterior);'
+      - homeassistant.service:
+          service: light.turn_on
+          data:
+            entity_id: light.light_controller_exterior_roof_passenger_flood_light
+          data_template:
+            brightness: !lambda 'return id(pending_bright_exterior);'
+      - homeassistant.service:
+          service: light.turn_on
+          data:
+            entity_id: light.light_controller_exterior_roof_driver_flood_light
+          data_template:
+            brightness: !lambda 'return id(pending_bright_exterior);'
+      - homeassistant.service:
+          service: light.turn_on
+          data:
+            entity_id: light.light_controller_exterior_roof_rear_flood_light
+          data_template:
+            brightness: !lambda 'return id(pending_bright_exterior);'
+
+text_sensor:
+  - platform: homeassistant
+    id: weather_condition
+    entity_id: weather.forecast_home
+    internal: true
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: lbl_weather_condition
+            text: !lambda |-
+              if (x.empty()) return "Unknown";
+              static const std::map<std::string, std::string> cond = {
+                {"clear-night", "Clear"}, {"cloudy", "Cloudy"}, {"exceptional", "Exceptional"},
+                {"fog", "Foggy"}, {"hail", "Hail"}, {"lightning", "Lightning"},
+                {"lightning-rainy", "Thunderstorm"}, {"partlycloudy", "Partly Cloudy"},
+                {"pouring", "Pouring"}, {"rainy", "Rainy"}, {"snowy", "Snowy"},
+                {"snowy-rainy", "Sleet"}, {"sunny", "Sunny"}, {"windy", "Windy"},
+                {"windy-variant", "Windy"},
+              };
+              auto it = cond.find(x);
+              if (it != cond.end()) return it->second.c_str();
+              return x.c_str();
+        - lvgl.label.update:
+            id: lbl_weather_icon
+            text: !lambda |-
+              static const std::map<std::string, std::string> icons = {
+                {"clear-night", "\U000F0594"}, {"cloudy", "\U000F0590"},
+                {"exceptional", "\U000F0F2F"}, {"fog", "\U000F0591"},
+                {"hail", "\U000F0592"}, {"lightning", "\U000F0593"},
+                {"lightning-rainy", "\U000F067E"}, {"partlycloudy", "\U000F0595"},
+                {"pouring", "\U000F0596"}, {"rainy", "\U000F0597"},
+                {"snowy", "\U000F0598"}, {"snowy-rainy", "\U000F067F"},
+                {"sunny", "\U000F0599"}, {"windy", "\U000F059D"},
+                {"windy-variant", "\U000F059E"},
+              };
+              auto it = icons.find(x);
+              if (it != icons.end()) return it->second.c_str();
+              return "\U000F0599";
+
+  - platform: homeassistant
+    id: weather_temp
+    entity_id: weather.forecast_home
+    attribute: temperature
+    internal: true
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: lbl_weather_temp
+            text: !lambda |-
+              if (x.empty()) return "--°";
+              static char buf[16];
+              snprintf(buf, sizeof(buf), "%s°", x.c_str());
+              return buf;
+
+  - platform: homeassistant
+    id: sunrise_time
+    entity_id: sensor.sunrise
+    internal: true
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: lbl_sunrise
+            text: !lambda 'return x.empty() ? "--:--" : x.c_str();'
+
+  - platform: homeassistant
+    id: sunset_time
+    entity_id: sensor.sunset
+    internal: true
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: lbl_sunset
+            text: !lambda 'return x.empty() ? "--:--" : x.c_str();'
+
+sensor:
+  - platform: homeassistant
+    id: water_level
+    entity_id: sensor.water_level
+    internal: true
+    on_value:
+      then:
+        - lvgl.bar.update:
+            id: bar_water
+            value: !lambda 'return isnan(x) ? 0 : (int)x;'
+        - lvgl.label.update:
+            id: lbl_water_pct
+            text: !lambda |-
+              if (isnan(x)) return "--%";
+              static char buf[8];
+              snprintf(buf, sizeof(buf), "%.0f%%", x);
+              return buf;
+
+  - platform: homeassistant
+    id: battery_time_remaining
+    entity_id: sensor.battery_time_remaining
+    internal: true
+    on_value:
+      then:
+        - lvgl.bar.update:
+            id: bar_battery
+            value: !lambda 'return isnan(x) ? 0 : (int)fminf(x, 48);'
+        - lvgl.label.update:
+            id: lbl_battery_time
+            text: !lambda |-
+              if (isnan(x)) return "-- hrs";
+              static char buf[16];
+              if (x >= 24) snprintf(buf, sizeof(buf), "%.0f days", x / 24.0f);
+              else snprintf(buf, sizeof(buf), "%.1f hrs", x);
+              return buf;
+
+  # Light brightness sensors (HA brightness is 0-255)
+  - platform: homeassistant
+    id: ha_bright_main_cans
+    entity_id: light.light_controller_main_can_lights
+    attribute: brightness
+    internal: true
+    on_value:
+      then:
+        - lvgl.slider.update:
+            id: sld_main_cans
+            value: !lambda 'return isnan(x) ? 0 : (int)x;'
+
+  - platform: homeassistant
+    id: ha_bright_bed_cans
+    entity_id: light.light_controller_bed_can_lights
+    attribute: brightness
+    internal: true
+    on_value:
+      then:
+        - lvgl.slider.update:
+            id: sld_bed_cans
+            value: !lambda 'return isnan(x) ? 0 : (int)x;'
+
+  - platform: homeassistant
+    id: ha_bright_door
+    entity_id: light.light_controller_door_light
+    attribute: brightness
+    internal: true
+    on_value:
+      then:
+        - lvgl.slider.update:
+            id: sld_door
+            value: !lambda 'return isnan(x) ? 0 : (int)x;'
+
+  - platform: homeassistant
+    id: ha_bright_dog_crate
+    entity_id: light.light_controller_dog_crate_lights
+    attribute: brightness
+    internal: true
+    on_value:
+      then:
+        - lvgl.slider.update:
+            id: sld_dog_crate
+            value: !lambda 'return isnan(x) ? 0 : (int)x;'
+
+  - platform: homeassistant
+    id: ha_bright_bed_capsule
+    entity_id: light.light_controller_bed_capsule_lights
+    attribute: brightness
+    internal: true
+    on_value:
+      then:
+        - lvgl.slider.update:
+            id: sld_bed_capsule
+            value: !lambda 'return isnan(x) ? 0 : (int)x;'
+
+  - platform: homeassistant
+    id: ha_bright_awning_out
+    entity_id: light.light_controller_awning_outside_light_strip
+    attribute: brightness
+    internal: true
+    on_value:
+      then:
+        - lvgl.slider.update:
+            id: sld_awning_out
+            value: !lambda 'return isnan(x) ? 0 : (int)x;'
+
+  - platform: homeassistant
+    id: ha_bright_awning_in
+    entity_id: light.light_controller_awning_inside_light_strip
+    attribute: brightness
+    internal: true
+    on_value:
+      then:
+        - lvgl.slider.update:
+            id: sld_awning_in
+            value: !lambda 'return isnan(x) ? 0 : (int)x;'
+
+  - platform: homeassistant
+    id: ha_bright_exterior
+    entity_id: light.light_controller_exterior_capsule_passenger_flood_light
+    attribute: brightness
+    internal: true
+    on_value:
+      then:
+        - lvgl.slider.update:
+            id: sld_exterior
+            value: !lambda 'return isnan(x) ? 0 : (int)x;'
+
+# ---- Fonts ----
+font:
+  # Large weather condition icon
+  - file: "fonts/materialdesignicons-webfont.ttf"
+    id: mdi_weather_160
+    size: 160
+    bpp: 4
+    glyphs: [
+      "\U000F0594", # clear-night
+      "\U000F0590", # cloudy
+      "\U000F0F2F", # exceptional
+      "\U000F0591", # fog
+      "\U000F0592", # hail
+      "\U000F0593", # lightning
+      "\U000F067E", # lightning-rainy
+      "\U000F0595", # partlycloudy
+      "\U000F0596", # pouring
+      "\U000F0597", # rainy
+      "\U000F0598", # snowy
+      "\U000F067F", # snowy-rainy
+      "\U000F0599", # sunny
+      "\U000F059D", # windy
+      "\U000F059E", # windy-variant
+      ]
+
+  # Small icons for sunrise/sunset, water, battery, lightbulb
+  - file: "fonts/materialdesignicons-webfont.ttf"
+    id: mdi_40
+    size: 40
+    bpp: 4
+    glyphs: [
+      "\U000F059C", # weather-sunset-up (sunrise)
+      "\U000F059B", # weather-sunset-down (sunset)
+      "\U000F058C", # water (drop)
+      "\U000F0079", # battery (full)
+      "\U000F008E", # battery-outline (empty)
+      "\U000F0335", # lightbulb
+      "\U000F0336", # lightbulb-on
+      "\U000F12A3", # lightbulb-off
+      "\U000F0143", # chevron-up (open)
+      "\U000F04DB", # stop
+      "\U000F0140", # chevron-down (close)
+      ]
+
+  # UI text font
+  - file: "fonts/Roboto-Regular.ttf"
+    id: roboto_20
+    size: 20
+    bpp: 4
+    glyphs: " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~°"
+
+  # Large value font
+  - file: "fonts/Roboto-Regular.ttf"
+    id: roboto_32
+    size: 32
+    bpp: 4
+    glyphs: " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~°"
+
+# LVGL dashboard
 lvgl:
   displays:
     - dsi_display
@@ -186,10 +593,755 @@ lvgl:
   byte_order: little_endian
   pages:
     - id: main_page
-      bg_color: 0x0000FF
+      bg_color: 0x1A1A2E
       widgets:
-        - label:
-            text: "hello world"
-            align: CENTER
-            text_font: montserrat_48
-            text_color: 0xFFFFFF
+        # ── Weather Panel (left ~400px) ──
+        - obj:
+            width: 400
+            height: 480
+            x: 0
+            y: 0
+            bg_color: 0x16213E
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 20
+            layout:
+              type: FLEX
+              flex_flow: COLUMN
+              flex_align_main: CENTER
+              flex_align_cross: CENTER
+              pad_row: 8
+            widgets:
+              # Weather icon
+              - label:
+                  id: lbl_weather_icon
+                  text_font: mdi_weather_160
+                  text_color: 0xFFD700
+                  text: "\U000F0599"
+
+              # Temperature
+              - label:
+                  id: lbl_weather_temp
+                  text_font: montserrat_48
+                  text_color: 0xFFFFFF
+                  text: "--°"
+
+              # Condition text
+              - label:
+                  id: lbl_weather_condition
+                  text_font: roboto_32
+                  text_color: 0xB0B0B0
+                  text: "Loading..."
+
+              # Sunrise row
+              - obj:
+                  width: SIZE_CONTENT
+                  height: SIZE_CONTENT
+                  bg_opa: TRANSP
+                  border_width: 0
+                  pad_all: 0
+                  layout:
+                    type: FLEX
+                    flex_flow: ROW
+                    flex_align_cross: CENTER
+                    pad_column: 8
+                  widgets:
+                    - label:
+                        text_font: mdi_40
+                        text_color: 0xFFA500
+                        text: "\U000F059C"
+                    - label:
+                        id: lbl_sunrise
+                        text_font: roboto_32
+                        text_color: 0xCCCCCC
+                        text: "--:--"
+
+              # Sunset row
+              - obj:
+                  width: SIZE_CONTENT
+                  height: SIZE_CONTENT
+                  bg_opa: TRANSP
+                  border_width: 0
+                  pad_all: 0
+                  layout:
+                    type: FLEX
+                    flex_flow: ROW
+                    flex_align_cross: CENTER
+                    pad_column: 8
+                  widgets:
+                    - label:
+                        text_font: mdi_40
+                        text_color: 0xFF6347
+                        text: "\U000F059B"
+                    - label:
+                        id: lbl_sunset
+                        text_font: roboto_32
+                        text_color: 0xCCCCCC
+                        text: "--:--"
+
+        # ── Water & Battery Panel (center ~300px) ──
+        - obj:
+            width: 300
+            height: 480
+            x: 400
+            y: 0
+            bg_color: 0x1A1A2E
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 20
+            layout:
+              type: FLEX
+              flex_flow: COLUMN
+              flex_align_main: CENTER
+              flex_align_cross: CENTER
+              pad_row: 24
+            widgets:
+              # ── Water Level ──
+              - obj:
+                  width: 260
+                  height: SIZE_CONTENT
+                  bg_opa: TRANSP
+                  border_width: 0
+                  pad_all: 0
+                  layout:
+                    type: FLEX
+                    flex_flow: COLUMN
+                    flex_align_cross: CENTER
+                    pad_row: 6
+                  widgets:
+                    # Icon + label row
+                    - obj:
+                        width: 260
+                        height: SIZE_CONTENT
+                        bg_opa: TRANSP
+                        border_width: 0
+                        pad_all: 0
+                        layout:
+                          type: FLEX
+                          flex_flow: ROW
+                          flex_align_main: SPACE_BETWEEN
+                          flex_align_cross: CENTER
+                        widgets:
+                          - obj:
+                              width: SIZE_CONTENT
+                              height: SIZE_CONTENT
+                              bg_opa: TRANSP
+                              border_width: 0
+                              pad_all: 0
+                              layout:
+                                type: FLEX
+                                flex_flow: ROW
+                                flex_align_cross: CENTER
+                                pad_column: 6
+                              widgets:
+                                - label:
+                                    text_font: mdi_40
+                                    text_color: 0x4FC3F7
+                                    text: "\U000F058C"
+                                - label:
+                                    text_font: roboto_20
+                                    text_color: 0xCCCCCC
+                                    text: "Water"
+                          - label:
+                              id: lbl_water_pct
+                              text_font: roboto_20
+                              text_color: 0xFFFFFF
+                              text: "--%"
+                    # Horizontal bar
+                    - bar:
+                        id: bar_water
+                        width: 260
+                        height: 20
+                        min_value: 0
+                        max_value: 100
+                        value: 0
+                        bg_color: 0x333333
+                        border_width: 0
+                        radius: 10
+                        indicator:
+                          bg_color: 0x4FC3F7
+                          radius: 10
+
+              # ── Battery Time ──
+              - obj:
+                  width: 260
+                  height: SIZE_CONTENT
+                  bg_opa: TRANSP
+                  border_width: 0
+                  pad_all: 0
+                  layout:
+                    type: FLEX
+                    flex_flow: COLUMN
+                    flex_align_cross: CENTER
+                    pad_row: 6
+                  widgets:
+                    # Icon + label row
+                    - obj:
+                        width: 260
+                        height: SIZE_CONTENT
+                        bg_opa: TRANSP
+                        border_width: 0
+                        pad_all: 0
+                        layout:
+                          type: FLEX
+                          flex_flow: ROW
+                          flex_align_main: SPACE_BETWEEN
+                          flex_align_cross: CENTER
+                        widgets:
+                          - obj:
+                              width: SIZE_CONTENT
+                              height: SIZE_CONTENT
+                              bg_opa: TRANSP
+                              border_width: 0
+                              pad_all: 0
+                              layout:
+                                type: FLEX
+                                flex_flow: ROW
+                                flex_align_cross: CENTER
+                                pad_column: 6
+                              widgets:
+                                - label:
+                                    text_font: mdi_40
+                                    text_color: 0x66BB6A
+                                    text: "\U000F0079"
+                                - label:
+                                    text_font: roboto_20
+                                    text_color: 0xCCCCCC
+                                    text: "Battery"
+                          - label:
+                              id: lbl_battery_time
+                              text_font: roboto_20
+                              text_color: 0xFFFFFF
+                              text: "-- hrs"
+                    # Horizontal bar (shows hours capped at 48h = 100%)
+                    - bar:
+                        id: bar_battery
+                        width: 260
+                        height: 20
+                        min_value: 0
+                        max_value: 48
+                        value: 0
+                        bg_color: 0x333333
+                        border_width: 0
+                        radius: 10
+                        indicator:
+                          bg_color: 0x66BB6A
+                          radius: 10
+
+        # ── Awning Controls Panel (~200px) ──
+        - obj:
+            width: 200
+            height: 480
+            x: 700
+            y: 0
+            bg_color: 0x16213E
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 15
+            layout:
+              type: FLEX
+              flex_flow: COLUMN
+              flex_align_main: CENTER
+              flex_align_cross: CENTER
+              pad_row: 30
+            widgets:
+              # ── Solar Panel Awning ──
+              - obj:
+                  width: 170
+                  height: SIZE_CONTENT
+                  bg_opa: TRANSP
+                  border_width: 0
+                  pad_all: 0
+                  layout:
+                    type: FLEX
+                    flex_flow: COLUMN
+                    flex_align_cross: CENTER
+                    pad_row: 10
+                  widgets:
+                    - label:
+                        text_font: roboto_20
+                        text_color: 0xCCCCCC
+                        text: "Solar Panel"
+                    - obj:
+                        width: 170
+                        height: SIZE_CONTENT
+                        bg_opa: TRANSP
+                        border_width: 0
+                        pad_all: 0
+                        layout:
+                          type: FLEX
+                          flex_flow: ROW
+                          flex_align_main: SPACE_EVENLY
+                          flex_align_cross: CENTER
+                        widgets:
+                          - button:
+                              width: 50
+                              height: 50
+                              bg_color: 0x388E3C
+                              radius: 8
+                              on_press:
+                                then:
+                                  - homeassistant.service:
+                                      service: cover.open_cover
+                                      data:
+                                        entity_id: cover.solar_panel_awning
+                              widgets:
+                                - label:
+                                    text_font: mdi_40
+                                    text_color: 0xFFFFFF
+                                    text: "\U000F0143"
+                                    align: CENTER
+                          - button:
+                              width: 50
+                              height: 50
+                              bg_color: 0xF57C00
+                              radius: 8
+                              on_press:
+                                then:
+                                  - homeassistant.service:
+                                      service: cover.stop_cover
+                                      data:
+                                        entity_id: cover.solar_panel_awning
+                              widgets:
+                                - label:
+                                    text_font: mdi_40
+                                    text_color: 0xFFFFFF
+                                    text: "\U000F04DB"
+                                    align: CENTER
+                          - button:
+                              width: 50
+                              height: 50
+                              bg_color: 0xD32F2F
+                              radius: 8
+                              on_press:
+                                then:
+                                  - homeassistant.service:
+                                      service: cover.close_cover
+                                      data:
+                                        entity_id: cover.solar_panel_awning
+                              widgets:
+                                - label:
+                                    text_font: mdi_40
+                                    text_color: 0xFFFFFF
+                                    text: "\U000F0140"
+                                    align: CENTER
+
+              # ── Main Awning ──
+              - obj:
+                  width: 170
+                  height: SIZE_CONTENT
+                  bg_opa: TRANSP
+                  border_width: 0
+                  pad_all: 0
+                  layout:
+                    type: FLEX
+                    flex_flow: COLUMN
+                    flex_align_cross: CENTER
+                    pad_row: 10
+                  widgets:
+                    - label:
+                        text_font: roboto_20
+                        text_color: 0xCCCCCC
+                        text: "Main Awning"
+                    - obj:
+                        width: 170
+                        height: SIZE_CONTENT
+                        bg_opa: TRANSP
+                        border_width: 0
+                        pad_all: 0
+                        layout:
+                          type: FLEX
+                          flex_flow: ROW
+                          flex_align_main: SPACE_EVENLY
+                          flex_align_cross: CENTER
+                        widgets:
+                          - button:
+                              width: 50
+                              height: 50
+                              bg_color: 0x388E3C
+                              radius: 8
+                              on_press:
+                                then:
+                                  - homeassistant.service:
+                                      service: cover.open_cover
+                                      data:
+                                        entity_id: cover.main_awning
+                              widgets:
+                                - label:
+                                    text_font: mdi_40
+                                    text_color: 0xFFFFFF
+                                    text: "\U000F0143"
+                                    align: CENTER
+                          - button:
+                              width: 50
+                              height: 50
+                              bg_color: 0xF57C00
+                              radius: 8
+                              on_press:
+                                then:
+                                  - homeassistant.service:
+                                      service: cover.stop_cover
+                                      data:
+                                        entity_id: cover.main_awning
+                              widgets:
+                                - label:
+                                    text_font: mdi_40
+                                    text_color: 0xFFFFFF
+                                    text: "\U000F04DB"
+                                    align: CENTER
+                          - button:
+                              width: 50
+                              height: 50
+                              bg_color: 0xD32F2F
+                              radius: 8
+                              on_press:
+                                then:
+                                  - homeassistant.service:
+                                      service: cover.close_cover
+                                      data:
+                                        entity_id: cover.main_awning
+                              widgets:
+                                - label:
+                                    text_font: mdi_40
+                                    text_color: 0xFFFFFF
+                                    text: "\U000F0140"
+                                    align: CENTER
+
+        # ── Lights Panel (right ~1020px) ──
+        - obj:
+            width: 1020
+            height: 480
+            x: 900
+            y: 0
+            bg_color: 0x1A1A2E
+            bg_opa: COVER
+            border_width: 0
+            pad_top: 15
+            pad_bottom: 15
+            pad_left: 10
+            pad_right: 10
+            layout:
+              type: FLEX
+              flex_flow: ROW
+              flex_align_main: SPACE_EVENLY
+              flex_align_cross: CENTER
+            widgets:
+              # -- Main Cans --
+              - obj:
+                  width: 120
+                  height: 440
+                  bg_opa: TRANSP
+                  border_width: 0
+                  pad_all: 0
+                  layout:
+                    type: FLEX
+                    flex_flow: COLUMN
+                    flex_align_main: CENTER
+                    flex_align_cross: CENTER
+                    pad_row: 6
+                  widgets:
+                    - slider:
+                        id: sld_main_cans
+                        width: 50
+                        height: 340
+                        min_value: 0
+                        max_value: 255
+                        value: 0
+                        bg_color: 0x333333
+                        border_width: 0
+                        radius: 8
+                        indicator:
+                          bg_color: 0xFFAB40
+                          radius: 8
+                        knob:
+                          bg_opa: TRANSP
+                          width: 0
+                          height: 0
+                        on_value:
+                          then:
+                            - lambda: 'id(pending_bright_main_cans) = (int)x;'
+                            - script.execute: debounce_main_cans
+                    - label:
+                        text_font: roboto_32
+                        text_color: 0xCCCCCC
+                        text: "Main"
+
+              # -- Bed Cans --
+              - obj:
+                  width: 120
+                  height: 440
+                  bg_opa: TRANSP
+                  border_width: 0
+                  pad_all: 0
+                  layout:
+                    type: FLEX
+                    flex_flow: COLUMN
+                    flex_align_main: CENTER
+                    flex_align_cross: CENTER
+                    pad_row: 6
+                  widgets:
+                    - slider:
+                        id: sld_bed_cans
+                        width: 50
+                        height: 340
+                        min_value: 0
+                        max_value: 255
+                        value: 0
+                        bg_color: 0x333333
+                        border_width: 0
+                        radius: 8
+                        indicator:
+                          bg_color: 0xFFAB40
+                          radius: 8
+                        knob:
+                          bg_opa: TRANSP
+                          width: 0
+                          height: 0
+                        on_value:
+                          then:
+                            - lambda: 'id(pending_bright_bed_cans) = (int)x;'
+                            - script.execute: debounce_bed_cans
+                    - label:
+                        text_font: roboto_32
+                        text_color: 0xCCCCCC
+                        text: "Bed"
+
+              # -- Door --
+              - obj:
+                  width: 120
+                  height: 440
+                  bg_opa: TRANSP
+                  border_width: 0
+                  pad_all: 0
+                  layout:
+                    type: FLEX
+                    flex_flow: COLUMN
+                    flex_align_main: CENTER
+                    flex_align_cross: CENTER
+                    pad_row: 6
+                  widgets:
+                    - slider:
+                        id: sld_door
+                        width: 50
+                        height: 340
+                        min_value: 0
+                        max_value: 255
+                        value: 0
+                        bg_color: 0x333333
+                        border_width: 0
+                        radius: 8
+                        indicator:
+                          bg_color: 0xFFAB40
+                          radius: 8
+                        knob:
+                          bg_opa: TRANSP
+                          width: 0
+                          height: 0
+                        on_value:
+                          then:
+                            - lambda: 'id(pending_bright_door) = (int)x;'
+                            - script.execute: debounce_door
+                    - label:
+                        text_font: roboto_32
+                        text_color: 0xCCCCCC
+                        text: "Door"
+
+              # -- Dog Crate --
+              - obj:
+                  width: 120
+                  height: 440
+                  bg_opa: TRANSP
+                  border_width: 0
+                  pad_all: 0
+                  layout:
+                    type: FLEX
+                    flex_flow: COLUMN
+                    flex_align_main: CENTER
+                    flex_align_cross: CENTER
+                    pad_row: 6
+                  widgets:
+                    - slider:
+                        id: sld_dog_crate
+                        width: 50
+                        height: 340
+                        min_value: 0
+                        max_value: 255
+                        value: 0
+                        bg_color: 0x333333
+                        border_width: 0
+                        radius: 8
+                        indicator:
+                          bg_color: 0xFFAB40
+                          radius: 8
+                        knob:
+                          bg_opa: TRANSP
+                          width: 0
+                          height: 0
+                        on_value:
+                          then:
+                            - lambda: 'id(pending_bright_dog_crate) = (int)x;'
+                            - script.execute: debounce_dog_crate
+                    - label:
+                        text_font: roboto_32
+                        text_color: 0xCCCCCC
+                        text: "Crate"
+
+              # -- Bed Capsule --
+              - obj:
+                  width: 120
+                  height: 440
+                  bg_opa: TRANSP
+                  border_width: 0
+                  pad_all: 0
+                  layout:
+                    type: FLEX
+                    flex_flow: COLUMN
+                    flex_align_main: CENTER
+                    flex_align_cross: CENTER
+                    pad_row: 6
+                  widgets:
+                    - slider:
+                        id: sld_bed_capsule
+                        width: 50
+                        height: 340
+                        min_value: 0
+                        max_value: 255
+                        value: 0
+                        bg_color: 0x333333
+                        border_width: 0
+                        radius: 8
+                        indicator:
+                          bg_color: 0xFFAB40
+                          radius: 8
+                        knob:
+                          bg_opa: TRANSP
+                          width: 0
+                          height: 0
+                        on_value:
+                          then:
+                            - lambda: 'id(pending_bright_bed_capsule) = (int)x;'
+                            - script.execute: debounce_bed_capsule
+                    - label:
+                        text_font: roboto_32
+                        text_color: 0xCCCCCC
+                        text: "Capsule"
+
+              # -- Awning Outside --
+              - obj:
+                  width: 120
+                  height: 440
+                  bg_opa: TRANSP
+                  border_width: 0
+                  pad_all: 0
+                  layout:
+                    type: FLEX
+                    flex_flow: COLUMN
+                    flex_align_main: CENTER
+                    flex_align_cross: CENTER
+                    pad_row: 6
+                  widgets:
+                    - slider:
+                        id: sld_awning_out
+                        width: 50
+                        height: 340
+                        min_value: 0
+                        max_value: 255
+                        value: 0
+                        bg_color: 0x333333
+                        border_width: 0
+                        radius: 8
+                        indicator:
+                          bg_color: 0xFFAB40
+                          radius: 8
+                        knob:
+                          bg_opa: TRANSP
+                          width: 0
+                          height: 0
+                        on_value:
+                          then:
+                            - lambda: 'id(pending_bright_awning_out) = (int)x;'
+                            - script.execute: debounce_awning_out
+                    - label:
+                        text_font: roboto_32
+                        text_color: 0xCCCCCC
+                        text: "Awn Out"
+
+              # -- Awning Inside --
+              - obj:
+                  width: 120
+                  height: 440
+                  bg_opa: TRANSP
+                  border_width: 0
+                  pad_all: 0
+                  layout:
+                    type: FLEX
+                    flex_flow: COLUMN
+                    flex_align_main: CENTER
+                    flex_align_cross: CENTER
+                    pad_row: 6
+                  widgets:
+                    - slider:
+                        id: sld_awning_in
+                        width: 50
+                        height: 340
+                        min_value: 0
+                        max_value: 255
+                        value: 0
+                        bg_color: 0x333333
+                        border_width: 0
+                        radius: 8
+                        indicator:
+                          bg_color: 0xFFAB40
+                          radius: 8
+                        knob:
+                          bg_opa: TRANSP
+                          width: 0
+                          height: 0
+                        on_value:
+                          then:
+                            - lambda: 'id(pending_bright_awning_in) = (int)x;'
+                            - script.execute: debounce_awning_in
+                    - label:
+                        text_font: roboto_32
+                        text_color: 0xCCCCCC
+                        text: "Awn In"
+
+              # -- Exterior (all 5 floods) --
+              - obj:
+                  width: 120
+                  height: 440
+                  bg_opa: TRANSP
+                  border_width: 0
+                  pad_all: 0
+                  layout:
+                    type: FLEX
+                    flex_flow: COLUMN
+                    flex_align_main: CENTER
+                    flex_align_cross: CENTER
+                    pad_row: 6
+                  widgets:
+                    - slider:
+                        id: sld_exterior
+                        width: 50
+                        height: 340
+                        min_value: 0
+                        max_value: 255
+                        value: 0
+                        bg_color: 0x333333
+                        border_width: 0
+                        radius: 8
+                        indicator:
+                          bg_color: 0xFFAB40
+                          radius: 8
+                        knob:
+                          bg_opa: TRANSP
+                          width: 0
+                          height: 0
+                        on_value:
+                          then:
+                            - lambda: 'id(pending_bright_exterior) = (int)x;'
+                            - script.execute: debounce_exterior
+                    - label:
+                        text_font: roboto_32
+                        text_color: 0xCCCCCC
+                        text: "Flood"
