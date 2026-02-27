@@ -134,27 +134,8 @@ void WaveshareDSI::setup() {
     ESP_LOGW(TAG, "register_event_callbacks failed: %s", esp_err_to_name(err));
   }
 
-  // ---- Step 7: Red screen diagnostic (confirms DSI path works) ----
-  ESP_LOGI(TAG, "Step 7: Drawing RED diagnostic screen");
-  {
-    const int w = 480;
-    const int h = 1920;
-    const size_t frame_bytes = w * h * sizeof(uint16_t);
-    auto *frame = static_cast<uint16_t *>(heap_caps_malloc(frame_bytes, MALLOC_CAP_SPIRAM));
-    if (frame) {
-      for (int i = 0; i < w * h; i++) frame[i] = 0xF800;  // Red in RGB565
-      esp_lcd_panel_draw_bitmap(panel_h, 0, 0, w, h, frame);
-      xSemaphoreTake(static_cast<SemaphoreHandle_t>(this->dma_sem_), pdMS_TO_TICKS(5000));
-      ESP_LOGI(TAG, "  RED screen drawn — you should see red now");
-      heap_caps_free(frame);
-    } else {
-      ESP_LOGE(TAG, "  Failed to allocate frame buffer for diagnostic!");
-    }
-  }
-  delay(3000);  // Hold red screen 3s so user can confirm display works
-
-  // ---- Step 8: Clear to black before LVGL takes over ----
-  ESP_LOGI(TAG, "Step 8: Clearing screen to black");
+  // ---- Step 7: Clear screen to black before LVGL takes over ----
+  ESP_LOGI(TAG, "Step 7: Clearing screen to black");
   this->fill(Color::BLACK);
 
   this->init_ok_ = true;
@@ -171,11 +152,6 @@ void WaveshareDSI::draw_pixels_at(int x_start, int y_start, int w, int h, const 
 
   if (x_offset == 0 && x_pad == 0) {
     // Fast path: tightly packed pixel data — direct DMA2D transfer (LVGL path)
-    static uint32_t flush_count = 0;
-    if (flush_count < 5) {
-      ESP_LOGI(TAG, "draw_pixels_at: x=%d y=%d w=%d h=%d (flush #%lu)", x_start, y_start, w, h, (unsigned long) flush_count);
-    }
-    flush_count++;
     auto panel_h = static_cast<esp_lcd_panel_handle_t>(this->panel_handle_);
     esp_lcd_panel_draw_bitmap(panel_h, x_start, y_start, x_start + w, y_start + h, ptr);
     if (this->dma_sem_) {

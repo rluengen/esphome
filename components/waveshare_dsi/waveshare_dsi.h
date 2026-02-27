@@ -27,6 +27,23 @@ class WaveshareDSI : public display::Display {
 
   void fill(Color color) override;
 
+  /// Override get_width/get_height to swap dimensions for 90°/270° rotation.
+  /// The base Display class does NOT do this — it always returns the internal
+  /// (physical) dimensions.  LVGL reads these to set its virtual canvas size,
+  /// so they must reflect the rotated orientation.
+  int get_width() override {
+    if (this->rotation_ == display::DISPLAY_ROTATION_90_DEGREES ||
+        this->rotation_ == display::DISPLAY_ROTATION_270_DEGREES)
+      return this->get_height_internal();
+    return this->get_width_internal();
+  }
+  int get_height() override {
+    if (this->rotation_ == display::DISPLAY_ROTATION_90_DEGREES ||
+        this->rotation_ == display::DISPLAY_ROTATION_270_DEGREES)
+      return this->get_width_internal();
+    return this->get_height_internal();
+  }
+
  protected:
   int get_width_internal() override { return 480; }
   int get_height_internal() override { return 1920; }
