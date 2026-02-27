@@ -22,7 +22,7 @@ esphome:
           id(display_backlight_i2c).write_byte(0x95, 0x17);
           // Backlight off, wait, then full brightness
           id(display_backlight_i2c).write_byte(0x96, 0x00);
-          delay(100);
+          delay(1000);  // OTA7290B driver requires 1s delay after backlight init
           id(display_backlight_i2c).write_byte(0x96, 0xFF);
 
 # ESP32-C6 co-processor for WiFi via SDIO
@@ -115,14 +115,10 @@ output:
     type: float
     write_action:
       - lambda: |-
-          // Write to BOTH brightness registers to cover panel variants
+          // Write brightness to register 0x96 (0x00=off, 0xFF=full)
+          // Per Waveshare wiki: ESP32-P4 uses register 0x96 at I2C address 0x45
           uint8_t brightness = (uint8_t)(state * 255);
-          uint8_t inverted = 255 - brightness;  // 0xab uses inverted brightness
-          // ESP32-P4 style (register 0x96, direct 0-255)
           id(display_backlight_i2c).write_byte(0x96, brightness);
-          // RPi style (register 0xab inverted + 0xaa latch)
-          id(display_backlight_i2c).write_byte(0xab, inverted);
-          id(display_backlight_i2c).write_byte(0xaa, 0x01);
 
 light:
   - platform: monochromatic
@@ -168,8 +164,10 @@ display:
     color_depth: 16
     pixel_mode: 16bit
     init_sequence:
-      - [0x11, 120]  # Sleep out
-      - [0x29, 20]   # Display on
+      - [0x11, 0x00]  # Sleep Out
+      - delay 120ms
+      - [0x29, 0x00]  # Display On
+      - delay 20ms
 
 # Periodic diagnostics: confirm backlight writes and read MCU status
 interval:
@@ -178,12 +176,10 @@ interval:
       - lambda: |-
           float b = id(display_backlight).current_values.get_brightness();
           uint8_t brightness = (uint8_t)(b * 255);
-          uint8_t inverted = 255 - brightness;
-          bool ack_ab = id(display_backlight_i2c).write_byte(0xab, inverted);
-          bool ack_aa = id(display_backlight_i2c).write_byte(0xaa, 0x01);
+          bool ack_96 = id(display_backlight_i2c).write_byte(0x96, brightness);
           uint8_t status = 0;
           id(display_backlight_i2c).read_byte(0x80, &status);
-          ESP_LOGI("panel_diag", "Backlight 0xAB/0xAA ACK: %s/%s, MCU status 0x80: 0x%02X", ack_ab ? "YES" : "NO", ack_aa ? "YES" : "NO", status);
+          ESP_LOGI("panel_diag", "Backlight 0x96=%d ACK: %s, MCU status 0x80: 0x%02X", brightness, ack_96 ? "YES" : "NO", status);
 
 # GT911 Touchscreen in polling mode
 touchscreen:
