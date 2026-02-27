@@ -3,7 +3,7 @@ substitutions:
   display_panel_power_switch_id: panel_power
 
 globals:
-  - id: last_input_ms
+  - id: last_activity_ms
     type: uint32_t
     restore_value: no
     initial_value: "0"
@@ -23,20 +23,20 @@ interval:
       - lambda: |-
           const uint32_t now = millis();
           // Initialize at boot
-          if (id(last_input_ms) == 0) id(last_input_ms) = now;
+          if (id(last_activity_ms) == 0) id(last_activity_ms) = now;
 
-          const uint32_t idle_ms = now - id(last_input_ms);
+          const uint32_t idle_ms = now - id(last_activity_ms);
           // Don't turn off if user explicitly wants to keep the display awake
           if (!id(screen_is_off) && !id(keep_display_awake) && idle_ms > (uint32_t) atoi("${sleep_idle_time_milliseconds}")) {
             id(enter_screen_off).execute();
           }
 
 script:
-  # Call whenever user interacts (touch / button)
+  # Call whenever user interacts (touch / button / remote wake)
   - id: screen_bump_activity
     then:
       - lambda: |-
-          id(last_input_ms) = millis();
+          id(last_activity_ms) = millis();
       - if:
           condition:
             lambda: 'return id(screen_is_off);'
@@ -58,7 +58,7 @@ script:
       # Force a redraw so the first frame is crisp
       - lambda: |-
           id(screen_is_off) = false;
-          id(last_input_ms) = millis();   // restart the idle timer
+          id(last_activity_ms) = millis();   // restart the idle timer
 
 switch:
   - platform: template
@@ -75,3 +75,10 @@ switch:
     turn_off_action:
       - lambda: |-
           id(keep_display_awake) = false;
+
+button:
+  - platform: template
+    name: "Wake Display"
+    id: wake_display_button
+    on_press:
+      - script.execute: screen_bump_activity
