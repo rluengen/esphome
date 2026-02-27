@@ -78,6 +78,7 @@ esphome:
 
 esp32:
   board: esp32-p4-evboard
+  variant: esp32p4
   flash_size: 16MB
   framework:
     type: esp-idf
@@ -93,7 +94,8 @@ esp_ldo:
     channel: 3
 
 logger:
-  level: INFO
+  level: VERBOSE
+  hardware_uart: UART0
 
 # I2C for GT911 Touchscreen and panel/backlight MCU
 # ESP32-P4 EVBoard default I2C used here
@@ -127,20 +129,6 @@ light:
     output: backlight_output
     default_transition_length: 250ms
     restore_mode: ALWAYS_ON
-
-# Diagnostic: toggle MIPI enable register and log I2C ACK
-switch:
-  - platform: template
-    name: "Panel MIPI Enable (0xAD)"
-    id: panel_mipi_enable
-    turn_on_action:
-      - lambda: |-
-          bool ack = id(display_backlight_i2c).write_byte(0xad, 0x01);
-          ESP_LOGI("panel_diag", "Wrote 0xAD=0x01 (MIPI enable), ACK: %s", ack ? "YES" : "NO");
-    turn_off_action:
-      - lambda: |-
-          bool ack = id(display_backlight_i2c).write_byte(0xad, 0x00);
-          ESP_LOGI("panel_diag", "Wrote 0xAD=0x00 (MIPI disable), ACK: %s", ack ? "YES" : "NO");
 
 # MIPI-DSI Display - Waveshare 8.8" (480x1920 portrait)
 display:
