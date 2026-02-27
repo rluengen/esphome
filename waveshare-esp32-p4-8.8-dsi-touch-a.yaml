@@ -90,6 +90,9 @@ packages:
         vars:
           wifi_ssid: !secret wifi_ssid
           wifi_password: !secret wifi_password
+      - path: packages/display/sleep.yaml
+        vars:
+          display_panel_power_switch_id: display_backlight
 
 # Ethernet - DISABLED (Waveshare 8.8" DSI may not have IP101 PHY)
 # ethernet:
@@ -169,6 +172,8 @@ touchscreen:
   - platform: gt911
     id: dsi_touchscreen
     update_interval: 200ms
+    on_touch:
+      - script.execute: screen_bump_activity
 
 # LVGL with centered "hello world" label
 lvgl:
