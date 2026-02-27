@@ -47,8 +47,8 @@ esphome:
             // Step 3: Backlight on (direct I2C)
             id(display_backlight_i2c).write_byte(0x96, 0xFF);
 
-            // Step 4: Wait 1000ms for bridge to stabilize (BLOCKING)
-            delay(1000);
+            // Step 4: Wait for bridge to stabilize (BLOCKING)
+            delay(200);
             ESP_LOGI("waveshare", "OTA7290B bridge init complete");
     - priority: 200
       then:
@@ -75,6 +75,7 @@ update:
     type: embedded
     path: network_adapter_esp32c6.bin
     sha256: 2aa46dbcd18f5b2046f58b82cdc62bdf21af137930e67c4b3b114f6e3e0daf15
+    update_interval: never
 
 packages:
   remote_packages:
@@ -162,33 +163,6 @@ light:
 waveshare_dsi:
   id: dsi_display
   rotation: 270
-
-# Built-in mipi_dsi DISABLED - ordering incompatible with OTA7290B bridge
-# display:
-#   - platform: mipi_dsi
-#     id: dsi_display
-#     model: CUSTOM
-#     rotation: 0
-#     dimensions:
-#       width: 480
-#       height: 1920
-#     lanes: 2
-#     color_order: rgb
-#     hsync_front_porch: 50
-#     hsync_pulse_width: 50
-#     hsync_back_porch: 50
-#     vsync_front_porch: 20
-#     vsync_pulse_width: 20
-#     vsync_back_porch: 20
-#     pclk_frequency: 75000000
-#     lane_bit_rate: 1300Mbps
-#     color_depth: 16
-#     pixel_mode: 16bit
-#     init_sequence:
-#       - [0x11, 0x00]  # Sleep Out (with param byte for DCS 0x15 packet)
-#       - delay 120ms
-#       - [0x29, 0x00]  # Display On (with param byte for DCS 0x15 packet)
-#       - delay 20ms
 
 # GT911 Touchscreen
 touchscreen:
