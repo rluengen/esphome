@@ -90,6 +90,7 @@ packages:
         vars:
           wifi_ssid: !secret wifi_ssid
           wifi_password: !secret wifi_password
+      - path: packages/time/homeassistant.yaml
       - path: packages/display/sleep.yaml
         vars:
           display_panel_power_switch_id: display_backlight
@@ -380,6 +381,38 @@ text_sensor:
               return buf;
 
   - platform: homeassistant
+    id: ha_latitude
+    entity_id: sensor.latitude
+    internal: true
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: lbl_location
+            text: !lambda |-
+              static char buf[48];
+              std::string lat = id(ha_latitude).state;
+              std::string lon = id(ha_longitude).state;
+              if (lat.empty() || lon.empty()) return "--";
+              snprintf(buf, sizeof(buf), "%s, %s", lat.c_str(), lon.c_str());
+              return buf;
+
+  - platform: homeassistant
+    id: ha_longitude
+    entity_id: sensor.longitude
+    internal: true
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: lbl_location
+            text: !lambda |-
+              static char buf[48];
+              std::string lat = id(ha_latitude).state;
+              std::string lon = id(ha_longitude).state;
+              if (lat.empty() || lon.empty()) return "--";
+              snprintf(buf, sizeof(buf), "%s, %s", lat.c_str(), lon.c_str());
+              return buf;
+
+  - platform: homeassistant
     id: sunrise_time
     entity_id: sensor.sunrise
     internal: true
@@ -400,9 +433,12 @@ text_sensor:
             text: !lambda 'return x.empty() ? "--:--" : x.c_str();'
 
 sensor:
-  - platform: homeassistant
+  # TODO: Replace with real HA sensors once hooked up
+  - platform: template
     id: water_level
-    entity_id: sensor.water_level
+    name: "Water Level (Test)"
+    update_interval: 10s
+    lambda: 'return (float)(rand() % 101);'  # 0-100%
     internal: true
     on_value:
       then:
@@ -417,9 +453,12 @@ sensor:
               snprintf(buf, sizeof(buf), "%.0f%%", x);
               return buf;
 
-  - platform: homeassistant
+  # TODO: Replace with real HA sensor once hooked up
+  - platform: template
     id: battery_time_remaining
-    entity_id: sensor.battery_time_remaining
+    name: "Battery Time (Test)"
+    update_interval: 10s
+    lambda: 'return (float)(rand() % 49);'  # 0-48 hours
     internal: true
     on_value:
       then:
@@ -433,6 +472,49 @@ sensor:
               static char buf[16];
               if (x >= 24) snprintf(buf, sizeof(buf), "%.0f days", x / 24.0f);
               else snprintf(buf, sizeof(buf), "%.1f hrs", x);
+              return buf;
+
+  # Interior climate sensors
+  - platform: homeassistant
+    id: ha_interior_temp
+    entity_id: sensor.interior_temperature
+    internal: true
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: lbl_interior_temp
+            text: !lambda |-
+              if (isnan(x)) return "--°";
+              static char buf[12];
+              snprintf(buf, sizeof(buf), "%.1f°", x);
+              return buf;
+
+  - platform: homeassistant
+    id: ha_interior_humidity
+    entity_id: sensor.interior_humidity
+    internal: true
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: lbl_interior_humidity
+            text: !lambda |-
+              if (isnan(x)) return "--%";
+              static char buf[12];
+              snprintf(buf, sizeof(buf), "%.0f%%", x);
+              return buf;
+
+  - platform: homeassistant
+    id: ha_fridge_temp
+    entity_id: sensor.fridge_temperature
+    internal: true
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: lbl_fridge_temp
+            text: !lambda |-
+              if (isnan(x)) return "--°";
+              static char buf[12];
+              snprintf(buf, sizeof(buf), "%.1f°", x);
               return buf;
 
   # Light brightness sensors (HA brightness is 0-255)
@@ -566,6 +648,11 @@ font:
       "\U000F0143", # chevron-up (open)
       "\U000F04DB", # stop
       "\U000F0140", # chevron-down (close)
+      "\U000F11B3", # awning-outline
+      "\U000F0425", # power
+      "\U000F050F", # thermometer
+      "\U000F058E", # water-percent (humidity)
+      "\U000F0290", # fridge
       ]
 
   # UI text font
@@ -581,6 +668,31 @@ font:
     size: 32
     bpp: 4
     glyphs: " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~°"
+
+# Update date/time labels every 60 seconds
+interval:
+  - interval: 60s
+    then:
+      - lvgl.label.update:
+          id: lbl_time
+          text: !lambda |-
+            auto time = id(ha_time).now();
+            if (!time.is_valid()) return "--:--";
+            static char buf[12];
+            int hr = time.hour % 12;
+            if (hr == 0) hr = 12;
+            snprintf(buf, sizeof(buf), "%d:%02d %s", hr, time.minute, time.hour < 12 ? "AM" : "PM");
+            return buf;
+      - lvgl.label.update:
+          id: lbl_date
+          text: !lambda |-
+            auto time = id(ha_time).now();
+            if (!time.is_valid()) return "---";
+            static char buf[24];
+            static const char* days[] = {"Sun","Mon","Tue","Wed","Thu","Fri","Sat"};
+            static const char* months[] = {"Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"};
+            snprintf(buf, sizeof(buf), "%s, %s %d", days[time.day_of_week-1], months[time.month-1], time.day_of_month);
+            return buf;
 
 # LVGL dashboard
 lvgl:
@@ -612,6 +724,27 @@ lvgl:
               flex_align_cross: CENTER
               pad_row: 8
             widgets:
+              # Time
+              - label:
+                  id: lbl_time
+                  text_font: roboto_32
+                  text_color: 0xFFFFFF
+                  text: "--:--"
+
+              # Date
+              - label:
+                  id: lbl_date
+                  text_font: roboto_20
+                  text_color: 0xB0B0B0
+                  text: "---"
+
+              # Location
+              - label:
+                  id: lbl_location
+                  text_font: roboto_20
+                  text_color: 0x808080
+                  text: "--"
+
               # Weather icon
               - label:
                   id: lbl_weather_icon
@@ -632,6 +765,61 @@ lvgl:
                   text_font: roboto_32
                   text_color: 0xB0B0B0
                   text: "Loading..."
+
+              # Interior temp + humidity row
+              - obj:
+                  width: SIZE_CONTENT
+                  height: SIZE_CONTENT
+                  bg_opa: TRANSP
+                  border_width: 0
+                  pad_all: 0
+                  layout:
+                    type: FLEX
+                    flex_flow: ROW
+                    flex_align_cross: CENTER
+                    pad_column: 6
+                  widgets:
+                    - label:
+                        text_font: mdi_40
+                        text_color: 0x4FC3F7
+                        text: "\U000F050F"
+                    - label:
+                        id: lbl_interior_temp
+                        text_font: roboto_20
+                        text_color: 0xCCCCCC
+                        text: "--°"
+                    - label:
+                        text_font: mdi_40
+                        text_color: 0x4FC3F7
+                        text: "\U000F058E"
+                    - label:
+                        id: lbl_interior_humidity
+                        text_font: roboto_20
+                        text_color: 0xCCCCCC
+                        text: "--%"
+
+              # Fridge temp row
+              - obj:
+                  width: SIZE_CONTENT
+                  height: SIZE_CONTENT
+                  bg_opa: TRANSP
+                  border_width: 0
+                  pad_all: 0
+                  layout:
+                    type: FLEX
+                    flex_flow: ROW
+                    flex_align_cross: CENTER
+                    pad_column: 6
+                  widgets:
+                    - label:
+                        text_font: mdi_40
+                        text_color: 0x81D4FA
+                        text: "\U000F0290"
+                    - label:
+                        id: lbl_fridge_temp
+                        text_font: roboto_20
+                        text_color: 0xCCCCCC
+                        text: "--°"
 
               # Sunrise row
               - obj:
@@ -940,9 +1128,9 @@ lvgl:
                     pad_row: 10
                   widgets:
                     - label:
-                        text_font: roboto_20
+                        text_font: mdi_40
                         text_color: 0xCCCCCC
-                        text: "Main Awning"
+                        text: "\U000F11B3"
                     - obj:
                         width: 170
                         height: SIZE_CONTENT
@@ -1043,7 +1231,7 @@ lvgl:
                     - slider:
                         id: sld_main_cans
                         width: 50
-                        height: 340
+                        height: 290
                         min_value: 0
                         max_value: 255
                         value: 0
@@ -1065,6 +1253,23 @@ lvgl:
                         text_font: roboto_32
                         text_color: 0xCCCCCC
                         text: "Main"
+                    - button:
+                        width: 50
+                        height: 50
+                        bg_color: 0x333333
+                        radius: 25
+                        on_press:
+                          then:
+                            - homeassistant.service:
+                                service: light.toggle
+                                data:
+                                  entity_id: light.light_controller_main_can_lights
+                        widgets:
+                          - label:
+                              text_font: mdi_40
+                              text_color: 0xFFAB40
+                              text: "\U000F0425"
+                              align: CENTER
 
               # -- Bed Cans --
               - obj:
@@ -1083,7 +1288,7 @@ lvgl:
                     - slider:
                         id: sld_bed_cans
                         width: 50
-                        height: 340
+                        height: 290
                         min_value: 0
                         max_value: 255
                         value: 0
@@ -1105,6 +1310,23 @@ lvgl:
                         text_font: roboto_32
                         text_color: 0xCCCCCC
                         text: "Bed"
+                    - button:
+                        width: 50
+                        height: 50
+                        bg_color: 0x333333
+                        radius: 25
+                        on_press:
+                          then:
+                            - homeassistant.service:
+                                service: light.toggle
+                                data:
+                                  entity_id: light.light_controller_bed_can_lights
+                        widgets:
+                          - label:
+                              text_font: mdi_40
+                              text_color: 0xFFAB40
+                              text: "\U000F0425"
+                              align: CENTER
 
               # -- Door --
               - obj:
@@ -1123,7 +1345,7 @@ lvgl:
                     - slider:
                         id: sld_door
                         width: 50
-                        height: 340
+                        height: 290
                         min_value: 0
                         max_value: 255
                         value: 0
@@ -1145,6 +1367,23 @@ lvgl:
                         text_font: roboto_32
                         text_color: 0xCCCCCC
                         text: "Door"
+                    - button:
+                        width: 50
+                        height: 50
+                        bg_color: 0x333333
+                        radius: 25
+                        on_press:
+                          then:
+                            - homeassistant.service:
+                                service: light.toggle
+                                data:
+                                  entity_id: light.light_controller_door_light
+                        widgets:
+                          - label:
+                              text_font: mdi_40
+                              text_color: 0xFFAB40
+                              text: "\U000F0425"
+                              align: CENTER
 
               # -- Dog Crate --
               - obj:
@@ -1163,7 +1402,7 @@ lvgl:
                     - slider:
                         id: sld_dog_crate
                         width: 50
-                        height: 340
+                        height: 290
                         min_value: 0
                         max_value: 255
                         value: 0
@@ -1185,6 +1424,23 @@ lvgl:
                         text_font: roboto_32
                         text_color: 0xCCCCCC
                         text: "Crate"
+                    - button:
+                        width: 50
+                        height: 50
+                        bg_color: 0x333333
+                        radius: 25
+                        on_press:
+                          then:
+                            - homeassistant.service:
+                                service: light.toggle
+                                data:
+                                  entity_id: light.light_controller_dog_crate_lights
+                        widgets:
+                          - label:
+                              text_font: mdi_40
+                              text_color: 0xFFAB40
+                              text: "\U000F0425"
+                              align: CENTER
 
               # -- Bed Capsule --
               - obj:
@@ -1203,7 +1459,7 @@ lvgl:
                     - slider:
                         id: sld_bed_capsule
                         width: 50
-                        height: 340
+                        height: 290
                         min_value: 0
                         max_value: 255
                         value: 0
@@ -1225,6 +1481,23 @@ lvgl:
                         text_font: roboto_32
                         text_color: 0xCCCCCC
                         text: "Capsule"
+                    - button:
+                        width: 50
+                        height: 50
+                        bg_color: 0x333333
+                        radius: 25
+                        on_press:
+                          then:
+                            - homeassistant.service:
+                                service: light.toggle
+                                data:
+                                  entity_id: light.light_controller_bed_capsule_lights
+                        widgets:
+                          - label:
+                              text_font: mdi_40
+                              text_color: 0xFFAB40
+                              text: "\U000F0425"
+                              align: CENTER
 
               # -- Awning Outside --
               - obj:
@@ -1243,7 +1516,7 @@ lvgl:
                     - slider:
                         id: sld_awning_out
                         width: 50
-                        height: 340
+                        height: 290
                         min_value: 0
                         max_value: 255
                         value: 0
@@ -1265,6 +1538,23 @@ lvgl:
                         text_font: roboto_32
                         text_color: 0xCCCCCC
                         text: "Awn Out"
+                    - button:
+                        width: 50
+                        height: 50
+                        bg_color: 0x333333
+                        radius: 25
+                        on_press:
+                          then:
+                            - homeassistant.service:
+                                service: light.toggle
+                                data:
+                                  entity_id: light.light_controller_awning_outside_light_strip
+                        widgets:
+                          - label:
+                              text_font: mdi_40
+                              text_color: 0xFFAB40
+                              text: "\U000F0425"
+                              align: CENTER
 
               # -- Awning Inside --
               - obj:
@@ -1283,7 +1573,7 @@ lvgl:
                     - slider:
                         id: sld_awning_in
                         width: 50
-                        height: 340
+                        height: 290
                         min_value: 0
                         max_value: 255
                         value: 0
@@ -1305,6 +1595,23 @@ lvgl:
                         text_font: roboto_32
                         text_color: 0xCCCCCC
                         text: "Awn In"
+                    - button:
+                        width: 50
+                        height: 50
+                        bg_color: 0x333333
+                        radius: 25
+                        on_press:
+                          then:
+                            - homeassistant.service:
+                                service: light.toggle
+                                data:
+                                  entity_id: light.light_controller_awning_inside_light_strip
+                        widgets:
+                          - label:
+                              text_font: mdi_40
+                              text_color: 0xFFAB40
+                              text: "\U000F0425"
+                              align: CENTER
 
               # -- Exterior (all 5 floods) --
               - obj:
@@ -1323,7 +1630,7 @@ lvgl:
                     - slider:
                         id: sld_exterior
                         width: 50
-                        height: 340
+                        height: 290
                         min_value: 0
                         max_value: 255
                         value: 0
@@ -1345,3 +1652,20 @@ lvgl:
                         text_font: roboto_32
                         text_color: 0xCCCCCC
                         text: "Flood"
+                    - button:
+                        width: 50
+                        height: 50
+                        bg_color: 0x333333
+                        radius: 25
+                        on_press:
+                          then:
+                            - homeassistant.service:
+                                service: light.toggle
+                                data:
+                                  entity_id: light.light_controller_exterior_capsule_passenger_flood_light
+                        widgets:
+                          - label:
+                              text_font: mdi_40
+                              text_color: 0xFFAB40
+                              text: "\U000F0425"
+                              align: CENTER
