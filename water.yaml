@@ -817,6 +817,21 @@ lvgl:
       long_press_time: 400ms
       long_press_repeat_time: 100ms
 
+  # Black circular border on top_layer to mask white crescents
+  # at the edges of the round bezel
+  top_layer:
+    widgets:
+      - obj:
+          align: CENTER
+          width: 480
+          height: 480
+          bg_opa: TRANSP
+          border_width: 6
+          border_color: 0x000000
+          border_opa: COVER
+          radius: 240
+          clickable: false
+
   widgets:
     - obj:
         align: CENTER
