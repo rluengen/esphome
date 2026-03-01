@@ -5,7 +5,7 @@ substitutions:
   device_name: touchpanel
   friendly_name: Waveshare 8.8" Touch Panel Controller
   project_name: waveshare_88_touch_panel
-  project_version: "1.0.8"
+  project_version: "1.0.9"
   log_level: DEBUG
 
 # Local external component for DSI display init with BSP-correct order
@@ -1600,7 +1600,6 @@ lvgl:
                   bg_opa: TRANSP
                   border_width: 0
                   scrollbar_mode: "OFF"
-                  pad_column: 4
                   pad_top: 15
                   pad_bottom: 15
                   pad_left: 10
