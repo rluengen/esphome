@@ -93,7 +93,8 @@ packages:
       - path: packages/time/homeassistant.yaml
       - path: packages/display/sleep.yaml
         vars:
-          display_panel_power_switch_id: display_backlight
+          touchscreen_id: dsi_touchscreen
+          backlight_id: display_backlight
 
 # Ethernet - DISABLED (Waveshare 8.8" DSI may not have IP101 PHY)
 # ethernet:
@@ -177,7 +178,6 @@ touchscreen:
       swap_xy: true
       mirror_x: true
     on_touch:
-      - script.execute: screen_bump_activity
       - lambda: |-
           for (auto &tp : touches) {
             ESP_LOGI("touch", "x=%d y=%d (display: 1920x480)", tp.x, tp.y);

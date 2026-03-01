@@ -34,7 +34,7 @@ packages:
       - path: packages/icons/network_icons.yaml
       - path: packages/icons/battery_icons.yaml
       - path: packages/icons/homeassistant_icons.yaml
-      - path: packages/display_timeout.yaml
+      - path: packages/display/sleep.yaml
         vars:
           touchscreen_id: my_touchscreen
           backlight_id: display_backlight_id
@@ -604,12 +604,12 @@ sensor:
     name: "Rotary Encoder"
     on_clockwise:
       then:
-        - script.execute: screen_timeout_timer
+        - script.execute: screen_bump_activity
         - script.execute: increase_light_brightness
 
     on_anticlockwise:
       then:
-        - script.execute: screen_timeout_timer
+        - script.execute: screen_bump_activity
         - script.execute: decrease_light_brightness
 
   # Home Assistant brightness attribute sensors for each selectable light.

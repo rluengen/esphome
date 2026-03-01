@@ -1,81 +1,126 @@
+# Reusable display sleep package for LVGL-based displays.
+# Combines configurable timeout, LVGL pause/resume, keep-awake toggle,
+# wake-touch guard, and a remote wake button.
+#
+# Required substitutions:
+#   backlight_id: light id for the display backlight (default: display_backlight_id)
+#   touchscreen_id: touchscreen component id for touch input (default: my_touchscreen)
+#
+# Optional substitutions:
+#   default_timeout_seconds: default sleep timeout in seconds (default: 60)
+#
+# Provides these IDs for consumers to reference:
+#   screen_bump_activity (script): call from encoder/other handlers to reset the timeout
+#   enter_screen_off (script): force display to sleep immediately
+#   exit_screen_off (script): force display to wake immediately
+#   screen_is_off (global bool): true when display is sleeping
+#   wake_touch (global bool): true on the first touch after waking, consume to ignore wake input
+#   keep_display_awake (global bool): true when keep-awake switch is on
+#   display_timeout (number): configurable timeout in seconds (10-720)
+#   display_keep_awake_switch (switch): toggle to keep display always on
+#   wake_display_button (button): press to wake display remotely
+#
+# Usage:
+#   packages:
+#     display_sleep:
+#       url: https://github.com/rluengen/esphome
+#       ref: main
+#       files:
+#         - path: packages/display/sleep.yaml
+#           vars:
+#             backlight_id: display_backlight_id
+#             touchscreen_id: my_touchscreen
+
 substitutions:
-  sleep_idle_time_milliseconds: 30000
-  display_panel_power_switch_id: panel_power
+  backlight_id: display_backlight_id
+  touchscreen_id: my_touchscreen
+  default_timeout_seconds: "60"
+
+number:
+  - platform: template
+    name: Screen Timeout
+    optimistic: true
+    entity_category: config
+    id: display_timeout
+    unit_of_measurement: "s"
+    initial_value: ${default_timeout_seconds}
+    restore_value: true
+    min_value: 10
+    max_value: 720
+    step: 5
+    mode: box
 
 globals:
-  - id: last_activity_ms
-    type: uint32_t
-    restore_value: no
-    initial_value: "0"
-
   - id: screen_is_off
     type: bool
-    restore_value: no
+    initial_value: "false"
+
+  - id: wake_touch
+    type: bool
+    initial_value: "false"
 
   - id: keep_display_awake
     type: bool
     restore_value: yes
     initial_value: "false"
 
-interval:
-  - interval: 1s
-    then:
-      - lambda: |-
-          const uint32_t now = millis();
-          // Initialize at boot
-          if (id(last_activity_ms) == 0) id(last_activity_ms) = now;
-
-          const uint32_t idle_ms = now - id(last_activity_ms);
-          // Don't turn off if user explicitly wants to keep the display awake
-          if (!id(screen_is_off) && !id(keep_display_awake) && idle_ms > (uint32_t) atoi("${sleep_idle_time_milliseconds}")) {
-            id(enter_screen_off).execute();
-          }
-
 script:
-  # Call whenever user interacts (touch / button / remote wake)
+  # Call whenever user interacts (touch / button / remote wake).
+  # Uses mode: restart so each call resets the sleep countdown.
   - id: screen_bump_activity
+    mode: restart
     then:
-      - lambda: |-
-          id(last_activity_ms) = millis();
       - if:
           condition:
             lambda: 'return id(screen_is_off);'
           then:
             - script.execute: exit_screen_off
+      - if:
+          condition:
+            lambda: 'return !id(keep_display_awake);'
+          then:
+            - delay: !lambda 'return (uint32_t)(id(display_timeout).state * 1000);'
+            - script.execute: enter_screen_off
 
-  # Turn off: pick A or B or both
+  # Put display to sleep: backlight off + LVGL paused
   - id: enter_screen_off
     then:
-      - light.turn_off: ${display_panel_power_switch_id}
-      - lambda: |-
-          id(screen_is_off) = true;
+      - if:
+          condition:
+            lambda: 'return !id(screen_is_off);'
+          then:
+            - logger.log: "Putting display to sleep"
+            - lambda: 'id(screen_is_off) = true;'
+            - light.turn_off: ${backlight_id}
+            - lvgl.pause:
 
-  # Turn on again (first tap wakes; second tap interacts)
+  # Wake display: backlight on + LVGL resumed
   - id: exit_screen_off
     then:
-      - light.turn_on: ${display_panel_power_switch_id}
-      - delay: 60ms   # give panel rails time to rise
-      # Force a redraw so the first frame is crisp
+      - logger.log: "Waking display"
       - lambda: |-
           id(screen_is_off) = false;
-          id(last_activity_ms) = millis();   // restart the idle timer
+          id(wake_touch) = true;
+      - light.turn_on: ${backlight_id}
+      - delay: 60ms   # give panel rails time to rise
+      - lvgl.resume:
+
+touchscreen:
+  - id: !extend ${touchscreen_id}
+    on_touch:
+      - script.execute: screen_bump_activity
 
 switch:
   - platform: template
     name: "Display Keep Awake"
     id: display_keep_awake_switch
     optimistic: true
-    # Replaced `restore_state: yes` (deprecated) with `restore_mode`.
-    # Use one of: RESTORE_DEFAULT_OFF, RESTORE_DEFAULT_ON, ALWAYS_OFF, ALWAYS_ON
-    # RESTORE_DEFAULT_OFF: restore previous state if present, otherwise default to OFF
     restore_mode: RESTORE_DEFAULT_OFF
     turn_on_action:
-      - lambda: |-
-          id(keep_display_awake) = true;
+      - lambda: 'id(keep_display_awake) = true;'
       - script.execute: exit_screen_off
     turn_off_action:
-      - lambda: |-
-          id(keep_display_awake) = false;
+      - lambda: 'id(keep_display_awake) = false;'
       - script.execute: screen_bump_activity
 
 button:
