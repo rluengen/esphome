@@ -4,6 +4,8 @@
 substitutions:
   device_name: touchpanel
   friendly_name: Waveshare 8.8" Touch Panel Controller
+  project_name: waveshare-8.8-touch-panel
+  project_version: "0.0.1"
   log_level: DEBUG
 
 # Local external component for DSI display init with BSP-correct order
@@ -21,6 +23,9 @@ web_server:
 esphome:
   name: ${device_name}
   friendly_name: ${friendly_name}
+  project:
+    name: smartvan.${project_name}
+    version: ${project_version}
   on_boot:
     - priority: 600
       then:
