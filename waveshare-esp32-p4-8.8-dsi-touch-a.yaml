@@ -433,24 +433,26 @@ text_sensor:
             text: !lambda 'return x.empty() ? "--:--" : x.c_str();'
 
 sensor:
-  # TODO: Replace with real HA sensors once hooked up
-  - platform: template
+  - platform: homeassistant
     id: water_level
-    name: "Water Level (Test)"
-    update_interval: 10s
-    lambda: 'return (float)(rand() % 101);'  # 0-100%
-    internal: true
+    entity_id: sensor.water_tank_display_fresh_water_tank_level
     on_value:
       then:
         - lvgl.bar.update:
             id: bar_water
             value: !lambda 'return isnan(x) ? 0 : (int)x;'
+
+  - platform: homeassistant
+    id: water_gallons
+    entity_id: sensor.water_tank_display_tank_gallons_remaining
+    on_value:
+      then:
         - lvgl.label.update:
             id: lbl_water_pct
             text: !lambda |-
-              if (isnan(x)) return "--%";
-              static char buf[8];
-              snprintf(buf, sizeof(buf), "%.0f%%", x);
+              if (isnan(x)) return "-- gal";
+              static char buf[16];
+              snprintf(buf, sizeof(buf), "%.1f gal", x);
               return buf;
 
   # TODO: Replace with real HA sensor once hooked up
@@ -934,7 +936,7 @@ lvgl:
                               id: lbl_water_pct
                               text_font: roboto_20
                               text_color: 0xFFFFFF
-                              text: "--%"
+                              text: "-- gal"
                     # Horizontal bar
                     - bar:
                         id: bar_water

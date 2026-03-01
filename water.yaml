@@ -69,7 +69,6 @@ packages:
           wifi_password: !secret wifi_password
       - path: packages/time/homeassistant.yaml
       - path: packages/icons/homeassistant_icons.yaml
-      - path: packages/icons/network_icons.yaml
       - path: devices/waveshare-ESP32-S3-Touch-LCD-2.8C.yaml
         vars:
           touchscreen_id: touch_id
@@ -214,16 +213,6 @@ number:
     mode: box
     unit_of_measurement: "Ohms"
     icon: "mdi:omega"
-
-wifi:
-  on_connect:
-    - lvgl.label.update:
-        id: lbl_wifi_status
-        text: "\U000F16BD"  # wifi-check
-  on_disconnect:
-    - lvgl.label.update:
-        id: lbl_wifi_status
-        text: "\U000F16C5"  # wifi-remove
 
 # https://esphome.io/components/xl9535/
 xl9535:
@@ -467,34 +456,6 @@ sensor:
       float remaining_gallons = id(tank_capacity_in_gallons) * (100.0 - id(tank_percent).state) / 100.0;
       float minutes = remaining_gallons / id(fill_rate_gpm);
       return minutes;
-
-  # Extend wifi_rssi sensor to update the WiFi icon
-  - id: !extend wifi_rssi
-    on_value:
-      - lvgl.label.update:
-          id: lbl_wifi_status
-          text: !lambda |-
-            if (isnan(x)) {
-              return "\U000F16C5";  // wifi-remove
-            }
-            int bars = 0;
-            if (x > -55) bars = 4;
-            else if (x > -65) bars = 3;
-            else if (x > -72) bars = 2;
-            else if (x > -80) bars = 1;
-            
-            if (bars == 4) return "\U000F0928";  // wifi-strength-4
-            else if (bars == 3) return "\U000F0925";  // wifi-strength-3
-            else if (bars == 2) return "\U000F0922";  // wifi-strength-2
-            else if (bars == 1) return "\U000F091F";  // wifi-strength-1
-            else return "\U000F05AA";  // wifi-off
-      - lvgl.label.update:
-          id: lbl_wifi_status
-          text_color: !lambda |-
-            if (isnan(x)) {
-              return lv_color_hex(0x888888);  // Gray for disconnected
-            }
-            return lv_color_hex(0xFFFFFF);
 
 # https://pictogrammers.com/library/mdi/
 
@@ -982,17 +943,6 @@ lvgl:
             text_font: homeassistant_icons
             text: "\U000F07D0"
             text_color: 0x03A9F4 # Blue color for Home Assistant icon
-            clickable: false
-
-        - label:
-            id: lbl_wifi_status
-            text: "\U000F05AA"  # wifi-off icon by default
-            align: BOTTOM_LEFT
-            x: 80
-            y: -60
-            text_font: wifi_icons
-            text_color: 0x888888  # Gray for disconnected
-            text_align: LEFT
             clickable: false
 
         - label:

@@ -98,7 +98,7 @@ display:
     spi_id: spi_lcd
     spi_mode: MODE1
     color_order: bgr
-    auto_clear_enabled: false
+    auto_clear_enabled: true
     # show_test_card: true
     dimensions:
       width: 480
