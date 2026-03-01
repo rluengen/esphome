@@ -5,7 +5,7 @@ substitutions:
   device_name: touchpanel
   friendly_name: Waveshare 8.8" Touch Panel Controller
   project_name: waveshare-8.8-touch-panel
-  project_version: "1.0.1"
+  project_version: "1.0.2"
   log_level: DEBUG
 
 # Local external component for DSI display init with BSP-correct order
