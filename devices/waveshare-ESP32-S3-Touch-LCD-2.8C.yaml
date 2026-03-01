@@ -113,15 +113,8 @@ display:
     hsync_pin: GPIO38
     vsync_pin: GPIO39
     pclk_pin: GPIO41
-    # RGB timing from Waveshare/wireless-tag reference (ZX2D10GE01R-V4848)
-    pclk_frequency: 15MHz
-    pclk_inverted: false
-    hsync_pulse_width: 10
-    hsync_back_porch: 10
-    hsync_front_porch: 10
-    vsync_pulse_width: 2
-    vsync_back_porch: 12
-    vsync_front_porch: 14
+    # Use ESPHome defaults (16MHz, inverted, 10/10/20 h-timing, 10/10/10 v-timing)
+    # which match the agillis reference working config
     init_sequence:
       - [ 0xFF, 0x77, 0x01, 0x00, 0x00, 0x13 ]
       - [ 0xEF, 0x08 ]
