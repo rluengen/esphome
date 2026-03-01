@@ -5,7 +5,7 @@ substitutions:
   device_name: touchpanel
   friendly_name: Waveshare 8.8" Touch Panel Controller
   project_name: waveshare-8.8-touch-panel
-  project_version: "0.0.1"
+  project_version: "1.0.1"
   log_level: DEBUG
 
 # Local external component for DSI display init with BSP-correct order
@@ -331,6 +331,97 @@ script:
           data_template:
             brightness: !lambda 'return id(pending_bright_exterior);'
 
+  # ── Tab Highlight Scripts ──
+  - id: highlight_tab_home
+    then:
+      - lvgl.widget.update:
+          id: btn_tab_home
+          bg_color: 0x3A506B
+      - lvgl.widget.update:
+          id: btn_tab_weather
+          bg_color: 0x1A1A2E
+      - lvgl.widget.update:
+          id: btn_tab_lights
+          bg_color: 0x1A1A2E
+      - lvgl.widget.update:
+          id: btn_tab_power
+          bg_color: 0x1A1A2E
+      - lvgl.widget.update:
+          id: btn_tab_water
+          bg_color: 0x1A1A2E
+
+  - id: highlight_tab_weather
+    then:
+      - lvgl.widget.update:
+          id: btn_tab_home
+          bg_color: 0x1A1A2E
+      - lvgl.widget.update:
+          id: btn_tab_weather
+          bg_color: 0x3A506B
+      - lvgl.widget.update:
+          id: btn_tab_lights
+          bg_color: 0x1A1A2E
+      - lvgl.widget.update:
+          id: btn_tab_power
+          bg_color: 0x1A1A2E
+      - lvgl.widget.update:
+          id: btn_tab_water
+          bg_color: 0x1A1A2E
+
+  - id: highlight_tab_lights
+    then:
+      - lvgl.widget.update:
+          id: btn_tab_home
+          bg_color: 0x1A1A2E
+      - lvgl.widget.update:
+          id: btn_tab_weather
+          bg_color: 0x1A1A2E
+      - lvgl.widget.update:
+          id: btn_tab_lights
+          bg_color: 0x3A506B
+      - lvgl.widget.update:
+          id: btn_tab_power
+          bg_color: 0x1A1A2E
+      - lvgl.widget.update:
+          id: btn_tab_water
+          bg_color: 0x1A1A2E
+
+  - id: highlight_tab_power
+    then:
+      - lvgl.widget.update:
+          id: btn_tab_home
+          bg_color: 0x1A1A2E
+      - lvgl.widget.update:
+          id: btn_tab_weather
+          bg_color: 0x1A1A2E
+      - lvgl.widget.update:
+          id: btn_tab_lights
+          bg_color: 0x1A1A2E
+      - lvgl.widget.update:
+          id: btn_tab_power
+          bg_color: 0x3A506B
+      - lvgl.widget.update:
+          id: btn_tab_water
+          bg_color: 0x1A1A2E
+
+  - id: highlight_tab_water
+    then:
+      - lvgl.widget.update:
+          id: btn_tab_home
+          bg_color: 0x1A1A2E
+      - lvgl.widget.update:
+          id: btn_tab_weather
+          bg_color: 0x1A1A2E
+      - lvgl.widget.update:
+          id: btn_tab_lights
+          bg_color: 0x1A1A2E
+      - lvgl.widget.update:
+          id: btn_tab_power
+          bg_color: 0x1A1A2E
+      - lvgl.widget.update:
+          id: btn_tab_water
+          bg_color: 0x3A506B
+
 text_sensor:
   - platform: homeassistant
     id: weather_condition
@@ -369,6 +460,37 @@ text_sensor:
               auto it = icons.find(x);
               if (it != icons.end()) return it->second.c_str();
               return "\U000F0599";
+        - lvgl.label.update:
+            id: lbl_weather_cond_lg
+            text: !lambda |-
+              if (x.empty()) return "Unknown";
+              static const std::map<std::string, std::string> cond = {
+                {"clear-night", "Clear"}, {"cloudy", "Cloudy"}, {"exceptional", "Exceptional"},
+                {"fog", "Foggy"}, {"hail", "Hail"}, {"lightning", "Lightning"},
+                {"lightning-rainy", "Thunderstorm"}, {"partlycloudy", "Partly Cloudy"},
+                {"pouring", "Pouring"}, {"rainy", "Rainy"}, {"snowy", "Snowy"},
+                {"snowy-rainy", "Sleet"}, {"sunny", "Sunny"}, {"windy", "Windy"},
+                {"windy-variant", "Windy"},
+              };
+              auto it = cond.find(x);
+              if (it != cond.end()) return it->second.c_str();
+              return x.c_str();
+        - lvgl.label.update:
+            id: lbl_weather_icon_lg
+            text: !lambda |-
+              static const std::map<std::string, std::string> icons = {
+                {"clear-night", "\U000F0594"}, {"cloudy", "\U000F0590"},
+                {"exceptional", "\U000F0F2F"}, {"fog", "\U000F0591"},
+                {"hail", "\U000F0592"}, {"lightning", "\U000F0593"},
+                {"lightning-rainy", "\U000F067E"}, {"partlycloudy", "\U000F0595"},
+                {"pouring", "\U000F0596"}, {"rainy", "\U000F0597"},
+                {"snowy", "\U000F0598"}, {"snowy-rainy", "\U000F067F"},
+                {"sunny", "\U000F0599"}, {"windy", "\U000F059D"},
+                {"windy-variant", "\U000F059E"},
+              };
+              auto it = icons.find(x);
+              if (it != icons.end()) return it->second.c_str();
+              return "\U000F0599";
 
   - platform: homeassistant
     id: weather_temp
@@ -379,6 +501,13 @@ text_sensor:
       then:
         - lvgl.label.update:
             id: lbl_weather_temp
+            text: !lambda |-
+              if (x.empty()) return "--°";
+              static char buf[16];
+              snprintf(buf, sizeof(buf), "%s°", x.c_str());
+              return buf;
+        - lvgl.label.update:
+            id: lbl_weather_temp_lg
             text: !lambda |-
               if (x.empty()) return "--°";
               static char buf[16];
@@ -426,6 +555,9 @@ text_sensor:
         - lvgl.label.update:
             id: lbl_sunrise
             text: !lambda 'return x.empty() ? "--:--" : x.c_str();'
+        - lvgl.label.update:
+            id: lbl_sunrise_wx
+            text: !lambda 'return x.empty() ? "--:--" : x.c_str();'
 
   - platform: homeassistant
     id: sunset_time
@@ -435,6 +567,9 @@ text_sensor:
       then:
         - lvgl.label.update:
             id: lbl_sunset
+            text: !lambda 'return x.empty() ? "--:--" : x.c_str();'
+        - lvgl.label.update:
+            id: lbl_sunset_wx
             text: !lambda 'return x.empty() ? "--:--" : x.c_str();'
 
 sensor:
@@ -446,6 +581,16 @@ sensor:
         - lvgl.bar.update:
             id: bar_water
             value: !lambda 'return isnan(x) ? 0 : (int)x;'
+        - lvgl.bar.update:
+            id: bar_water_wtr
+            value: !lambda 'return isnan(x) ? 0 : (int)x;'
+        - lvgl.label.update:
+            id: lbl_water_pct_wtr
+            text: !lambda |-
+              if (isnan(x)) return "0%";
+              static char buf[8];
+              snprintf(buf, sizeof(buf), "%.0f%%", x);
+              return buf;
 
   - platform: homeassistant
     id: water_gallons
@@ -454,6 +599,13 @@ sensor:
       then:
         - lvgl.label.update:
             id: lbl_water_pct
+            text: !lambda |-
+              if (isnan(x)) return "-- gal";
+              static char buf[16];
+              snprintf(buf, sizeof(buf), "%.1f gal", x);
+              return buf;
+        - lvgl.label.update:
+            id: lbl_water_gallons_wtr
             text: !lambda |-
               if (isnan(x)) return "-- gal";
               static char buf[16];
@@ -472,6 +624,9 @@ sensor:
         - lvgl.bar.update:
             id: bar_battery
             value: !lambda 'return isnan(x) ? 0 : (int)fminf(x, 48);'
+        - lvgl.bar.update:
+            id: bar_battery_pwr
+            value: !lambda 'return isnan(x) ? 0 : (int)fminf(x, 48);'
         - lvgl.label.update:
             id: lbl_battery_time
             text: !lambda |-
@@ -479,6 +634,14 @@ sensor:
               static char buf[16];
               if (x >= 24) snprintf(buf, sizeof(buf), "%.0f days", x / 24.0f);
               else snprintf(buf, sizeof(buf), "%.1f hrs", x);
+              return buf;
+        - lvgl.label.update:
+            id: lbl_battery_time_pwr
+            text: !lambda |-
+              if (isnan(x)) return "-- hrs remaining";
+              static char buf[32];
+              if (x >= 24) snprintf(buf, sizeof(buf), "%.0f days remaining", x / 24.0f);
+              else snprintf(buf, sizeof(buf), "%.1f hrs remaining", x);
               return buf;
 
   # Interior climate sensors
@@ -490,6 +653,13 @@ sensor:
       then:
         - lvgl.label.update:
             id: lbl_interior_temp
+            text: !lambda |-
+              if (isnan(x)) return "--°";
+              static char buf[12];
+              snprintf(buf, sizeof(buf), "%.1f°", x);
+              return buf;
+        - lvgl.label.update:
+            id: lbl_interior_temp_wx
             text: !lambda |-
               if (isnan(x)) return "--°";
               static char buf[12];
@@ -509,6 +679,13 @@ sensor:
               static char buf[12];
               snprintf(buf, sizeof(buf), "%.0f%%", x);
               return buf;
+        - lvgl.label.update:
+            id: lbl_interior_hum_wx
+            text: !lambda |-
+              if (isnan(x)) return "--%";
+              static char buf[12];
+              snprintf(buf, sizeof(buf), "%.0f%%", x);
+              return buf;
 
   - platform: homeassistant
     id: ha_fridge_temp
@@ -518,6 +695,13 @@ sensor:
       then:
         - lvgl.label.update:
             id: lbl_fridge_temp
+            text: !lambda |-
+              if (isnan(x)) return "--°";
+              static char buf[12];
+              snprintf(buf, sizeof(buf), "%.1f°", x);
+              return buf;
+        - lvgl.label.update:
+            id: lbl_fridge_temp_wx
             text: !lambda |-
               if (isnan(x)) return "--°";
               static char buf[12];
@@ -613,6 +797,62 @@ sensor:
             id: sld_exterior
             value: !lambda 'return isnan(x) ? 0 : (int)x;'
 
+# ---- Water Control State Sensors ----
+# Track hot water heater and water pump state from the water tank controller
+binary_sensor:
+  - platform: homeassistant
+    id: ha_hot_water_heater_state
+    entity_id: switch.water_tank_display_hot_water_heater
+    internal: true
+    on_state:
+      then:
+        - lvgl.label.update:
+            id: lbl_heater_status
+            text: !lambda 'return x ? "ON" : "OFF";'
+            text_color: !lambda 'return x ? lv_color_hex(0xFF6600) : lv_color_hex(0x888888);'
+        - lvgl.label.update:
+            id: lbl_heater_icon
+            text: !lambda 'return x ? "\U000F0F92" : "\U000F0F91";'
+            text_color: !lambda 'return x ? lv_color_hex(0xFF6600) : lv_color_hex(0x808080);'
+
+  - platform: homeassistant
+    id: ha_water_pump_state
+    entity_id: switch.water_tank_display_water_pump
+    internal: true
+    on_state:
+      then:
+        - lvgl.label.update:
+            id: lbl_pump_status
+            text: !lambda 'return x ? "ON" : "OFF";'
+            text_color: !lambda 'return x ? lv_color_hex(0x00BFFF) : lv_color_hex(0x888888);'
+        - lvgl.label.update:
+            id: lbl_pump_icon
+            text: !lambda 'return x ? "\U000F058E" : "\U000F0F93";'
+            text_color: !lambda 'return x ? lv_color_hex(0x00BFFF) : lv_color_hex(0x808080);'
+
+# ---- 7-Day Forecast Sensors ----
+# These pull from HA template sensors. Create them in HA configuration.yaml:
+#   template:
+#     - sensor:
+#         - name: "Forecast Day 1 High"
+#           state: "{{ state_attr('weather.forecast_home', 'forecast')[0].temperature | round(0) }}"
+#         - name: "Forecast Day 1 Low"
+#           state: "{{ state_attr('weather.forecast_home', 'forecast')[0].templow | round(0) }}"
+#     - trigger:
+#         - platform: time_pattern
+#           hours: "/1"
+#       action:
+#         - service: weather.get_forecasts
+#           target:
+#             entity_id: weather.forecast_home
+#           data:
+#             type: daily
+#           response_variable: forecast
+#       sensor:
+#         - name: "Forecast Day 0 Condition"
+#           state: "{{ forecast['weather.forecast_home'].forecast[0].condition }}"
+#         # ... repeat for days 0-6, high, low, condition
+
 # ---- Fonts ----
 font:
   # Large weather condition icon
@@ -660,6 +900,27 @@ font:
       "\U000F050F", # thermometer
       "\U000F058E", # water-percent (humidity)
       "\U000F0290", # fridge
+      "\U000F02DC", # home (tab icon)
+      "\U000F0238", # fire (hot water heater)
+      "\U000F0F92", # water-boiler (on)
+      "\U000F0F91", # water-boiler-off
+      "\U000F0F93", # water-pump-off
+      # Weather condition icons (for forecast cards)
+      "\U000F0594", # clear-night
+      "\U000F0590", # cloudy
+      "\U000F0F2F", # exceptional
+      "\U000F0591", # fog
+      "\U000F0592", # hail
+      "\U000F0593", # lightning
+      "\U000F067E", # lightning-rainy
+      "\U000F0595", # partlycloudy
+      "\U000F0596", # pouring
+      "\U000F0597", # rainy
+      "\U000F0598", # snowy
+      "\U000F067F", # snowy-rainy
+      "\U000F0599", # sunny
+      "\U000F059D", # windy
+      "\U000F059E", # windy-variant
       ]
 
   # UI text font
@@ -701,7 +962,8 @@ interval:
             snprintf(buf, sizeof(buf), "%s, %s %d", days[time.day_of_week-1], months[time.month-1], time.day_of_month);
             return buf;
 
-# LVGL dashboard
+# LVGL tabbed dashboard
+# Layout: 80px left tab bar | 1840px content area (1920x480 total)
 lvgl:
   displays:
     - dsi_display
@@ -712,967 +974,1693 @@ lvgl:
   byte_order: little_endian
   pages:
     - id: main_page
-      bg_color: 0x1A1A2E
+      bg_color: 0x0D1B2A
       widgets:
-        # ── Weather Panel (left ~400px) ──
+        # ═══════════════════════════════════════════════════
+        # LEFT TAB BAR (80px wide, full height)
+        # ═══════════════════════════════════════════════════
         - obj:
-            width: 400
+            width: 80
             height: 480
             x: 0
             y: 0
-            bg_color: 0x16213E
+            bg_color: 0x0D1B2A
             bg_opa: COVER
             border_width: 0
-            pad_all: 20
+            pad_top: 20
+            pad_bottom: 20
+            pad_row: 8
+            scrollbar_mode: "OFF"
             layout:
               type: FLEX
               flex_flow: COLUMN
               flex_align_main: CENTER
               flex_align_cross: CENTER
-              pad_row: 8
             widgets:
-              # Time
-              - label:
-                  id: lbl_time
-                  text_font: roboto_32
-                  text_color: 0xFFFFFF
-                  text: "--:--"
-
-              # Date
-              - label:
-                  id: lbl_date
-                  text_font: roboto_20
-                  text_color: 0xB0B0B0
-                  text: "---"
-
-              # Location
-              - label:
-                  id: lbl_location
-                  text_font: roboto_20
-                  text_color: 0x808080
-                  text: "--"
-
-              # Weather icon
-              - label:
-                  id: lbl_weather_icon
-                  text_font: mdi_weather_160
-                  text_color: 0xFFD700
-                  text: "\U000F0599"
-
-              # Temperature
-              - label:
-                  id: lbl_weather_temp
-                  text_font: montserrat_48
-                  text_color: 0xFFFFFF
-                  text: "--°"
-
-              # Condition text
-              - label:
-                  id: lbl_weather_condition
-                  text_font: roboto_32
-                  text_color: 0xB0B0B0
-                  text: "Loading..."
-
-              # Interior temp + humidity row
-              - obj:
-                  width: SIZE_CONTENT
-                  height: SIZE_CONTENT
-                  bg_opa: TRANSP
+              # ── Home Tab Button ──
+              - button:
+                  id: btn_tab_home
+                  width: 64
+                  height: 72
+                  bg_color: 0x3A506B
+                  radius: 12
                   border_width: 0
-                  pad_all: 0
-                  layout:
-                    type: FLEX
-                    flex_flow: ROW
-                    flex_align_cross: CENTER
-                    pad_column: 6
+                  on_press:
+                    then:
+                      - lvgl.widget.show: content_home
+                      - lvgl.widget.hide: content_weather
+                      - lvgl.widget.hide: content_lights
+                      - lvgl.widget.hide: content_power
+                      - lvgl.widget.hide: content_water
+                      - script.execute: highlight_tab_home
                   widgets:
                     - label:
                         text_font: mdi_40
-                        text_color: 0x4FC3F7
-                        text: "\U000F050F"
+                        text_color: 0xFFFFFF
+                        text: "\U000F02DC"
+                        align: CENTER
+
+              # ── Weather Tab Button ──
+              - button:
+                  id: btn_tab_weather
+                  width: 64
+                  height: 72
+                  bg_color: 0x1A1A2E
+                  radius: 12
+                  border_width: 0
+                  on_press:
+                    then:
+                      - lvgl.widget.hide: content_home
+                      - lvgl.widget.show: content_weather
+                      - lvgl.widget.hide: content_lights
+                      - lvgl.widget.hide: content_power
+                      - lvgl.widget.hide: content_water
+                      - script.execute: highlight_tab_weather
+                  widgets:
                     - label:
-                        id: lbl_interior_temp
+                        text_font: mdi_40
+                        text_color: 0xB0B0B0
+                        text: "\U000F0590"
+                        align: CENTER
+
+              # ── Lights Tab Button ──
+              - button:
+                  id: btn_tab_lights
+                  width: 64
+                  height: 72
+                  bg_color: 0x1A1A2E
+                  radius: 12
+                  border_width: 0
+                  on_press:
+                    then:
+                      - lvgl.widget.hide: content_home
+                      - lvgl.widget.hide: content_weather
+                      - lvgl.widget.show: content_lights
+                      - lvgl.widget.hide: content_power
+                      - lvgl.widget.hide: content_water
+                      - script.execute: highlight_tab_lights
+                  widgets:
+                    - label:
+                        text_font: mdi_40
+                        text_color: 0xB0B0B0
+                        text: "\U000F0335"
+                        align: CENTER
+
+              # ── Power Tab Button ──
+              - button:
+                  id: btn_tab_power
+                  width: 64
+                  height: 72
+                  bg_color: 0x1A1A2E
+                  radius: 12
+                  border_width: 0
+                  on_press:
+                    then:
+                      - lvgl.widget.hide: content_home
+                      - lvgl.widget.hide: content_weather
+                      - lvgl.widget.hide: content_lights
+                      - lvgl.widget.show: content_power
+                      - lvgl.widget.hide: content_water
+                      - script.execute: highlight_tab_power
+                  widgets:
+                    - label:
+                        text_font: mdi_40
+                        text_color: 0xB0B0B0
+                        text: "\U000F0079"
+                        align: CENTER
+
+              # ── Water Tab Button ──
+              - button:
+                  id: btn_tab_water
+                  width: 64
+                  height: 72
+                  bg_color: 0x1A1A2E
+                  radius: 12
+                  border_width: 0
+                  on_press:
+                    then:
+                      - lvgl.widget.hide: content_home
+                      - lvgl.widget.hide: content_weather
+                      - lvgl.widget.hide: content_lights
+                      - lvgl.widget.hide: content_power
+                      - lvgl.widget.show: content_water
+                      - script.execute: highlight_tab_water
+                  widgets:
+                    - label:
+                        text_font: mdi_40
+                        text_color: 0xB0B0B0
+                        text: "\U000F058C"
+                        align: CENTER
+
+        # ═══════════════════════════════════════════════════
+        # HOME TAB CONTENT
+        # ═══════════════════════════════════════════════════
+        - obj:
+            id: content_home
+            width: 1840
+            height: 480
+            x: 80
+            y: 0
+            bg_color: 0x1A1A2E
+            bg_opa: COVER
+            border_width: 0
+            scrollbar_mode: "OFF"
+            pad_all: 0
+            widgets:
+              # ── Time & Date Section (left) ──
+              - obj:
+                  width: 480
+                  height: 480
+                  x: 0
+                  y: 0
+                  bg_opa: TRANSP
+                  border_width: 0
+                  scrollbar_mode: "OFF"
+                  pad_all: 20
+                  widgets:
+                    - label:
+                        id: lbl_time
+                        text: "12:00 AM"
+                        text_font: roboto_32
+                        text_color: 0xFFFFFF
+                        x: 20
+                        y: 20
+                    - label:
+                        id: lbl_date
+                        text: "Mon, Jan 1"
                         text_font: roboto_20
-                        text_color: 0xCCCCCC
+                        text_color: 0xB0B0B0
+                        x: 20
+                        y: 60
+                    - label:
+                        id: lbl_location
+                        text: "..."
+                        text_font: roboto_20
+                        text_color: 0x808080
+                        x: 20
+                        y: 90
+                    # ── Current Weather ──
+                    - label:
+                        id: lbl_weather_icon
+                        text_font: mdi_weather_160
+                        text_color: 0xFFD700
+                        text: "\U000F0599"
+                        x: 30
+                        y: 140
+                    - label:
+                        id: lbl_weather_temp
                         text: "--°"
+                        text_font: roboto_32
+                        text_color: 0xFFFFFF
+                        x: 210
+                        y: 180
                     - label:
-                        text_font: mdi_40
-                        text_color: 0x4FC3F7
-                        text: "\U000F058E"
-                    - label:
-                        id: lbl_interior_humidity
+                        id: lbl_weather_condition
+                        text: "--"
                         text_font: roboto_20
-                        text_color: 0xCCCCCC
-                        text: "--%"
-
-              # Fridge temp row
-              - obj:
-                  width: SIZE_CONTENT
-                  height: SIZE_CONTENT
-                  bg_opa: TRANSP
-                  border_width: 0
-                  pad_all: 0
-                  layout:
-                    type: FLEX
-                    flex_flow: ROW
-                    flex_align_cross: CENTER
-                    pad_column: 6
-                  widgets:
-                    - label:
-                        text_font: mdi_40
-                        text_color: 0x81D4FA
-                        text: "\U000F0290"
-                    - label:
-                        id: lbl_fridge_temp
-                        text_font: roboto_20
-                        text_color: 0xCCCCCC
-                        text: "--°"
-
-              # Sunrise row
-              - obj:
-                  width: SIZE_CONTENT
-                  height: SIZE_CONTENT
-                  bg_opa: TRANSP
-                  border_width: 0
-                  pad_all: 0
-                  layout:
-                    type: FLEX
-                    flex_flow: ROW
-                    flex_align_cross: CENTER
-                    pad_column: 8
-                  widgets:
+                        text_color: 0xB0B0B0
+                        x: 210
+                        y: 220
+                    # ── Sunrise / Sunset ──
                     - label:
                         text_font: mdi_40
                         text_color: 0xFFA500
                         text: "\U000F059C"
+                        x: 20
+                        y: 380
                     - label:
                         id: lbl_sunrise
-                        text_font: roboto_32
-                        text_color: 0xCCCCCC
                         text: "--:--"
-
-              # Sunset row
-              - obj:
-                  width: SIZE_CONTENT
-                  height: SIZE_CONTENT
-                  bg_opa: TRANSP
-                  border_width: 0
-                  pad_all: 0
-                  layout:
-                    type: FLEX
-                    flex_flow: ROW
-                    flex_align_cross: CENTER
-                    pad_column: 8
-                  widgets:
+                        text_font: roboto_20
+                        text_color: 0xB0B0B0
+                        x: 70
+                        y: 390
                     - label:
                         text_font: mdi_40
                         text_color: 0xFF6347
                         text: "\U000F059B"
+                        x: 200
+                        y: 380
                     - label:
                         id: lbl_sunset
-                        text_font: roboto_32
-                        text_color: 0xCCCCCC
                         text: "--:--"
+                        text_font: roboto_20
+                        text_color: 0xB0B0B0
+                        x: 250
+                        y: 390
 
-        # ── Water & Battery Panel (center ~300px) ──
-        - obj:
-            width: 300
-            height: 480
-            x: 400
-            y: 0
-            bg_color: 0x1A1A2E
-            bg_opa: COVER
-            border_width: 0
-            pad_all: 20
-            layout:
-              type: FLEX
-              flex_flow: COLUMN
-              flex_align_main: CENTER
-              flex_align_cross: CENTER
-              pad_row: 24
-            widgets:
-              # ── Water Level ──
+              # ── Climate & Status Section (center) ──
               - obj:
-                  width: 260
-                  height: SIZE_CONTENT
+                  width: 560
+                  height: 480
+                  x: 480
+                  y: 0
                   bg_opa: TRANSP
                   border_width: 0
-                  pad_all: 0
-                  layout:
-                    type: FLEX
-                    flex_flow: COLUMN
-                    flex_align_cross: CENTER
-                    pad_row: 6
+                  scrollbar_mode: "OFF"
                   widgets:
-                    # Icon + label row
-                    - obj:
-                        width: 260
-                        height: SIZE_CONTENT
-                        bg_opa: TRANSP
-                        border_width: 0
-                        pad_all: 0
-                        layout:
-                          type: FLEX
-                          flex_flow: ROW
-                          flex_align_main: SPACE_BETWEEN
-                          flex_align_cross: CENTER
-                        widgets:
-                          - obj:
-                              width: SIZE_CONTENT
-                              height: SIZE_CONTENT
-                              bg_opa: TRANSP
-                              border_width: 0
-                              pad_all: 0
-                              layout:
-                                type: FLEX
-                                flex_flow: ROW
-                                flex_align_cross: CENTER
-                                pad_column: 6
-                              widgets:
-                                - label:
-                                    text_font: mdi_40
-                                    text_color: 0x4FC3F7
-                                    text: "\U000F058C"
-                                - label:
-                                    text_font: roboto_20
-                                    text_color: 0xCCCCCC
-                                    text: "Water"
-                          - label:
-                              id: lbl_water_pct
-                              text_font: roboto_20
-                              text_color: 0xFFFFFF
-                              text: "-- gal"
-                    # Horizontal bar
+                    # ── Interior Climate ──
+                    - label:
+                        text: "Interior Climate"
+                        text_font: roboto_20
+                        text_color: 0x808080
+                        x: 20
+                        y: 20
+                    - label:
+                        text_font: mdi_40
+                        text_color: 0xFF6347
+                        text: "\U000F050F"
+                        x: 20
+                        y: 55
+                    - label:
+                        id: lbl_interior_temp
+                        text: "--°F"
+                        text_font: roboto_32
+                        text_color: 0xFFFFFF
+                        x: 70
+                        y: 60
+                    - label:
+                        text_font: mdi_40
+                        text_color: 0x4FC3F7
+                        text: "\U000F058E"
+                        x: 200
+                        y: 55
+                    - label:
+                        id: lbl_interior_humidity
+                        text: "--%"
+                        text_font: roboto_32
+                        text_color: 0xFFFFFF
+                        x: 250
+                        y: 60
+                    - label:
+                        text_font: mdi_40
+                        text_color: 0x81D4FA
+                        text: "\U000F0290"
+                        x: 380
+                        y: 55
+                    - label:
+                        id: lbl_fridge_temp
+                        text: "--°F"
+                        text_font: roboto_32
+                        text_color: 0xFFFFFF
+                        x: 430
+                        y: 60
+
+                    # ── Water Level Bar ──
+                    - label:
+                        text: "Water"
+                        text_font: roboto_20
+                        text_color: 0x808080
+                        x: 20
+                        y: 140
                     - bar:
                         id: bar_water
-                        width: 260
-                        height: 20
+                        width: 500
+                        height: 30
+                        x: 20
+                        y: 170
+                        bg_color: 0x2D2D44
+                        indicator:
+                          bg_color: 0x4FC3F7
                         min_value: 0
                         max_value: 100
                         value: 0
-                        bg_color: 0x333333
-                        border_width: 0
-                        radius: 10
-                        indicator:
-                          bg_color: 0x4FC3F7
-                          radius: 10
+                    - label:
+                        id: lbl_water_pct
+                        text: "0%"
+                        text_font: roboto_20
+                        text_color: 0xFFFFFF
+                        x: 230
+                        y: 203
 
-              # ── Battery Time ──
-              - obj:
-                  width: 260
-                  height: SIZE_CONTENT
-                  bg_opa: TRANSP
-                  border_width: 0
-                  pad_all: 0
-                  layout:
-                    type: FLEX
-                    flex_flow: COLUMN
-                    flex_align_cross: CENTER
-                    pad_row: 6
-                  widgets:
-                    # Icon + label row
-                    - obj:
-                        width: 260
-                        height: SIZE_CONTENT
-                        bg_opa: TRANSP
-                        border_width: 0
-                        pad_all: 0
-                        layout:
-                          type: FLEX
-                          flex_flow: ROW
-                          flex_align_main: SPACE_BETWEEN
-                          flex_align_cross: CENTER
-                        widgets:
-                          - obj:
-                              width: SIZE_CONTENT
-                              height: SIZE_CONTENT
-                              bg_opa: TRANSP
-                              border_width: 0
-                              pad_all: 0
-                              layout:
-                                type: FLEX
-                                flex_flow: ROW
-                                flex_align_cross: CENTER
-                                pad_column: 6
-                              widgets:
-                                - label:
-                                    text_font: mdi_40
-                                    text_color: 0x66BB6A
-                                    text: "\U000F0079"
-                                - label:
-                                    text_font: roboto_20
-                                    text_color: 0xCCCCCC
-                                    text: "Battery"
-                          - label:
-                              id: lbl_battery_time
-                              text_font: roboto_20
-                              text_color: 0xFFFFFF
-                              text: "-- hrs"
-                    # Horizontal bar (shows hours capped at 48h = 100%)
+                    # ── Battery Bar ──
+                    - label:
+                        text: "Battery"
+                        text_font: roboto_20
+                        text_color: 0x808080
+                        x: 20
+                        y: 240
                     - bar:
                         id: bar_battery
-                        width: 260
-                        height: 20
-                        min_value: 0
-                        max_value: 48
-                        value: 0
-                        bg_color: 0x333333
-                        border_width: 0
-                        radius: 10
+                        width: 500
+                        height: 30
+                        x: 20
+                        y: 270
+                        bg_color: 0x2D2D44
                         indicator:
                           bg_color: 0x66BB6A
-                          radius: 10
-
-        # ── Awning Controls Panel (~200px) ──
-        - obj:
-            width: 200
-            height: 480
-            x: 700
-            y: 0
-            bg_color: 0x16213E
-            bg_opa: COVER
-            border_width: 0
-            pad_all: 15
-            layout:
-              type: FLEX
-              flex_flow: COLUMN
-              flex_align_main: CENTER
-              flex_align_cross: CENTER
-              pad_row: 30
-            widgets:
-              # ── Solar Panel Awning ──
-              - obj:
-                  width: 170
-                  height: SIZE_CONTENT
-                  bg_opa: TRANSP
-                  border_width: 0
-                  pad_all: 0
-                  layout:
-                    type: FLEX
-                    flex_flow: COLUMN
-                    flex_align_cross: CENTER
-                    pad_row: 10
-                  widgets:
+                        min_value: 0
+                        max_value: 100
+                        value: 0
                     - label:
+                        id: lbl_battery_time
+                        text: "--"
                         text_font: roboto_20
-                        text_color: 0xCCCCCC
-                        text: "Solar Panel"
-                    - obj:
-                        width: 170
-                        height: SIZE_CONTENT
-                        bg_opa: TRANSP
-                        border_width: 0
-                        pad_all: 0
-                        layout:
-                          type: FLEX
-                          flex_flow: ROW
-                          flex_align_main: SPACE_EVENLY
-                          flex_align_cross: CENTER
-                        widgets:
-                          - button:
-                              width: 50
-                              height: 50
-                              bg_color: 0x388E3C
-                              radius: 8
-                              on_press:
-                                then:
-                                  - homeassistant.service:
-                                      service: cover.open_cover
-                                      data:
-                                        entity_id: cover.solar_panel_awning
-                              widgets:
-                                - label:
-                                    text_font: mdi_40
-                                    text_color: 0xFFFFFF
-                                    text: "\U000F0143"
-                                    align: CENTER
-                          - button:
-                              width: 50
-                              height: 50
-                              bg_color: 0xF57C00
-                              radius: 8
-                              on_press:
-                                then:
-                                  - homeassistant.service:
-                                      service: cover.stop_cover
-                                      data:
-                                        entity_id: cover.solar_panel_awning
-                              widgets:
-                                - label:
-                                    text_font: mdi_40
-                                    text_color: 0xFFFFFF
-                                    text: "\U000F04DB"
-                                    align: CENTER
-                          - button:
-                              width: 50
-                              height: 50
-                              bg_color: 0xD32F2F
-                              radius: 8
-                              on_press:
-                                then:
-                                  - homeassistant.service:
-                                      service: cover.close_cover
-                                      data:
-                                        entity_id: cover.solar_panel_awning
-                              widgets:
-                                - label:
-                                    text_font: mdi_40
-                                    text_color: 0xFFFFFF
-                                    text: "\U000F0140"
-                                    align: CENTER
+                        text_color: 0xFFFFFF
+                        x: 200
+                        y: 303
 
-              # ── Main Awning ──
+              # ── Awning Controls Section (right) ──
               - obj:
-                  width: 170
-                  height: SIZE_CONTENT
+                  width: 760
+                  height: 480
+                  x: 1060
+                  y: 0
                   bg_opa: TRANSP
                   border_width: 0
-                  pad_all: 0
-                  layout:
-                    type: FLEX
-                    flex_flow: COLUMN
-                    flex_align_cross: CENTER
-                    pad_row: 10
+                  scrollbar_mode: "OFF"
                   widgets:
+                    # ── Solar Panel Awning ──
                     - label:
-                        text_font: mdi_40
-                        text_color: 0xCCCCCC
-                        text: "\U000F11B3"
-                    - obj:
-                        width: 170
-                        height: SIZE_CONTENT
-                        bg_opa: TRANSP
-                        border_width: 0
-                        pad_all: 0
-                        layout:
-                          type: FLEX
-                          flex_flow: ROW
-                          flex_align_main: SPACE_EVENLY
-                          flex_align_cross: CENTER
+                        text: "Solar Panel"
+                        text_font: roboto_20
+                        text_color: 0x808080
+                        x: 40
+                        y: 30
+                    - button:
+                        width: 100
+                        height: 60
+                        x: 40
+                        y: 65
+                        bg_color: 0x2D2D44
+                        radius: 10
+                        on_press:
+                          then:
+                            - homeassistant.service:
+                                service: cover.open_cover
+                                data:
+                                  entity_id: cover.solar_panel_awning
                         widgets:
-                          - button:
-                              width: 50
-                              height: 50
-                              bg_color: 0x388E3C
-                              radius: 8
-                              on_press:
-                                then:
-                                  - homeassistant.service:
-                                      service: cover.open_cover
-                                      data:
-                                        entity_id: cover.main_awning
-                              widgets:
-                                - label:
-                                    text_font: mdi_40
-                                    text_color: 0xFFFFFF
-                                    text: "\U000F0143"
-                                    align: CENTER
-                          - button:
-                              width: 50
-                              height: 50
-                              bg_color: 0xF57C00
-                              radius: 8
-                              on_press:
-                                then:
-                                  - homeassistant.service:
-                                      service: cover.stop_cover
-                                      data:
-                                        entity_id: cover.main_awning
-                              widgets:
-                                - label:
-                                    text_font: mdi_40
-                                    text_color: 0xFFFFFF
-                                    text: "\U000F04DB"
-                                    align: CENTER
-                          - button:
-                              width: 50
-                              height: 50
-                              bg_color: 0xD32F2F
-                              radius: 8
-                              on_press:
-                                then:
-                                  - homeassistant.service:
-                                      service: cover.close_cover
-                                      data:
-                                        entity_id: cover.main_awning
-                              widgets:
-                                - label:
-                                    text_font: mdi_40
-                                    text_color: 0xFFFFFF
-                                    text: "\U000F0140"
-                                    align: CENTER
+                          - label:
+                              text_font: mdi_40
+                              text_color: 0x66BB6A
+                              text: "\U000F0143"
+                              align: CENTER
+                    - button:
+                        width: 100
+                        height: 60
+                        x: 160
+                        y: 65
+                        bg_color: 0x2D2D44
+                        radius: 10
+                        on_press:
+                          then:
+                            - homeassistant.service:
+                                service: cover.stop_cover
+                                data:
+                                  entity_id: cover.solar_panel_awning
+                        widgets:
+                          - label:
+                              text_font: mdi_40
+                              text_color: 0xFFA726
+                              text: "\U000F04DB"
+                              align: CENTER
+                    - button:
+                        width: 100
+                        height: 60
+                        x: 280
+                        y: 65
+                        bg_color: 0x2D2D44
+                        radius: 10
+                        on_press:
+                          then:
+                            - homeassistant.service:
+                                service: cover.close_cover
+                                data:
+                                  entity_id: cover.solar_panel_awning
+                        widgets:
+                          - label:
+                              text_font: mdi_40
+                              text_color: 0xEF5350
+                              text: "\U000F0140"
+                              align: CENTER
 
-        # ── Lights Panel (right ~1020px) ──
+                    # ── Main Awning ──
+                    - label:
+                        text: "Main Awning"
+                        text_font: roboto_20
+                        text_color: 0x808080
+                        x: 40
+                        y: 180
+                    - button:
+                        width: 100
+                        height: 60
+                        x: 40
+                        y: 215
+                        bg_color: 0x2D2D44
+                        radius: 10
+                        on_press:
+                          then:
+                            - homeassistant.service:
+                                service: cover.open_cover
+                                data:
+                                  entity_id: cover.awning
+                        widgets:
+                          - label:
+                              text_font: mdi_40
+                              text_color: 0x66BB6A
+                              text: "\U000F0143"
+                              align: CENTER
+                    - button:
+                        width: 100
+                        height: 60
+                        x: 160
+                        y: 215
+                        bg_color: 0x2D2D44
+                        radius: 10
+                        on_press:
+                          then:
+                            - homeassistant.service:
+                                service: cover.stop_cover
+                                data:
+                                  entity_id: cover.awning
+                        widgets:
+                          - label:
+                              text_font: mdi_40
+                              text_color: 0xFFA726
+                              text: "\U000F04DB"
+                              align: CENTER
+                    - button:
+                        width: 100
+                        height: 60
+                        x: 280
+                        y: 215
+                        bg_color: 0x2D2D44
+                        radius: 10
+                        on_press:
+                          then:
+                            - homeassistant.service:
+                                service: cover.close_cover
+                                data:
+                                  entity_id: cover.awning
+                        widgets:
+                          - label:
+                              text_font: mdi_40
+                              text_color: 0xEF5350
+                              text: "\U000F0140"
+                              align: CENTER
+
+        # ═══════════════════════════════════════════════════
+        # WEATHER TAB CONTENT
+        # ═══════════════════════════════════════════════════
         - obj:
-            width: 1020
+            id: content_weather
+            hidden: true
+            width: 1840
             height: 480
-            x: 900
+            x: 80
             y: 0
             bg_color: 0x1A1A2E
             bg_opa: COVER
             border_width: 0
-            pad_top: 15
-            pad_bottom: 15
-            pad_left: 10
-            pad_right: 10
+            scrollbar_mode: "OFF"
+            pad_all: 0
+            widgets:
+              # ── Current Conditions (left 500px) ──
+              - obj:
+                  width: 500
+                  height: 480
+                  x: 0
+                  y: 0
+                  bg_opa: TRANSP
+                  border_width: 0
+                  scrollbar_mode: "OFF"
+                  widgets:
+                    - label:
+                        text: "Current Weather"
+                        text_font: roboto_20
+                        text_color: 0x808080
+                        x: 30
+                        y: 15
+                    - label:
+                        id: lbl_weather_icon_lg
+                        text_font: mdi_weather_160
+                        text_color: 0xFFD700
+                        text: "\U000F0599"
+                        x: 40
+                        y: 60
+                    - label:
+                        id: lbl_weather_temp_lg
+                        text: "--°"
+                        text_font: roboto_32
+                        text_color: 0xFFFFFF
+                        x: 230
+                        y: 110
+                    - label:
+                        id: lbl_weather_cond_lg
+                        text: "--"
+                        text_font: roboto_20
+                        text_color: 0xB0B0B0
+                        x: 230
+                        y: 150
+                    # Sunrise / Sunset
+                    - label:
+                        text_font: mdi_40
+                        text_color: 0xFFA500
+                        text: "\U000F059C"
+                        x: 30
+                        y: 280
+                    - label:
+                        id: lbl_sunrise_wx
+                        text: "--:--"
+                        text_font: roboto_20
+                        text_color: 0xB0B0B0
+                        x: 80
+                        y: 290
+                    - label:
+                        text_font: mdi_40
+                        text_color: 0xFF6347
+                        text: "\U000F059B"
+                        x: 200
+                        y: 280
+                    - label:
+                        id: lbl_sunset_wx
+                        text: "--:--"
+                        text_font: roboto_20
+                        text_color: 0xB0B0B0
+                        x: 250
+                        y: 290
+                    # Interior climate
+                    - label:
+                        text_font: mdi_40
+                        text_color: 0xFF6347
+                        text: "\U000F050F"
+                        x: 30
+                        y: 360
+                    - label:
+                        id: lbl_interior_temp_wx
+                        text: "--°F"
+                        text_font: roboto_20
+                        text_color: 0xFFFFFF
+                        x: 80
+                        y: 370
+                    - label:
+                        text_font: mdi_40
+                        text_color: 0x4FC3F7
+                        text: "\U000F058E"
+                        x: 180
+                        y: 360
+                    - label:
+                        id: lbl_interior_hum_wx
+                        text: "--%"
+                        text_font: roboto_20
+                        text_color: 0xFFFFFF
+                        x: 230
+                        y: 370
+                    - label:
+                        text_font: mdi_40
+                        text_color: 0x81D4FA
+                        text: "\U000F0290"
+                        x: 330
+                        y: 360
+                    - label:
+                        id: lbl_fridge_temp_wx
+                        text: "--°F"
+                        text_font: roboto_20
+                        text_color: 0xFFFFFF
+                        x: 380
+                        y: 370
+
+              # ── Vertical Divider ──
+              - obj:
+                  width: 2
+                  height: 440
+                  x: 510
+                  y: 20
+                  bg_color: 0x3A3A5C
+                  bg_opa: COVER
+                  border_width: 0
+
+              # ── 7-Day Forecast (right 1320px) ──
+              # Requires HA template sensors - see comments in sensor section
+              - obj:
+                  width: 1320
+                  height: 480
+                  x: 520
+                  y: 0
+                  bg_opa: TRANSP
+                  border_width: 0
+                  scrollbar_mode: "OFF"
+                  pad_column: 4
+                  pad_top: 15
+                  pad_bottom: 15
+                  pad_left: 10
+                  pad_right: 10
+                  layout:
+                    type: FLEX
+                    flex_flow: ROW
+                    flex_align_main: SPACE_EVENLY
+                    flex_align_cross: CENTER
+                  widgets:
+                    # Day 1
+                    - obj:
+                        width: 170
+                        height: 440
+                        bg_color: 0x2D2D44
+                        bg_opa: COVER
+                        radius: 16
+                        border_width: 0
+                        scrollbar_mode: "OFF"
+                        widgets:
+                          - label:
+                              id: lbl_fc_day1_name
+                              text: "Mon"
+                              text_font: roboto_20
+                              text_color: 0xB0B0B0
+                              align: TOP_MID
+                              y: 15
+                          - label:
+                              id: lbl_fc_day1_icon
+                              text_font: mdi_40
+                              text_color: 0xFFD700
+                              text: "\U000F0599"
+                              align: TOP_MID
+                              y: 55
+                          - label:
+                              id: lbl_fc_day1_high
+                              text: "--°"
+                              text_font: roboto_32
+                              text_color: 0xFFFFFF
+                              align: TOP_MID
+                              y: 120
+                          - label:
+                              id: lbl_fc_day1_low
+                              text: "--°"
+                              text_font: roboto_20
+                              text_color: 0x808080
+                              align: TOP_MID
+                              y: 165
+
+                    # Day 2
+                    - obj:
+                        width: 170
+                        height: 440
+                        bg_color: 0x2D2D44
+                        bg_opa: COVER
+                        radius: 16
+                        border_width: 0
+                        scrollbar_mode: "OFF"
+                        widgets:
+                          - label:
+                              id: lbl_fc_day2_name
+                              text: "Tue"
+                              text_font: roboto_20
+                              text_color: 0xB0B0B0
+                              align: TOP_MID
+                              y: 15
+                          - label:
+                              id: lbl_fc_day2_icon
+                              text_font: mdi_40
+                              text_color: 0xFFD700
+                              text: "\U000F0599"
+                              align: TOP_MID
+                              y: 55
+                          - label:
+                              id: lbl_fc_day2_high
+                              text: "--°"
+                              text_font: roboto_32
+                              text_color: 0xFFFFFF
+                              align: TOP_MID
+                              y: 120
+                          - label:
+                              id: lbl_fc_day2_low
+                              text: "--°"
+                              text_font: roboto_20
+                              text_color: 0x808080
+                              align: TOP_MID
+                              y: 165
+
+                    # Day 3
+                    - obj:
+                        width: 170
+                        height: 440
+                        bg_color: 0x2D2D44
+                        bg_opa: COVER
+                        radius: 16
+                        border_width: 0
+                        scrollbar_mode: "OFF"
+                        widgets:
+                          - label:
+                              id: lbl_fc_day3_name
+                              text: "Wed"
+                              text_font: roboto_20
+                              text_color: 0xB0B0B0
+                              align: TOP_MID
+                              y: 15
+                          - label:
+                              id: lbl_fc_day3_icon
+                              text_font: mdi_40
+                              text_color: 0xFFD700
+                              text: "\U000F0599"
+                              align: TOP_MID
+                              y: 55
+                          - label:
+                              id: lbl_fc_day3_high
+                              text: "--°"
+                              text_font: roboto_32
+                              text_color: 0xFFFFFF
+                              align: TOP_MID
+                              y: 120
+                          - label:
+                              id: lbl_fc_day3_low
+                              text: "--°"
+                              text_font: roboto_20
+                              text_color: 0x808080
+                              align: TOP_MID
+                              y: 165
+
+                    # Day 4
+                    - obj:
+                        width: 170
+                        height: 440
+                        bg_color: 0x2D2D44
+                        bg_opa: COVER
+                        radius: 16
+                        border_width: 0
+                        scrollbar_mode: "OFF"
+                        widgets:
+                          - label:
+                              id: lbl_fc_day4_name
+                              text: "Thu"
+                              text_font: roboto_20
+                              text_color: 0xB0B0B0
+                              align: TOP_MID
+                              y: 15
+                          - label:
+                              id: lbl_fc_day4_icon
+                              text_font: mdi_40
+                              text_color: 0xFFD700
+                              text: "\U000F0599"
+                              align: TOP_MID
+                              y: 55
+                          - label:
+                              id: lbl_fc_day4_high
+                              text: "--°"
+                              text_font: roboto_32
+                              text_color: 0xFFFFFF
+                              align: TOP_MID
+                              y: 120
+                          - label:
+                              id: lbl_fc_day4_low
+                              text: "--°"
+                              text_font: roboto_20
+                              text_color: 0x808080
+                              align: TOP_MID
+                              y: 165
+
+                    # Day 5
+                    - obj:
+                        width: 170
+                        height: 440
+                        bg_color: 0x2D2D44
+                        bg_opa: COVER
+                        radius: 16
+                        border_width: 0
+                        scrollbar_mode: "OFF"
+                        widgets:
+                          - label:
+                              id: lbl_fc_day5_name
+                              text: "Fri"
+                              text_font: roboto_20
+                              text_color: 0xB0B0B0
+                              align: TOP_MID
+                              y: 15
+                          - label:
+                              id: lbl_fc_day5_icon
+                              text_font: mdi_40
+                              text_color: 0xFFD700
+                              text: "\U000F0599"
+                              align: TOP_MID
+                              y: 55
+                          - label:
+                              id: lbl_fc_day5_high
+                              text: "--°"
+                              text_font: roboto_32
+                              text_color: 0xFFFFFF
+                              align: TOP_MID
+                              y: 120
+                          - label:
+                              id: lbl_fc_day5_low
+                              text: "--°"
+                              text_font: roboto_20
+                              text_color: 0x808080
+                              align: TOP_MID
+                              y: 165
+
+                    # Day 6
+                    - obj:
+                        width: 170
+                        height: 440
+                        bg_color: 0x2D2D44
+                        bg_opa: COVER
+                        radius: 16
+                        border_width: 0
+                        scrollbar_mode: "OFF"
+                        widgets:
+                          - label:
+                              id: lbl_fc_day6_name
+                              text: "Sat"
+                              text_font: roboto_20
+                              text_color: 0xB0B0B0
+                              align: TOP_MID
+                              y: 15
+                          - label:
+                              id: lbl_fc_day6_icon
+                              text_font: mdi_40
+                              text_color: 0xFFD700
+                              text: "\U000F0599"
+                              align: TOP_MID
+                              y: 55
+                          - label:
+                              id: lbl_fc_day6_high
+                              text: "--°"
+                              text_font: roboto_32
+                              text_color: 0xFFFFFF
+                              align: TOP_MID
+                              y: 120
+                          - label:
+                              id: lbl_fc_day6_low
+                              text: "--°"
+                              text_font: roboto_20
+                              text_color: 0x808080
+                              align: TOP_MID
+                              y: 165
+
+                    # Day 7
+                    - obj:
+                        width: 170
+                        height: 440
+                        bg_color: 0x2D2D44
+                        bg_opa: COVER
+                        radius: 16
+                        border_width: 0
+                        scrollbar_mode: "OFF"
+                        widgets:
+                          - label:
+                              id: lbl_fc_day7_name
+                              text: "Sun"
+                              text_font: roboto_20
+                              text_color: 0xB0B0B0
+                              align: TOP_MID
+                              y: 15
+                          - label:
+                              id: lbl_fc_day7_icon
+                              text_font: mdi_40
+                              text_color: 0xFFD700
+                              text: "\U000F0599"
+                              align: TOP_MID
+                              y: 55
+                          - label:
+                              id: lbl_fc_day7_high
+                              text: "--°"
+                              text_font: roboto_32
+                              text_color: 0xFFFFFF
+                              align: TOP_MID
+                              y: 120
+                          - label:
+                              id: lbl_fc_day7_low
+                              text: "--°"
+                              text_font: roboto_20
+                              text_color: 0x808080
+                              align: TOP_MID
+                              y: 165
+
+        # ═══════════════════════════════════════════════════
+        # LIGHTS TAB CONTENT
+        # ═══════════════════════════════════════════════════
+        - obj:
+            id: content_lights
+            hidden: true
+            width: 1840
+            height: 480
+            x: 80
+            y: 0
+            bg_color: 0x1A1A2E
+            bg_opa: COVER
+            border_width: 0
+            scrollbar_mode: "OFF"
+            pad_left: 20
+            pad_right: 20
+            pad_top: 10
+            pad_bottom: 10
             layout:
               type: FLEX
               flex_flow: ROW
               flex_align_main: SPACE_EVENLY
               flex_align_cross: CENTER
             widgets:
-              # -- Main Cans --
+              # ── Main Cans ──
               - obj:
-                  width: 120
-                  height: 440
+                  width: 200
+                  height: 450
                   bg_opa: TRANSP
                   border_width: 0
-                  pad_all: 0
-                  layout:
-                    type: FLEX
-                    flex_flow: COLUMN
-                    flex_align_main: CENTER
-                    flex_align_cross: CENTER
-                    pad_row: 6
+                  scrollbar_mode: "OFF"
                   widgets:
+                    - button:
+                        width: 60
+                        height: 60
+                        align: TOP_MID
+                        bg_color: 0x2D2D44
+                        radius: 30
+                        on_press:
+                          then:
+                            - homeassistant.service:
+                                service: light.toggle
+                                data:
+                                  entity_id: light.main_cans
+                        widgets:
+                          - label:
+                              text_font: mdi_40
+                              text_color: 0xFFD700
+                              text: "\U000F0335"
+                              align: CENTER
                     - slider:
                         id: sld_main_cans
-                        width: 50
-                        height: 290
+                        width: 30
+                        height: 280
+                        align: CENTER
+                        y: 15
+                        bg_color: 0x2D2D44
+                        indicator:
+                          bg_color: 0xFFD700
+                        knob:
+                          bg_color: 0xFFFFFF
+                          radius: 14
+                          width: 28
+                          height: 28
                         min_value: 0
                         max_value: 255
                         value: 0
-                        bg_color: 0x333333
-                        border_width: 0
-                        radius: 8
-                        indicator:
-                          bg_color: 0xFFAB40
-                          radius: 8
-                        knob:
-                          bg_opa: TRANSP
-                          width: 0
-                          height: 0
-                        on_value:
+                        mode:
+                          vertical: true
+                        on_release:
                           then:
-                            - lambda: 'id(pending_bright_main_cans) = (int)x;'
                             - script.execute: debounce_main_cans
                     - label:
-                        text_font: roboto_32
-                        text_color: 0xCCCCCC
-                        text: "Main"
+                        text: "Main Cans"
+                        text_font: roboto_20
+                        text_color: 0xB0B0B0
+                        align: BOTTOM_MID
+                        y: -5
+
+              # ── Bed Cans ──
+              - obj:
+                  width: 200
+                  height: 450
+                  bg_opa: TRANSP
+                  border_width: 0
+                  scrollbar_mode: "OFF"
+                  widgets:
                     - button:
-                        width: 50
-                        height: 50
-                        bg_color: 0x333333
-                        radius: 25
+                        width: 60
+                        height: 60
+                        align: TOP_MID
+                        bg_color: 0x2D2D44
+                        radius: 30
                         on_press:
                           then:
                             - homeassistant.service:
                                 service: light.toggle
                                 data:
-                                  entity_id: light.light_controller_main_can_lights
+                                  entity_id: light.bed_cans
                         widgets:
                           - label:
                               text_font: mdi_40
-                              text_color: 0xFFAB40
-                              text: "\U000F0425"
+                              text_color: 0xFFD700
+                              text: "\U000F0335"
                               align: CENTER
-
-              # -- Bed Cans --
-              - obj:
-                  width: 120
-                  height: 440
-                  bg_opa: TRANSP
-                  border_width: 0
-                  pad_all: 0
-                  layout:
-                    type: FLEX
-                    flex_flow: COLUMN
-                    flex_align_main: CENTER
-                    flex_align_cross: CENTER
-                    pad_row: 6
-                  widgets:
                     - slider:
                         id: sld_bed_cans
-                        width: 50
-                        height: 290
+                        width: 30
+                        height: 280
+                        align: CENTER
+                        y: 15
+                        bg_color: 0x2D2D44
+                        indicator:
+                          bg_color: 0xFFD700
+                        knob:
+                          bg_color: 0xFFFFFF
+                          radius: 14
+                          width: 28
+                          height: 28
                         min_value: 0
                         max_value: 255
                         value: 0
-                        bg_color: 0x333333
-                        border_width: 0
-                        radius: 8
-                        indicator:
-                          bg_color: 0xFFAB40
-                          radius: 8
-                        knob:
-                          bg_opa: TRANSP
-                          width: 0
-                          height: 0
-                        on_value:
+                        mode:
+                          vertical: true
+                        on_release:
                           then:
-                            - lambda: 'id(pending_bright_bed_cans) = (int)x;'
                             - script.execute: debounce_bed_cans
                     - label:
-                        text_font: roboto_32
-                        text_color: 0xCCCCCC
-                        text: "Bed"
+                        text: "Bed Cans"
+                        text_font: roboto_20
+                        text_color: 0xB0B0B0
+                        align: BOTTOM_MID
+                        y: -5
+
+              # ── Door ──
+              - obj:
+                  width: 200
+                  height: 450
+                  bg_opa: TRANSP
+                  border_width: 0
+                  scrollbar_mode: "OFF"
+                  widgets:
                     - button:
-                        width: 50
-                        height: 50
-                        bg_color: 0x333333
-                        radius: 25
+                        width: 60
+                        height: 60
+                        align: TOP_MID
+                        bg_color: 0x2D2D44
+                        radius: 30
                         on_press:
                           then:
                             - homeassistant.service:
                                 service: light.toggle
                                 data:
-                                  entity_id: light.light_controller_bed_can_lights
+                                  entity_id: light.door
                         widgets:
                           - label:
                               text_font: mdi_40
-                              text_color: 0xFFAB40
-                              text: "\U000F0425"
+                              text_color: 0xFFD700
+                              text: "\U000F0335"
                               align: CENTER
-
-              # -- Door --
-              - obj:
-                  width: 120
-                  height: 440
-                  bg_opa: TRANSP
-                  border_width: 0
-                  pad_all: 0
-                  layout:
-                    type: FLEX
-                    flex_flow: COLUMN
-                    flex_align_main: CENTER
-                    flex_align_cross: CENTER
-                    pad_row: 6
-                  widgets:
                     - slider:
                         id: sld_door
-                        width: 50
-                        height: 290
+                        width: 30
+                        height: 280
+                        align: CENTER
+                        y: 15
+                        bg_color: 0x2D2D44
+                        indicator:
+                          bg_color: 0xFFD700
+                        knob:
+                          bg_color: 0xFFFFFF
+                          radius: 14
+                          width: 28
+                          height: 28
                         min_value: 0
                         max_value: 255
                         value: 0
-                        bg_color: 0x333333
-                        border_width: 0
-                        radius: 8
-                        indicator:
-                          bg_color: 0xFFAB40
-                          radius: 8
-                        knob:
-                          bg_opa: TRANSP
-                          width: 0
-                          height: 0
-                        on_value:
+                        mode:
+                          vertical: true
+                        on_release:
                           then:
-                            - lambda: 'id(pending_bright_door) = (int)x;'
                             - script.execute: debounce_door
                     - label:
-                        text_font: roboto_32
-                        text_color: 0xCCCCCC
                         text: "Door"
+                        text_font: roboto_20
+                        text_color: 0xB0B0B0
+                        align: BOTTOM_MID
+                        y: -5
+
+              # ── Dog Crate ──
+              - obj:
+                  width: 200
+                  height: 450
+                  bg_opa: TRANSP
+                  border_width: 0
+                  scrollbar_mode: "OFF"
+                  widgets:
                     - button:
-                        width: 50
-                        height: 50
-                        bg_color: 0x333333
-                        radius: 25
+                        width: 60
+                        height: 60
+                        align: TOP_MID
+                        bg_color: 0x2D2D44
+                        radius: 30
                         on_press:
                           then:
                             - homeassistant.service:
                                 service: light.toggle
                                 data:
-                                  entity_id: light.light_controller_door_light
+                                  entity_id: light.dog_crate
                         widgets:
                           - label:
                               text_font: mdi_40
-                              text_color: 0xFFAB40
-                              text: "\U000F0425"
+                              text_color: 0xFFD700
+                              text: "\U000F0335"
                               align: CENTER
-
-              # -- Dog Crate --
-              - obj:
-                  width: 120
-                  height: 440
-                  bg_opa: TRANSP
-                  border_width: 0
-                  pad_all: 0
-                  layout:
-                    type: FLEX
-                    flex_flow: COLUMN
-                    flex_align_main: CENTER
-                    flex_align_cross: CENTER
-                    pad_row: 6
-                  widgets:
                     - slider:
                         id: sld_dog_crate
-                        width: 50
-                        height: 290
+                        width: 30
+                        height: 280
+                        align: CENTER
+                        y: 15
+                        bg_color: 0x2D2D44
+                        indicator:
+                          bg_color: 0xFFD700
+                        knob:
+                          bg_color: 0xFFFFFF
+                          radius: 14
+                          width: 28
+                          height: 28
                         min_value: 0
                         max_value: 255
                         value: 0
-                        bg_color: 0x333333
-                        border_width: 0
-                        radius: 8
-                        indicator:
-                          bg_color: 0xFFAB40
-                          radius: 8
-                        knob:
-                          bg_opa: TRANSP
-                          width: 0
-                          height: 0
-                        on_value:
+                        mode:
+                          vertical: true
+                        on_release:
                           then:
-                            - lambda: 'id(pending_bright_dog_crate) = (int)x;'
                             - script.execute: debounce_dog_crate
                     - label:
-                        text_font: roboto_32
-                        text_color: 0xCCCCCC
-                        text: "Crate"
+                        text: "Dog Crate"
+                        text_font: roboto_20
+                        text_color: 0xB0B0B0
+                        align: BOTTOM_MID
+                        y: -5
+
+              # ── Bed Capsule ──
+              - obj:
+                  width: 200
+                  height: 450
+                  bg_opa: TRANSP
+                  border_width: 0
+                  scrollbar_mode: "OFF"
+                  widgets:
                     - button:
-                        width: 50
-                        height: 50
-                        bg_color: 0x333333
-                        radius: 25
+                        width: 60
+                        height: 60
+                        align: TOP_MID
+                        bg_color: 0x2D2D44
+                        radius: 30
                         on_press:
                           then:
                             - homeassistant.service:
                                 service: light.toggle
                                 data:
-                                  entity_id: light.light_controller_dog_crate_lights
+                                  entity_id: light.bed_capsule
                         widgets:
                           - label:
                               text_font: mdi_40
-                              text_color: 0xFFAB40
-                              text: "\U000F0425"
+                              text_color: 0xFFD700
+                              text: "\U000F0335"
                               align: CENTER
-
-              # -- Bed Capsule --
-              - obj:
-                  width: 120
-                  height: 440
-                  bg_opa: TRANSP
-                  border_width: 0
-                  pad_all: 0
-                  layout:
-                    type: FLEX
-                    flex_flow: COLUMN
-                    flex_align_main: CENTER
-                    flex_align_cross: CENTER
-                    pad_row: 6
-                  widgets:
                     - slider:
                         id: sld_bed_capsule
-                        width: 50
-                        height: 290
+                        width: 30
+                        height: 280
+                        align: CENTER
+                        y: 15
+                        bg_color: 0x2D2D44
+                        indicator:
+                          bg_color: 0xFFD700
+                        knob:
+                          bg_color: 0xFFFFFF
+                          radius: 14
+                          width: 28
+                          height: 28
                         min_value: 0
                         max_value: 255
                         value: 0
-                        bg_color: 0x333333
-                        border_width: 0
-                        radius: 8
-                        indicator:
-                          bg_color: 0xFFAB40
-                          radius: 8
-                        knob:
-                          bg_opa: TRANSP
-                          width: 0
-                          height: 0
-                        on_value:
+                        mode:
+                          vertical: true
+                        on_release:
                           then:
-                            - lambda: 'id(pending_bright_bed_capsule) = (int)x;'
                             - script.execute: debounce_bed_capsule
                     - label:
-                        text_font: roboto_32
-                        text_color: 0xCCCCCC
-                        text: "Capsule"
+                        text: "Bed Capsule"
+                        text_font: roboto_20
+                        text_color: 0xB0B0B0
+                        align: BOTTOM_MID
+                        y: -5
+
+              # ── Awning Out ──
+              - obj:
+                  width: 200
+                  height: 450
+                  bg_opa: TRANSP
+                  border_width: 0
+                  scrollbar_mode: "OFF"
+                  widgets:
                     - button:
-                        width: 50
-                        height: 50
-                        bg_color: 0x333333
-                        radius: 25
+                        width: 60
+                        height: 60
+                        align: TOP_MID
+                        bg_color: 0x2D2D44
+                        radius: 30
                         on_press:
                           then:
                             - homeassistant.service:
                                 service: light.toggle
                                 data:
-                                  entity_id: light.light_controller_bed_capsule_lights
+                                  entity_id: light.awning_out
                         widgets:
                           - label:
                               text_font: mdi_40
-                              text_color: 0xFFAB40
-                              text: "\U000F0425"
+                              text_color: 0xFFD700
+                              text: "\U000F0335"
                               align: CENTER
-
-              # -- Awning Outside --
-              - obj:
-                  width: 120
-                  height: 440
-                  bg_opa: TRANSP
-                  border_width: 0
-                  pad_all: 0
-                  layout:
-                    type: FLEX
-                    flex_flow: COLUMN
-                    flex_align_main: CENTER
-                    flex_align_cross: CENTER
-                    pad_row: 6
-                  widgets:
                     - slider:
                         id: sld_awning_out
-                        width: 50
-                        height: 290
+                        width: 30
+                        height: 280
+                        align: CENTER
+                        y: 15
+                        bg_color: 0x2D2D44
+                        indicator:
+                          bg_color: 0xFFD700
+                        knob:
+                          bg_color: 0xFFFFFF
+                          radius: 14
+                          width: 28
+                          height: 28
                         min_value: 0
                         max_value: 255
                         value: 0
-                        bg_color: 0x333333
-                        border_width: 0
-                        radius: 8
-                        indicator:
-                          bg_color: 0xFFAB40
-                          radius: 8
-                        knob:
-                          bg_opa: TRANSP
-                          width: 0
-                          height: 0
-                        on_value:
+                        mode:
+                          vertical: true
+                        on_release:
                           then:
-                            - lambda: 'id(pending_bright_awning_out) = (int)x;'
                             - script.execute: debounce_awning_out
                     - label:
-                        text_font: roboto_32
-                        text_color: 0xCCCCCC
-                        text: "Awn Out"
+                        text: "Awning Out"
+                        text_font: roboto_20
+                        text_color: 0xB0B0B0
+                        align: BOTTOM_MID
+                        y: -5
+
+              # ── Awning In ──
+              - obj:
+                  width: 200
+                  height: 450
+                  bg_opa: TRANSP
+                  border_width: 0
+                  scrollbar_mode: "OFF"
+                  widgets:
                     - button:
-                        width: 50
-                        height: 50
-                        bg_color: 0x333333
-                        radius: 25
+                        width: 60
+                        height: 60
+                        align: TOP_MID
+                        bg_color: 0x2D2D44
+                        radius: 30
                         on_press:
                           then:
                             - homeassistant.service:
                                 service: light.toggle
                                 data:
-                                  entity_id: light.light_controller_awning_outside_light_strip
+                                  entity_id: light.awning_in
                         widgets:
                           - label:
                               text_font: mdi_40
-                              text_color: 0xFFAB40
-                              text: "\U000F0425"
+                              text_color: 0xFFD700
+                              text: "\U000F0335"
                               align: CENTER
-
-              # -- Awning Inside --
-              - obj:
-                  width: 120
-                  height: 440
-                  bg_opa: TRANSP
-                  border_width: 0
-                  pad_all: 0
-                  layout:
-                    type: FLEX
-                    flex_flow: COLUMN
-                    flex_align_main: CENTER
-                    flex_align_cross: CENTER
-                    pad_row: 6
-                  widgets:
                     - slider:
                         id: sld_awning_in
-                        width: 50
-                        height: 290
+                        width: 30
+                        height: 280
+                        align: CENTER
+                        y: 15
+                        bg_color: 0x2D2D44
+                        indicator:
+                          bg_color: 0xFFD700
+                        knob:
+                          bg_color: 0xFFFFFF
+                          radius: 14
+                          width: 28
+                          height: 28
                         min_value: 0
                         max_value: 255
                         value: 0
-                        bg_color: 0x333333
-                        border_width: 0
-                        radius: 8
-                        indicator:
-                          bg_color: 0xFFAB40
-                          radius: 8
-                        knob:
-                          bg_opa: TRANSP
-                          width: 0
-                          height: 0
-                        on_value:
+                        mode:
+                          vertical: true
+                        on_release:
                           then:
-                            - lambda: 'id(pending_bright_awning_in) = (int)x;'
                             - script.execute: debounce_awning_in
                     - label:
-                        text_font: roboto_32
-                        text_color: 0xCCCCCC
-                        text: "Awn In"
+                        text: "Awning In"
+                        text_font: roboto_20
+                        text_color: 0xB0B0B0
+                        align: BOTTOM_MID
+                        y: -5
+
+              # ── Exterior Floods ──
+              - obj:
+                  width: 200
+                  height: 450
+                  bg_opa: TRANSP
+                  border_width: 0
+                  scrollbar_mode: "OFF"
+                  widgets:
                     - button:
-                        width: 50
-                        height: 50
-                        bg_color: 0x333333
-                        radius: 25
+                        width: 60
+                        height: 60
+                        align: TOP_MID
+                        bg_color: 0x2D2D44
+                        radius: 30
                         on_press:
                           then:
                             - homeassistant.service:
                                 service: light.toggle
                                 data:
-                                  entity_id: light.light_controller_awning_inside_light_strip
+                                  entity_id: light.exterior_floods
                         widgets:
                           - label:
                               text_font: mdi_40
-                              text_color: 0xFFAB40
-                              text: "\U000F0425"
+                              text_color: 0xFFD700
+                              text: "\U000F0335"
                               align: CENTER
-
-              # -- Exterior (all 5 floods) --
-              - obj:
-                  width: 120
-                  height: 440
-                  bg_opa: TRANSP
-                  border_width: 0
-                  pad_all: 0
-                  layout:
-                    type: FLEX
-                    flex_flow: COLUMN
-                    flex_align_main: CENTER
-                    flex_align_cross: CENTER
-                    pad_row: 6
-                  widgets:
                     - slider:
                         id: sld_exterior
-                        width: 50
-                        height: 290
+                        width: 30
+                        height: 280
+                        align: CENTER
+                        y: 15
+                        bg_color: 0x2D2D44
+                        indicator:
+                          bg_color: 0xFFD700
+                        knob:
+                          bg_color: 0xFFFFFF
+                          radius: 14
+                          width: 28
+                          height: 28
                         min_value: 0
                         max_value: 255
                         value: 0
-                        bg_color: 0x333333
-                        border_width: 0
-                        radius: 8
-                        indicator:
-                          bg_color: 0xFFAB40
-                          radius: 8
-                        knob:
-                          bg_opa: TRANSP
-                          width: 0
-                          height: 0
-                        on_value:
+                        mode:
+                          vertical: true
+                        on_release:
                           then:
-                            - lambda: 'id(pending_bright_exterior) = (int)x;'
                             - script.execute: debounce_exterior
                     - label:
+                        text: "Ext Floods"
+                        text_font: roboto_20
+                        text_color: 0xB0B0B0
+                        align: BOTTOM_MID
+                        y: -5
+
+        # ═══════════════════════════════════════════════════
+        # POWER TAB CONTENT
+        # ═══════════════════════════════════════════════════
+        - obj:
+            id: content_power
+            hidden: true
+            width: 1840
+            height: 480
+            x: 80
+            y: 0
+            bg_color: 0x1A1A2E
+            bg_opa: COVER
+            border_width: 0
+            scrollbar_mode: "OFF"
+            pad_all: 0
+            widgets:
+              # ── Battery Status (left) ──
+              - obj:
+                  width: 800
+                  height: 480
+                  x: 0
+                  y: 0
+                  bg_opa: TRANSP
+                  border_width: 0
+                  scrollbar_mode: "OFF"
+                  widgets:
+                    - label:
+                        text: "Battery Status"
                         text_font: roboto_32
-                        text_color: 0xCCCCCC
-                        text: "Flood"
+                        text_color: 0xFFFFFF
+                        x: 40
+                        y: 30
+                    - label:
+                        text_font: mdi_40
+                        text_color: 0x66BB6A
+                        text: "\U000F0079"
+                        x: 40
+                        y: 90
+                    - label:
+                        id: lbl_battery_time_pwr
+                        text: "-- remaining"
+                        text_font: roboto_32
+                        text_color: 0xFFFFFF
+                        x: 100
+                        y: 95
+                    - bar:
+                        id: bar_battery_pwr
+                        width: 700
+                        height: 40
+                        x: 40
+                        y: 160
+                        bg_color: 0x2D2D44
+                        indicator:
+                          bg_color: 0x66BB6A
+                        min_value: 0
+                        max_value: 100
+                        value: 0
+
+              # ── Solar Panel Awning (right) ──
+              - obj:
+                  width: 1000
+                  height: 480
+                  x: 820
+                  y: 0
+                  bg_opa: TRANSP
+                  border_width: 0
+                  scrollbar_mode: "OFF"
+                  widgets:
+                    - label:
+                        text: "Solar Panel Awning"
+                        text_font: roboto_32
+                        text_color: 0xFFFFFF
+                        x: 40
+                        y: 30
+                    - label:
+                        text_font: mdi_40
+                        text_color: 0xFFA726
+                        text: "\U000F11B3"
+                        x: 40
+                        y: 90
                     - button:
-                        width: 50
-                        height: 50
-                        bg_color: 0x333333
-                        radius: 25
+                        width: 200
+                        height: 80
+                        x: 40
+                        y: 160
+                        bg_color: 0x2E7D32
+                        radius: 12
                         on_press:
                           then:
                             - homeassistant.service:
-                                service: light.toggle
+                                service: cover.open_cover
                                 data:
-                                  entity_id: light.light_controller_exterior_capsule_passenger_flood_light
+                                  entity_id: cover.solar_panel_awning
                         widgets:
                           - label:
                               text_font: mdi_40
-                              text_color: 0xFFAB40
-                              text: "\U000F0425"
+                              text_color: 0xFFFFFF
+                              text: "\U000F0143"
                               align: CENTER
+                              x: -30
+                          - label:
+                              text: "Open"
+                              text_font: roboto_20
+                              text_color: 0xFFFFFF
+                              align: CENTER
+                              x: 20
+                    - button:
+                        width: 200
+                        height: 80
+                        x: 260
+                        y: 160
+                        bg_color: 0xF57F17
+                        radius: 12
+                        on_press:
+                          then:
+                            - homeassistant.service:
+                                service: cover.stop_cover
+                                data:
+                                  entity_id: cover.solar_panel_awning
+                        widgets:
+                          - label:
+                              text_font: mdi_40
+                              text_color: 0xFFFFFF
+                              text: "\U000F04DB"
+                              align: CENTER
+                              x: -25
+                          - label:
+                              text: "Stop"
+                              text_font: roboto_20
+                              text_color: 0xFFFFFF
+                              align: CENTER
+                              x: 20
+                    - button:
+                        width: 200
+                        height: 80
+                        x: 480
+                        y: 160
+                        bg_color: 0xC62828
+                        radius: 12
+                        on_press:
+                          then:
+                            - homeassistant.service:
+                                service: cover.close_cover
+                                data:
+                                  entity_id: cover.solar_panel_awning
+                        widgets:
+                          - label:
+                              text_font: mdi_40
+                              text_color: 0xFFFFFF
+                              text: "\U000F0140"
+                              align: CENTER
+                              x: -30
+                          - label:
+                              text: "Close"
+                              text_font: roboto_20
+                              text_color: 0xFFFFFF
+                              align: CENTER
+                              x: 20
+
+        # ═══════════════════════════════════════════════════
+        # WATER TAB CONTENT
+        # ═══════════════════════════════════════════════════
+        - obj:
+            id: content_water
+            hidden: true
+            width: 1840
+            height: 480
+            x: 80
+            y: 0
+            bg_color: 0x1A1A2E
+            bg_opa: COVER
+            border_width: 0
+            scrollbar_mode: "OFF"
+            pad_all: 0
+            widgets:
+              # ── Water Level (left) ──
+              - obj:
+                  width: 600
+                  height: 480
+                  x: 0
+                  y: 0
+                  bg_opa: TRANSP
+                  border_width: 0
+                  scrollbar_mode: "OFF"
+                  widgets:
+                    - label:
+                        text: "Fresh Water"
+                        text_font: roboto_32
+                        text_color: 0xFFFFFF
+                        x: 40
+                        y: 30
+                    - label:
+                        text_font: mdi_40
+                        text_color: 0x4FC3F7
+                        text: "\U000F058C"
+                        x: 40
+                        y: 90
+                    - label:
+                        id: lbl_water_pct_wtr
+                        text: "0%"
+                        text_font: roboto_32
+                        text_color: 0xFFFFFF
+                        x: 100
+                        y: 95
+                    - bar:
+                        id: bar_water_wtr
+                        width: 500
+                        height: 40
+                        x: 40
+                        y: 160
+                        bg_color: 0x2D2D44
+                        indicator:
+                          bg_color: 0x4FC3F7
+                        min_value: 0
+                        max_value: 100
+                        value: 0
+                    - label:
+                        id: lbl_water_gallons_wtr
+                        text: "-- gal"
+                        text_font: roboto_32
+                        text_color: 0xB0B0B0
+                        x: 40
+                        y: 220
+
+              # ── Hot Water Heater (center) ──
+              - obj:
+                  width: 500
+                  height: 480
+                  x: 620
+                  y: 0
+                  bg_opa: TRANSP
+                  border_width: 0
+                  scrollbar_mode: "OFF"
+                  widgets:
+                    - label:
+                        text: "Hot Water Heater"
+                        text_font: roboto_32
+                        text_color: 0xFFFFFF
+                        x: 40
+                        y: 30
+                    - button:
+                        id: btn_hot_water
+                        width: 400
+                        height: 120
+                        x: 40
+                        y: 90
+                        bg_color: 0x2D2D44
+                        radius: 16
+                        on_press:
+                          then:
+                            - homeassistant.service:
+                                service: switch.toggle
+                                data:
+                                  entity_id: switch.water_tank_display_hot_water_heater
+                        widgets:
+                          - label:
+                              id: lbl_heater_icon
+                              text_font: mdi_40
+                              text_color: 0x808080
+                              text: "\U000F0F91"
+                              align: LEFT_MID
+                              x: 30
+                          - label:
+                              id: lbl_heater_status
+                              text: "OFF"
+                              text_font: roboto_32
+                              text_color: 0x808080
+                              align: CENTER
+                              x: 30
+
+              # ── Water Pump (right) ──
+              - obj:
+                  width: 500
+                  height: 480
+                  x: 1140
+                  y: 0
+                  bg_opa: TRANSP
+                  border_width: 0
+                  scrollbar_mode: "OFF"
+                  widgets:
+                    - label:
+                        text: "Water Pump"
+                        text_font: roboto_32
+                        text_color: 0xFFFFFF
+                        x: 40
+                        y: 30
+                    - button:
+                        id: btn_water_pump
+                        width: 400
+                        height: 120
+                        x: 40
+                        y: 90
+                        bg_color: 0x2D2D44
+                        radius: 16
+                        on_press:
+                          then:
+                            - homeassistant.service:
+                                service: switch.toggle
+                                data:
+                                  entity_id: switch.water_tank_display_water_pump
+                        widgets:
+                          - label:
+                              id: lbl_pump_icon
+                              text_font: mdi_40
+                              text_color: 0x808080
+                              text: "\U000F0F93"
+                              align: LEFT_MID
+                              x: 30
+                          - label:
+                              id: lbl_pump_status
+                              text: "OFF"
+                              text_font: roboto_32
+                              text_color: 0x808080
+                              align: CENTER
+                              x: 30
