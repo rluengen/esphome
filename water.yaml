@@ -87,19 +87,11 @@ esphome:
     name: smartvan.${project_name}
     version: ${project_version}
   on_boot:
-    - priority: 800
-      then:
-        # Fill display framebuffer with black to prevent white edge banding on round display
-        - lambda: |-
-            auto *disp = id(round_display_id);
-            disp->fill(Color::BLACK);
-    - priority: 600
-      then:
-        # ensure that all the valves are closed on first start (should be the default)
-        - valve.close: valve_input_output_hydrant
-        - valve.close: valve_water_pump_supply
-        - valve.close: valve_fill
-        - switch.turn_off: water_pump_switch
+    # ensure that all the valves are closed on first start (should be the default)
+    - valve.close: valve_input_output_hydrant
+    - valve.close: valve_water_pump_supply
+    - valve.close: valve_fill
+    - switch.turn_off: water_pump_switch
 
 globals:
   - id: fill_start_time

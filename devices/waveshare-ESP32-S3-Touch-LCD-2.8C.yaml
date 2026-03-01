@@ -156,7 +156,7 @@ display:
       - [ 0x3A, 0x66 ]
       - [ 0x36, 0x00 ]
       - [ 0x35, 0x00 ]
-      - [ 0x20 ]
+      - [ 0x21 ]          # Display Inversion On - makes undriven pixels black (fixes white edges on round display)
       - delay 120ms
       - [ 0x29 ]
     data_pins:
