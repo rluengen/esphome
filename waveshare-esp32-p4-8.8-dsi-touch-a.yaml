@@ -192,6 +192,9 @@ touchscreen:
 
 # Pending brightness globals for slider debounce
 globals:
+  - id: sleep_start_millis
+    type: uint32_t
+    initial_value: '0'
   - id: pending_bright_main_cans
     type: int
     initial_value: '0'
@@ -219,6 +222,31 @@ globals:
 
 # Debounce scripts: mode restart + 300ms delay = only fires after user stops dragging
 script:
+  # Record timestamp when screen goes to sleep
+  - id: !extend enter_screen_off
+    then:
+      - lambda: 'id(sleep_start_millis) = millis();'
+
+  # On wake: if asleep >= 5 minutes, switch to home tab
+  - id: !extend exit_screen_off
+    then:
+      - lambda: |-
+          uint32_t now = millis();
+          uint32_t elapsed = now - id(sleep_start_millis);
+          if (elapsed >= 300000) {  // 5 minutes in ms
+            // Will be followed by show_home_on_wake script
+            id(show_home_on_wake).execute();
+          }
+
+  - id: show_home_on_wake
+    then:
+      - lvgl.widget.show: content_home
+      - lvgl.widget.hide: content_weather
+      - lvgl.widget.hide: content_lights
+      - lvgl.widget.hide: content_power
+      - lvgl.widget.hide: content_water
+      - script.execute: highlight_tab_home
+
   - id: debounce_main_cans
     mode: restart
     then:
@@ -491,6 +519,22 @@ text_sensor:
               auto it = icons.find(x);
               if (it != icons.end()) return it->second.c_str();
               return "\U000F0599";
+        - lvgl.label.update:
+            id: lbl_tab_weather_icon
+            text: !lambda |-
+              static const std::map<std::string, std::string> icons = {
+                {"clear-night", "\U000F0594"}, {"cloudy", "\U000F0590"},
+                {"exceptional", "\U000F0F2F"}, {"fog", "\U000F0591"},
+                {"hail", "\U000F0592"}, {"lightning", "\U000F0593"},
+                {"lightning-rainy", "\U000F067E"}, {"partlycloudy", "\U000F0595"},
+                {"pouring", "\U000F0596"}, {"rainy", "\U000F0597"},
+                {"snowy", "\U000F0598"}, {"snowy-rainy", "\U000F067F"},
+                {"sunny", "\U000F0599"}, {"windy", "\U000F059D"},
+                {"windy-variant", "\U000F059E"},
+              };
+              auto it = icons.find(x);
+              if (it != icons.end()) return it->second.c_str();
+              return "\U000F0599";
 
   - platform: homeassistant
     id: weather_temp
@@ -511,6 +555,13 @@ text_sensor:
             text: !lambda |-
               if (x.empty()) return "--°";
               static char buf[16];
+              snprintf(buf, sizeof(buf), "%s°", x.c_str());
+              return buf;
+        - lvgl.label.update:
+            id: lbl_tab_weather_temp
+            text: !lambda |-
+              if (x.empty()) return "";
+              static char buf[8];
               snprintf(buf, sizeof(buf), "%s°", x.c_str());
               return buf;
 
@@ -967,6 +1018,13 @@ sensor:
             id: bar_water_wtr
             value: !lambda 'return isnan(x) ? 0 : (int)x;'
         - lvgl.label.update:
+            id: lbl_tab_water_pct
+            text: !lambda |-
+              if (isnan(x)) return "";
+              static char buf[8];
+              snprintf(buf, sizeof(buf), "%.0f%%", x);
+              return buf;
+        - lvgl.label.update:
             id: lbl_water_pct_wtr
             text: !lambda |-
               if (isnan(x)) return "0%";
@@ -993,6 +1051,37 @@ sensor:
               static char buf[16];
               snprintf(buf, sizeof(buf), "%.1f gal", x);
               return buf;
+
+  # Battery state of charge
+  - platform: homeassistant
+    id: ha_battery_soc
+    entity_id: sensor.ecoflow_battery_percentage
+    internal: true
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: lbl_tab_power_pct
+            text: !lambda |-
+              if (isnan(x)) return "";
+              static char buf[8];
+              snprintf(buf, sizeof(buf), "%.0f%%", x);
+              return buf;
+        - lvgl.label.update:
+            id: lbl_tab_power_icon
+            text: !lambda |-
+              if (isnan(x)) return "\U000F008E";
+              int pct = (int)x;
+              if (pct >= 95) return "\U000F0079";
+              if (pct >= 85) return "\U000F0082";
+              if (pct >= 75) return "\U000F0081";
+              if (pct >= 65) return "\U000F0080";
+              if (pct >= 55) return "\U000F007F";
+              if (pct >= 45) return "\U000F007E";
+              if (pct >= 35) return "\U000F007D";
+              if (pct >= 25) return "\U000F007C";
+              if (pct >= 15) return "\U000F007B";
+              if (pct >= 5)  return "\U000F007A";
+              return "\U000F008E";
 
   # TODO: Replace with real HA sensor once hooked up
   - platform: template
@@ -1472,8 +1561,33 @@ font:
       "\U000F02DC", # home
       "\U000F0590", # cloudy (weather)
       "\U000F0335", # lightbulb
-      "\U000F0079", # battery (power)
+      "\U000F0079", # battery (full)
+      "\U000F008E", # battery-outline (empty)
+      "\U000F007A", # battery-10
+      "\U000F007B", # battery-20
+      "\U000F007C", # battery-30
+      "\U000F007D", # battery-40
+      "\U000F007E", # battery-50
+      "\U000F007F", # battery-60
+      "\U000F0080", # battery-70
+      "\U000F0081", # battery-80
+      "\U000F0082", # battery-90
       "\U000F058C", # water
+      # Weather condition icons (for dynamic tab icon)
+      "\U000F0594", # clear-night
+      "\U000F0F2F", # exceptional
+      "\U000F0591", # fog
+      "\U000F0592", # hail
+      "\U000F0593", # lightning
+      "\U000F067E", # lightning-rainy
+      "\U000F0595", # partlycloudy
+      "\U000F0596", # pouring
+      "\U000F0597", # rainy
+      "\U000F0598", # snowy
+      "\U000F067F", # snowy-rainy
+      "\U000F0599", # sunny
+      "\U000F059D", # windy
+      "\U000F059E", # windy-variant
       ]
 
   # UI text font
@@ -1489,6 +1603,12 @@ font:
     size: 38
     bpp: 4
     glyphs: " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~°"
+
+  - file: "fonts/Roboto-Regular.ttf"
+    id: roboto_xlarge
+    size: 56
+    bpp: 4
+    glyphs: " 0123456789:AMP"
 
 # Update date/time labels every 60 seconds
 interval:
@@ -1509,9 +1629,9 @@ interval:
           text: !lambda |-
             auto time = id(ha_time).now();
             if (!time.is_valid()) return "---";
-            static char buf[24];
-            static const char* days[] = {"Sun","Mon","Tue","Wed","Thu","Fri","Sat"};
-            static const char* months[] = {"Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"};
+            static char buf[32];
+            static const char* days[] = {"Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"};
+            static const char* months[] = {"January","February","March","April","May","June","July","August","September","October","November","December"};
             snprintf(buf, sizeof(buf), "%s, %s %d", days[time.day_of_week-1], months[time.month-1], time.day_of_month);
             return buf;
 
@@ -1543,6 +1663,7 @@ lvgl:
             pad_top: 0
             pad_bottom: 0
             scrollbar_mode: "OFF"
+            scrollable: false
             layout:
               type: FLEX
               flex_flow: COLUMN
@@ -1590,10 +1711,19 @@ lvgl:
                       - script.execute: highlight_tab_weather
                   widgets:
                     - label:
+                        id: lbl_tab_weather_icon
                         text_font: mdi_tab
                         text_color: 0xB0B0B0
                         text: "\U000F0590"
                         align: CENTER
+                        y: -6
+                    - label:
+                        id: lbl_tab_weather_temp
+                        text_font: roboto_small
+                        text_color: 0x808080
+                        text: ""
+                        align: CENTER
+                        y: 26
 
               # ── Lights Tab Button ──
               - button:
@@ -1636,10 +1766,19 @@ lvgl:
                       - script.execute: highlight_tab_power
                   widgets:
                     - label:
+                        id: lbl_tab_power_icon
                         text_font: mdi_tab
                         text_color: 0xB0B0B0
                         text: "\U000F0079"
                         align: CENTER
+                        y: -6
+                    - label:
+                        id: lbl_tab_power_pct
+                        text_font: roboto_small
+                        text_color: 0x808080
+                        text: ""
+                        align: CENTER
+                        y: 26
 
               # ── Water Tab Button ──
               - button:
@@ -1663,6 +1802,14 @@ lvgl:
                         text_color: 0xB0B0B0
                         text: "\U000F058C"
                         align: CENTER
+                        y: -6
+                    - label:
+                        id: lbl_tab_water_pct
+                        text_font: roboto_small
+                        text_color: 0x808080
+                        text: ""
+                        align: CENTER
+                        y: 26
 
         # ═══════════════════════════════════════════════════
         # HOME TAB CONTENT
@@ -1693,24 +1840,24 @@ lvgl:
                     - label:
                         id: lbl_time
                         text: "12:00 AM"
-                        text_font: roboto_large
+                        text_font: roboto_xlarge
                         text_color: 0xFFFFFF
                         x: 20
-                        y: 20
+                        y: 15
                     - label:
                         id: lbl_date
-                        text: "Mon, Jan 1"
-                        text_font: roboto_small
+                        text: "Monday, January 1"
+                        text_font: roboto_large
                         text_color: 0xB0B0B0
                         x: 20
-                        y: 60
+                        y: 75
                     - label:
                         id: lbl_location
                         text: "..."
                         text_font: roboto_small
                         text_color: 0x808080
                         x: 20
-                        y: 90
+                        y: 118
                     # ── Current Weather ──
                     - label:
                         id: lbl_weather_icon
@@ -1786,7 +1933,7 @@ lvgl:
                         y: 55
                     - label:
                         id: lbl_interior_temp
-                        text: "--°F"
+                        text: "--°"
                         text_font: roboto_large
                         text_color: 0xFFFFFF
                         x: 70
@@ -1812,7 +1959,7 @@ lvgl:
                         y: 55
                     - label:
                         id: lbl_fridge_temp
-                        text: "--°F"
+                        text: "--°"
                         text_font: roboto_large
                         text_color: 0xFFFFFF
                         x: 430
@@ -2039,12 +2186,6 @@ lvgl:
                   scrollbar_mode: "OFF"
                   widgets:
                     - label:
-                        text: "Current Weather"
-                        text_font: roboto_small
-                        text_color: 0x808080
-                        x: 30
-                        y: 15
-                    - label:
                         id: lbl_weather_icon_lg
                         text_font: mdi_weather_large
                         text_color: 0xFFD700
@@ -2101,7 +2242,7 @@ lvgl:
                         y: 360
                     - label:
                         id: lbl_interior_temp_wx
-                        text: "--°F"
+                        text: "--°"
                         text_font: roboto_small
                         text_color: 0xFFFFFF
                         x: 80
@@ -2127,7 +2268,7 @@ lvgl:
                         y: 360
                     - label:
                         id: lbl_fridge_temp_wx
-                        text: "--°F"
+                        text: "--°"
                         text_font: roboto_small
                         text_color: 0xFFFFFF
                         x: 380

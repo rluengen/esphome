@@ -28,7 +28,7 @@
 # Then I just need the voltage divider circuit from the water tank sensor to the ADS1115 input.
 
 # xl9535 Device
-# Relay 1: relay_hydrant_valve
+# Relay 1: relay_hot_water_heater
 # Relay 2: relay_supply_valve
 # Relay 3: relay_fill_valve
 # Relay 4: relay_water_pump
@@ -88,7 +88,6 @@ esphome:
     version: ${project_version}
   on_boot:
     # ensure that all the valves are closed on first start (should be the default)
-    - valve.close: valve_input_output_hydrant
     - valve.close: valve_water_pump_supply
     - valve.close: valve_fill
     - switch.turn_off: water_pump_switch
@@ -239,7 +238,6 @@ binary_sensor:
         - logger.log: "Tank full - stopping fill operations"
         - script.stop: water_fill
         - valve.close: valve_fill
-        - valve.close: valve_input_output_hydrant
 
   - platform: template
     id: water_tank_low
@@ -268,7 +266,6 @@ binary_sensor:
         - logger.log: "Water leak detected - emergency shutdown"
         - switch.turn_off: water_pump_switch
         - valve.close: valve_water_pump_supply
-        - valve.close: valve_input_output_hydrant
         - valve.close: valve_fill
         - script.stop: pump_timer_countdown
         - script.stop: water_fill
@@ -462,58 +459,6 @@ sensor:
 # https://esphome.io/components/valve/template/
 # Requires Home Assistant 2024.5 or later to use valves.
 valve:
-  # The valve which controls the external hydrant being used.
-  # Closed (default) = Hydrant Out
-  # Open = Hydrant in (Fresh Fill)
-  - platform: template
-    device_class: water
-    id: valve_input_output_hydrant
-    name: "Input Hydrant Selection Valve"
-    icon: "mdi:valve"
-    lambda: |-
-      return {};
-    open_action:
-      - script.execute: screen_bump_activity
-      - if:
-          condition:
-            binary_sensor.is_on: water_tank_full
-          then:
-            - logger.log: "Cannot open hydrant valve - tank is full"
-          else:
-            - logger.log: "Input Selection Valve Opening"
-            - switch.turn_on: relay_hydrant_valve
-            - valve.template.publish:
-                id: valve_input_output_hydrant
-                current_operation: OPENING
-            - delay: !lambda 'return (uint32_t)(id(valve_actuation_time).state * 1000);'
-            - valve.template.publish:
-                id: valve_input_output_hydrant
-                current_operation: IDLE
-                position: !lambda "return VALVE_OPEN;"
-            - lvgl.label.update:
-                id: lbl_valve_hydrant
-                text: "\U000F1068"
-            - logger.log: "Input Selection Valve Opened"
-    close_action:
-      - script.execute: screen_bump_activity
-      - logger.log: "Input Selection Valve Closing"
-      - switch.turn_off: relay_hydrant_valve
-      - valve.template.publish:
-          id: valve_input_output_hydrant
-          current_operation: CLOSING
-      - delay: !lambda 'return (uint32_t)(id(valve_actuation_time).state * 1000);'
-      - valve.template.publish:
-          id: valve_input_output_hydrant
-          current_operation: IDLE
-          position: !lambda "return VALVE_CLOSED;"
-      - lvgl.label.update:
-          id: lbl_valve_hydrant
-          text: "\U000F1067"
-      - logger.log: "Input Selection Valve Closed"
-    assumed_state: false
-    optimistic: false
-    has_position: true
-
   # The valve which controls the input to the water pump. This is either
   # the water tank or the external (dirty) fill port.
   # Closed (default) = Dirty Water Fill Port
@@ -658,7 +603,6 @@ switch:
       - switch.turn_off: relay_water_pump
       - delay: 250ms  # Wait for pump to stop before closing valves
       - valve.close: valve_water_pump_supply
-      - valve.close: valve_input_output_hydrant
       - lvgl.label.update:
           id: lbl_pump_status
           text: "\U000F0F93"  # water-pump-off icon
@@ -687,8 +631,8 @@ switch:
 
   # XL9535 relay outputs
   - platform: gpio
-    id: relay_hydrant_valve
-    name: "Hydrant Valve Relay"
+    id: hot_water_heater_relay
+    name: "Hot Water Heater Relay"
     internal: true
     pin:
       xl9535: xl9535_hub
@@ -737,15 +681,6 @@ switch:
             - switch.turn_off: relay_water_pump
 
   # PCF8574 outputs
-  - platform: gpio
-    id: hot_water_heater_relay
-    name: "Hot Water Heater Relay"
-    internal: true
-    pin:
-      pcf8574: pcf8574_hub
-      number: 1
-      mode: OUTPUT
-      inverted: false
 
 font:
   - file: "fonts/segoeui.ttf"
@@ -817,21 +752,6 @@ lvgl:
       long_press_time: 400ms
       long_press_repeat_time: 100ms
 
-  # Black circular border on top_layer to mask white crescents
-  # at the edges of the round bezel
-  top_layer:
-    widgets:
-      - obj:
-          align: CENTER
-          width: 480
-          height: 480
-          bg_opa: TRANSP
-          border_width: 6
-          border_color: 0x000000
-          border_opa: COVER
-          radius: 240
-          clickable: false
-
   widgets:
     - obj:
         align: CENTER
@@ -863,7 +783,6 @@ lvgl:
                     then:
                       # Turning ON
                       - logger.log: "Water Fill button ON"
-                      - valve.close: valve_input_output_hydrant
                       - script.execute: water_fill
                     else:
                       # Turning OFF
@@ -952,7 +871,7 @@ lvgl:
         - label:
             id: lbl_connection_status
             align: BOTTOM_LEFT
-            x: 20
+            x: 120
             y: -60
             text_align: LEFT
             text_font: homeassistant_icons
@@ -961,21 +880,10 @@ lvgl:
             clickable: false
 
         - label:
-            id: lbl_valve_hydrant
-            text: "\U000F1066"
-            align: BOTTOM_LEFT
-            x: 130
-            y: -60
-            text_font: valve_icon_40
-            text_color: 0x00CED1  # Turquoise for hydrant
-            text_align: LEFT
-            clickable: false
-
-        - label:
             id: lbl_valve_supply
             text: "\U000F1066"
             align: BOTTOM_LEFT
-            x: 190
+            x: 180
             y: -60
             text_font: valve_icon_40
             text_color: 0x888888  # Gray for supply
@@ -986,7 +894,7 @@ lvgl:
             id: lbl_valve_fill
             text: "\U000F1066"
             align: BOTTOM_LEFT
-            x: 250
+            x: 240
             y: -60
             text_font: valve_icon_40
             text_color: 0x00FF00  # Green for fill
@@ -998,7 +906,7 @@ lvgl:
             id: lbl_pump_status
             text: "\U000F0F93"  # water-pump-off icon
             align: BOTTOM_LEFT
-            x: 310
+            x: 300
             y: -60
             text_font: valve_icon_40
             text_color: 0x888888  # Gray for off
@@ -1010,7 +918,7 @@ lvgl:
             id: lbl_hot_water_status
             text: "\U000F0F91"  # water-boiler-off icon
             align: BOTTOM_LEFT
-            x: 370
+            x: 360
             y: -60
             text_font: valve_icon_40
             text_color: 0x888888  # Gray for off
@@ -1032,7 +940,6 @@ script:
             - logger.log: "Water Fill: Configuring valves"
             - valve.close: valve_water_pump_supply
             - valve.open: valve_fill
-            - valve.close: valve_input_output_hydrant
             
             # Wait for valves to reach their positions
             - logger.log: "Water Fill: Waiting for valves"
