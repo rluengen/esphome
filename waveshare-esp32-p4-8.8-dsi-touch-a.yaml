@@ -1608,7 +1608,7 @@ font:
     id: roboto_xlarge
     size: 56
     bpp: 4
-    glyphs: " 0123456789:AMP"
+    glyphs: " -0123456789:AMP"
 
 # Update date/time labels every 60 seconds
 interval:
