@@ -247,6 +247,30 @@ script:
       - lvgl.widget.hide: content_water
       - script.execute: highlight_tab_home
 
+  # Update lights tab icon and count badge
+  - id: update_lights_tab
+    then:
+      - lambda: |-
+          int count = 0;
+          if (!isnan(id(ha_bright_main_cans).state) && id(ha_bright_main_cans).state > 0) count++;
+          if (!isnan(id(ha_bright_bed_cans).state) && id(ha_bright_bed_cans).state > 0) count++;
+          if (!isnan(id(ha_bright_door).state) && id(ha_bright_door).state > 0) count++;
+          if (!isnan(id(ha_bright_dog_crate).state) && id(ha_bright_dog_crate).state > 0) count++;
+          if (!isnan(id(ha_bright_bed_capsule).state) && id(ha_bright_bed_capsule).state > 0) count++;
+          if (!isnan(id(ha_bright_awning_out).state) && id(ha_bright_awning_out).state > 0) count++;
+          if (!isnan(id(ha_bright_awning_in).state) && id(ha_bright_awning_in).state > 0) count++;
+          if (!isnan(id(ha_bright_exterior).state) && id(ha_bright_exterior).state > 0) count++;
+          // Update icon
+          lv_label_set_text(id(lbl_tab_lights_icon), count > 0 ? "\U000F0336" : "\U000F0335");
+          // Update count badge
+          if (count > 0) {
+            static char buf[4];
+            snprintf(buf, sizeof(buf), "%d", count);
+            lv_label_set_text(id(lbl_tab_lights_count), buf);
+          } else {
+            lv_label_set_text(id(lbl_tab_lights_count), "");
+          }
+
   - id: debounce_main_cans
     mode: restart
     then:
@@ -1190,6 +1214,7 @@ sensor:
         - lvgl.slider.update:
             id: sld_main_cans
             value: !lambda 'return isnan(x) ? 0 : (int)x;'
+        - script.execute: update_lights_tab
 
   - platform: homeassistant
     id: ha_bright_bed_cans
@@ -1201,6 +1226,7 @@ sensor:
         - lvgl.slider.update:
             id: sld_bed_cans
             value: !lambda 'return isnan(x) ? 0 : (int)x;'
+        - script.execute: update_lights_tab
 
   - platform: homeassistant
     id: ha_bright_door
@@ -1212,6 +1238,7 @@ sensor:
         - lvgl.slider.update:
             id: sld_door
             value: !lambda 'return isnan(x) ? 0 : (int)x;'
+        - script.execute: update_lights_tab
 
   - platform: homeassistant
     id: ha_bright_dog_crate
@@ -1223,6 +1250,7 @@ sensor:
         - lvgl.slider.update:
             id: sld_dog_crate
             value: !lambda 'return isnan(x) ? 0 : (int)x;'
+        - script.execute: update_lights_tab
 
   - platform: homeassistant
     id: ha_bright_bed_capsule
@@ -1234,6 +1262,7 @@ sensor:
         - lvgl.slider.update:
             id: sld_bed_capsule
             value: !lambda 'return isnan(x) ? 0 : (int)x;'
+        - script.execute: update_lights_tab
 
   - platform: homeassistant
     id: ha_bright_awning_out
@@ -1245,6 +1274,7 @@ sensor:
         - lvgl.slider.update:
             id: sld_awning_out
             value: !lambda 'return isnan(x) ? 0 : (int)x;'
+        - script.execute: update_lights_tab
 
   - platform: homeassistant
     id: ha_bright_awning_in
@@ -1256,6 +1286,7 @@ sensor:
         - lvgl.slider.update:
             id: sld_awning_in
             value: !lambda 'return isnan(x) ? 0 : (int)x;'
+        - script.execute: update_lights_tab
 
   - platform: homeassistant
     id: ha_bright_exterior
@@ -1267,6 +1298,7 @@ sensor:
         - lvgl.slider.update:
             id: sld_exterior
             value: !lambda 'return isnan(x) ? 0 : (int)x;'
+        - script.execute: update_lights_tab
 
   # ---- 7-Day Forecast Temperature Sensors ----
   # Day 1 (today)
@@ -1561,6 +1593,8 @@ font:
       "\U000F02DC", # home
       "\U000F0590", # cloudy (weather)
       "\U000F0335", # lightbulb
+      "\U000F0336", # lightbulb-on
+      "\U000F12A3", # lightbulb-off
       "\U000F0079", # battery (full)
       "\U000F008E", # battery-outline (empty)
       "\U000F007A", # battery-10
@@ -1743,10 +1777,19 @@ lvgl:
                       - script.execute: highlight_tab_lights
                   widgets:
                     - label:
+                        id: lbl_tab_lights_icon
                         text_font: mdi_tab
                         text_color: 0xB0B0B0
                         text: "\U000F0335"
                         align: CENTER
+                        y: -6
+                    - label:
+                        id: lbl_tab_lights_count
+                        text_font: roboto_small
+                        text_color: 0x808080
+                        text: ""
+                        align: CENTER
+                        y: 26
 
               # ── Power Tab Button ──
               - button:
