@@ -146,6 +146,54 @@ i2c_device:
   - address: 0x45
     id: display_backlight_i2c
 
+# ---- Audio: ES8311 Codec + NS4150B Power Amplifier ----
+# ES8311 codec at I2C address 0x18 (shares bus with GT911 + backlight MCU)
+audio_dac:
+  - platform: es8311
+    id: es8311_dac
+    bits_per_sample: 24bit
+    sample_rate: 16000
+    use_mclk: true
+    address: 0x18
+
+i2s_audio:
+  - id: i2s_out
+    i2s_lrclk_pin: GPIO10    # WS / LRCK
+    i2s_bclk_pin: GPIO12     # BCLK / SCLK
+    i2s_mclk_pin: GPIO13     # MCLK
+
+speaker:
+  - platform: i2s_audio
+    id: i2s_speaker
+    i2s_audio_id: i2s_out
+    i2s_dout_pin: GPIO9      # ES8311 DSDIN (data TO codec)
+    dac_type: external
+    audio_dac: es8311_dac
+    sample_rate: 16000
+    bits_per_sample: 24bit
+    channel: left
+    use_apll: true
+    mclk_multiple: 384
+    timeout: never
+    buffer_duration: 500ms
+    i2s_mode: primary
+    num_channels: 1
+
+media_player:
+  - platform: speaker
+    name: "Speaker"
+    id: speaker_media_player
+    announcement_pipeline:
+      speaker: i2s_speaker
+      num_channels: 1
+
+# NS4150B power amplifier enable (GPIO53, active high)
+switch:
+  - platform: gpio
+    name: "Speaker Enable"
+    pin: GPIO53
+    restore_mode: RESTORE_DEFAULT_ON
+
 # Backlight brightness control as a light
 output:
   - platform: template
@@ -219,6 +267,13 @@ globals:
   - id: pending_bright_exterior
     type: int
     initial_value: '0'
+  # Track last awning movement direction: true = was opening, false = was closing
+  - id: solar_awning_was_opening
+    type: bool
+    initial_value: 'true'
+  - id: main_awning_was_opening
+    type: bool
+    initial_value: 'true'
 
 # Debounce scripts: mode restart + 300ms delay = only fires after user stops dragging
 script:
@@ -485,23 +540,39 @@ script:
             brightness: !lambda 'return id(pending_bright_exterior);'
 
   # ── Awning Toggle Scripts ──
+  # Single-button logic: closed→open, open→close, opening/closing→stop
+  # Stopped at intermediate: reverse from last moving direction
   - id: toggle_solar_awning
     then:
       - if:
           condition:
             lambda: |-
               std::string s = id(ha_cover_solar_panel).state;
-              return s == "open" || s == "opening";
+              return s == "opening" || s == "closing";
           then:
             - homeassistant.service:
-                service: cover.close_cover
+                service: cover.stop_cover
                 data:
                   entity_id: cover.solar_panel_awning
           else:
-            - homeassistant.service:
-                service: cover.open_cover
-                data:
-                  entity_id: cover.solar_panel_awning
+            - if:
+                condition:
+                  lambda: |-
+                    std::string s = id(ha_cover_solar_panel).state;
+                    if (s == "closed") return true;
+                    // Stopped intermediate: if was opening, now close (return false)
+                    // if was closing, now open (return true)
+                    return !id(solar_awning_was_opening);
+                then:
+                  - homeassistant.service:
+                      service: cover.open_cover
+                      data:
+                        entity_id: cover.solar_panel_awning
+                else:
+                  - homeassistant.service:
+                      service: cover.close_cover
+                      data:
+                        entity_id: cover.solar_panel_awning
 
   - id: toggle_main_awning
     then:
@@ -509,17 +580,29 @@ script:
           condition:
             lambda: |-
               std::string s = id(ha_cover_main_awning).state;
-              return s == "open" || s == "opening";
+              return s == "opening" || s == "closing";
           then:
             - homeassistant.service:
-                service: cover.close_cover
+                service: cover.stop_cover
                 data:
                   entity_id: cover.awning
           else:
-            - homeassistant.service:
-                service: cover.open_cover
-                data:
-                  entity_id: cover.awning
+            - if:
+                condition:
+                  lambda: |-
+                    std::string s = id(ha_cover_main_awning).state;
+                    if (s == "closed") return true;
+                    return !id(main_awning_was_opening);
+                then:
+                  - homeassistant.service:
+                      service: cover.open_cover
+                      data:
+                        entity_id: cover.awning
+                else:
+                  - homeassistant.service:
+                      service: cover.close_cover
+                      data:
+                        entity_id: cover.awning
 
   # ── Tab Highlight Scripts ──
   - id: highlight_tab_home
@@ -997,16 +1080,33 @@ text_sensor:
     internal: true
     on_value:
       then:
+        # Track direction for intermediate stop logic
+        - lambda: |-
+            if (x == "opening") id(solar_awning_was_opening) = true;
+            else if (x == "closing") id(solar_awning_was_opening) = false;
+        # Icon: closed→expand(green), open→collapse(green), opening/closing→stop(orange)
         - lvgl.label.update:
             id: lbl_solar_awning_action
             text: !lambda |-
-              if (x == "open" || x == "opening") return std::string("\U000F04CE");
-              return std::string("\U000F04CF");
+              if (x == "opening" || x == "closing") return std::string("\U000F04DB");
+              if (x == "open") return std::string("\U000F0760");
+              return std::string("\U000F0761");
+        - lvgl.label.update:
+            id: lbl_solar_awning_action
+            text_color: !lambda |-
+              if (x == "opening" || x == "closing") return lv_color_hex(0xFFA726);
+              return lv_color_hex(0x66BB6A);
         - lvgl.label.update:
             id: lbl_solar_awning_action_pwr
             text: !lambda |-
-              if (x == "open" || x == "opening") return std::string("\U000F04CE");
-              return std::string("\U000F04CF");
+              if (x == "opening" || x == "closing") return std::string("\U000F04DB");
+              if (x == "open") return std::string("\U000F0760");
+              return std::string("\U000F0761");
+        - lvgl.label.update:
+            id: lbl_solar_awning_action_pwr
+            text_color: !lambda |-
+              if (x == "opening" || x == "closing") return lv_color_hex(0xFFA726);
+              return lv_color_hex(0x66BB6A);
 
   - platform: homeassistant
     id: ha_cover_main_awning
@@ -1014,11 +1114,48 @@ text_sensor:
     internal: true
     on_value:
       then:
+        - lambda: |-
+            if (x == "opening") id(main_awning_was_opening) = true;
+            else if (x == "closing") id(main_awning_was_opening) = false;
         - lvgl.label.update:
             id: lbl_main_awning_action
             text: !lambda |-
-              if (x == "open" || x == "opening") return std::string("\U000F04CE");
-              return std::string("\U000F04CF");
+              if (x == "opening" || x == "closing") return std::string("\U000F04DB");
+              if (x == "open") return std::string("\U000F0760");
+              return std::string("\U000F0761");
+        - lvgl.label.update:
+            id: lbl_main_awning_action
+            text_color: !lambda |-
+              if (x == "opening" || x == "closing") return lv_color_hex(0xFFA726);
+              return lv_color_hex(0x66BB6A);
+
+  # AC Inverter state sensor
+  - platform: homeassistant
+    id: ha_ac_inverter
+    entity_id: switch.ecoflow_ac_inverter
+    internal: true
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: lbl_inverter_icon
+            text: !lambda |-
+              if (x == "on") return std::string("\U000F06A5");
+              return std::string("\U000F06A6");
+        - lvgl.label.update:
+            id: lbl_inverter_icon
+            text_color: !lambda |-
+              if (x == "on") return lv_color_hex(0x66BB6A);
+              return lv_color_hex(0x808080);
+        - lvgl.label.update:
+            id: lbl_inverter_text
+            text: !lambda |-
+              if (x == "on") return std::string("AC Inverter On");
+              return std::string("AC Inverter Off");
+        - lvgl.label.update:
+            id: lbl_inverter_text
+            text_color: !lambda |-
+              if (x == "on") return lv_color_hex(0xFFFFFF);
+              return lv_color_hex(0x808080);
 
   # Light entity state sensors (detect unavailable to disable sliders)
   - platform: homeassistant
@@ -1768,8 +1905,8 @@ font:
       "\U000F0143", # chevron-up (open)
       "\U000F04DB", # stop
       "\U000F0140", # chevron-down (close)
-      "\U000F04CF", # unfold-more-horizontal (awning open)
-      "\U000F04CE", # unfold-less-horizontal (awning close)
+      "\U000F0761", # unfold-more-vertical (awning open)
+      "\U000F0760", # unfold-less-vertical (awning close)
       "\U000F11B3", # awning-outline
       "\U000F0425", # power
       "\U000F050F", # thermometer
@@ -1782,6 +1919,7 @@ font:
       "\U000F0F93", # water-pump-off
       "\U000F0A72", # solar-power
       "\U000F06A5", # power-plug
+      "\U000F06A6", # power-plug-off
       # Weather condition icons (for forecast cards)
       "\U000F0594", # clear-night
       "\U000F0590", # cloudy
@@ -2542,7 +2680,7 @@ lvgl:
                         x: 40
                         y: 30
                     - button:
-                        width: 130
+                        width: 280
                         height: 60
                         x: 40
                         y: 65
@@ -2556,26 +2694,7 @@ lvgl:
                               id: lbl_solar_awning_action
                               text_font: mdi_small
                               text_color: 0x66BB6A
-                              text: "\U000F04CF"
-                              align: CENTER
-                    - button:
-                        width: 130
-                        height: 60
-                        x: 190
-                        y: 65
-                        bg_color: 0x2D2D44
-                        radius: 10
-                        on_press:
-                          then:
-                            - homeassistant.service:
-                                service: cover.stop_cover
-                                data:
-                                  entity_id: cover.solar_panel_awning
-                        widgets:
-                          - label:
-                              text_font: mdi_small
-                              text_color: 0xFFA726
-                              text: "\U000F04DB"
+                              text: "\U000F0761"
                               align: CENTER
 
                     # ── Main Awning ──
@@ -2586,7 +2705,7 @@ lvgl:
                         x: 40
                         y: 180
                     - button:
-                        width: 130
+                        width: 280
                         height: 60
                         x: 40
                         y: 215
@@ -2600,26 +2719,7 @@ lvgl:
                               id: lbl_main_awning_action
                               text_font: mdi_small
                               text_color: 0x66BB6A
-                              text: "\U000F04CF"
-                              align: CENTER
-                    - button:
-                        width: 130
-                        height: 60
-                        x: 190
-                        y: 215
-                        bg_color: 0x2D2D44
-                        radius: 10
-                        on_press:
-                          then:
-                            - homeassistant.service:
-                                service: cover.stop_cover
-                                data:
-                                  entity_id: cover.awning
-                        widgets:
-                          - label:
-                              text_font: mdi_small
-                              text_color: 0xFFA726
-                              text: "\U000F04DB"
+                              text: "\U000F0761"
                               align: CENTER
 
         # ═══════════════════════════════════════════════════
@@ -3557,6 +3657,36 @@ lvgl:
                         x: 220
                         y: 325
 
+                    # ── AC Inverter Toggle ──
+                    - button:
+                        width: 700
+                        height: 60
+                        x: 40
+                        y: 400
+                        bg_color: 0x2D2D44
+                        radius: 10
+                        on_press:
+                          then:
+                            - homeassistant.service:
+                                service: switch.toggle
+                                data:
+                                  entity_id: switch.ecoflow_ac_inverter
+                        widgets:
+                          - label:
+                              id: lbl_inverter_icon
+                              text_font: mdi_small
+                              text_color: 0x808080
+                              text: "\U000F06A6"
+                              x: 20
+                              align: LEFT_MID
+                          - label:
+                              id: lbl_inverter_text
+                              text: "AC Inverter Off"
+                              text_font: roboto_small
+                              text_color: 0x808080
+                              x: 70
+                              align: LEFT_MID
+
               # ── Solar Panel Awning (right) ──
               - obj:
                   width: 1000
@@ -3580,7 +3710,7 @@ lvgl:
                         x: 40
                         y: 90
                     - button:
-                        width: 280
+                        width: 580
                         height: 80
                         x: 40
                         y: 160
@@ -3594,26 +3724,7 @@ lvgl:
                               id: lbl_solar_awning_action_pwr
                               text_font: mdi_small
                               text_color: 0x66BB6A
-                              text: "\U000F04CF"
-                              align: CENTER
-                    - button:
-                        width: 280
-                        height: 80
-                        x: 340
-                        y: 160
-                        bg_color: 0x2D2D44
-                        radius: 12
-                        on_press:
-                          then:
-                            - homeassistant.service:
-                                service: cover.stop_cover
-                                data:
-                                  entity_id: cover.solar_panel_awning
-                        widgets:
-                          - label:
-                              text_font: mdi_small
-                              text_color: 0xFFA726
-                              text: "\U000F04DB"
+                              text: "\U000F0761"
                               align: CENTER
 
                     # ── Power History Chart ──
