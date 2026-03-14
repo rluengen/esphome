@@ -163,7 +163,7 @@ light:
     name: "Display Backlight"
     id: display_backlight
     output: backlight_output
-    default_transition_length: 250ms
+    default_transition_length: 350ms
     restore_mode: RESTORE_DEFAULT_ON
 
 # MIPI-DSI Display - Waveshare 8.8" (480x1920 portrait)
@@ -251,24 +251,125 @@ script:
   - id: update_lights_tab
     then:
       - lambda: |-
-          int count = 0;
-          if (!isnan(id(ha_bright_main_cans).state) && id(ha_bright_main_cans).state > 0) count++;
-          if (!isnan(id(ha_bright_bed_cans).state) && id(ha_bright_bed_cans).state > 0) count++;
-          if (!isnan(id(ha_bright_door).state) && id(ha_bright_door).state > 0) count++;
-          if (!isnan(id(ha_bright_dog_crate).state) && id(ha_bright_dog_crate).state > 0) count++;
-          if (!isnan(id(ha_bright_bed_capsule).state) && id(ha_bright_bed_capsule).state > 0) count++;
-          if (!isnan(id(ha_bright_awning_out).state) && id(ha_bright_awning_out).state > 0) count++;
-          if (!isnan(id(ha_bright_awning_in).state) && id(ha_bright_awning_in).state > 0) count++;
-          if (!isnan(id(ha_bright_exterior).state) && id(ha_bright_exterior).state > 0) count++;
-          // Update icon
-          lv_label_set_text(id(lbl_tab_lights_icon), count > 0 ? "\U000F0336" : "\U000F0335");
-          // Update count badge
-          if (count > 0) {
-            static char buf[4];
-            snprintf(buf, sizeof(buf), "%d", count);
-            lv_label_set_text(id(lbl_tab_lights_count), buf);
-          } else {
+          float vals[] = {
+            id(ha_bright_main_cans).state,
+            id(ha_bright_bed_cans).state,
+            id(ha_bright_door).state,
+            id(ha_bright_dog_crate).state,
+            id(ha_bright_bed_capsule).state,
+            id(ha_bright_awning_out).state,
+            id(ha_bright_awning_in).state,
+            id(ha_bright_exterior).state,
+          };
+          int all_nan = 1;
+          float max_bright = 0;
+          for (int i = 0; i < 8; i++) {
+            if (!isnan(vals[i])) {
+              all_nan = 0;
+              if (vals[i] > max_bright) max_bright = vals[i];
+            }
+          }
+          if (all_nan) {
+            // No data from any light - alert icon, no badge
+            lv_label_set_text(id(lbl_tab_lights_icon), "\U000F19E2");
             lv_label_set_text(id(lbl_tab_lights_count), "");
+          } else if (max_bright <= 0) {
+            // All lights off - off-outline icon, no badge
+            lv_label_set_text(id(lbl_tab_lights_icon), "\U000F12A4");
+            lv_label_set_text(id(lbl_tab_lights_count), "");
+          } else {
+            // At least one light on - graduated icon based on max brightness
+            int pct = (int)((max_bright / 255.0f) * 100.0f);
+            const char* icon;
+            if (pct >= 90)      icon = "\U000F0336";  // lightbulb-on (full)
+            else if (pct >= 80) icon = "\U000F1A56";  // lightbulb-on-90
+            else if (pct >= 70) icon = "\U000F1A55";  // lightbulb-on-80
+            else if (pct >= 60) icon = "\U000F1A54";  // lightbulb-on-70
+            else if (pct >= 50) icon = "\U000F1A53";  // lightbulb-on-60
+            else if (pct >= 40) icon = "\U000F1A52";  // lightbulb-on-50
+            else if (pct >= 30) icon = "\U000F1A51";  // lightbulb-on-40
+            else if (pct >= 20) icon = "\U000F1A50";  // lightbulb-on-30
+            else if (pct >= 10) icon = "\U000F1A4F";  // lightbulb-on-20
+            else                icon = "\U000F1A4E";  // lightbulb-on-10
+            lv_label_set_text(id(lbl_tab_lights_icon), icon);
+            static char buf[8];
+            snprintf(buf, sizeof(buf), "%d%%", pct);
+            lv_label_set_text(id(lbl_tab_lights_count), buf);
+          }
+
+  # Update water tab icon based on sensor/pump/heater state
+  - id: update_water_tab
+    then:
+      - lambda: |-
+          float level = id(water_level).state;
+          // If water sensor is disconnected (NaN), show alert icon
+          if (isnan(level)) {
+            lv_label_set_text(id(lbl_tab_water_icon), "\U000F1503");  // water-alert-outline
+            return;
+          }
+          // If tank is empty (level <= 0)
+          if (level <= 0) {
+            lv_label_set_text(id(lbl_tab_water_icon), "\U000F1507");  // water-minus-outline
+            return;
+          }
+          // Check pump and heater state
+          bool pump_on = id(ha_water_pump_state).state;
+          bool heater_on = id(ha_hot_water_heater_state).state;
+          if (pump_on && heater_on) {
+            lv_label_set_text(id(lbl_tab_water_icon), "\U000F1A85");  // water-thermometer
+          } else if (pump_on) {
+            lv_label_set_text(id(lbl_tab_water_icon), "\U000F058C");  // water
+          } else {
+            lv_label_set_text(id(lbl_tab_water_icon), "\U000F1508");  // water-off-outline
+          }
+
+  # Update power tab icon based on SOC and charging state
+  - id: update_power_tab
+    then:
+      - lambda: |-
+          float soc = id(ha_battery_soc).state;
+          float charge_power = id(ha_charging_power).state;
+          bool charging = !isnan(charge_power) && charge_power > 0;
+          // Update percentage badge
+          if (!isnan(soc)) {
+            static char buf[8];
+            snprintf(buf, sizeof(buf), "%.0f%%", soc);
+            lv_label_set_text(id(lbl_tab_power_pct), buf);
+          } else {
+            lv_label_set_text(id(lbl_tab_power_pct), "");
+          }
+          // Update icon
+          if (isnan(soc)) {
+            // No data - alert icon
+            lv_label_set_text(id(lbl_tab_power_icon), "\U000F10CD");
+          } else {
+            int pct = (int)soc;
+            const char* icon;
+            if (charging) {
+              if (pct >= 95)      icon = "\U000F0085";  // battery-charging-100
+              else if (pct >= 85) icon = "\U000F008B";  // battery-charging-90
+              else if (pct >= 75) icon = "\U000F008A";  // battery-charging-80
+              else if (pct >= 65) icon = "\U000F089E";  // battery-charging-70
+              else if (pct >= 55) icon = "\U000F0089";  // battery-charging-60
+              else if (pct >= 45) icon = "\U000F089D";  // battery-charging-50
+              else if (pct >= 35) icon = "\U000F0088";  // battery-charging-40
+              else if (pct >= 25) icon = "\U000F0087";  // battery-charging-30
+              else if (pct >= 15) icon = "\U000F0086";  // battery-charging-20
+              else                icon = "\U000F089C";  // battery-charging-10
+            } else {
+              if (pct >= 95)      icon = "\U000F0079";  // battery (full)
+              else if (pct >= 85) icon = "\U000F0082";  // battery-90
+              else if (pct >= 75) icon = "\U000F0081";  // battery-80
+              else if (pct >= 65) icon = "\U000F0080";  // battery-70
+              else if (pct >= 55) icon = "\U000F007F";  // battery-60
+              else if (pct >= 45) icon = "\U000F007E";  // battery-50
+              else if (pct >= 35) icon = "\U000F007D";  // battery-40
+              else if (pct >= 25) icon = "\U000F007C";  // battery-30
+              else if (pct >= 15) icon = "\U000F007B";  // battery-20
+              else if (pct >= 5)  icon = "\U000F007A";  // battery-10
+              else                icon = "\U000F008E";  // battery-outline (empty)
+            }
+            lv_label_set_text(id(lbl_tab_power_icon), icon);
           }
 
   - id: debounce_main_cans
@@ -382,6 +483,43 @@ script:
             entity_id: light.light_controller_exterior_roof_rear_flood_light
           data_template:
             brightness: !lambda 'return id(pending_bright_exterior);'
+
+  # ── Awning Toggle Scripts ──
+  - id: toggle_solar_awning
+    then:
+      - if:
+          condition:
+            lambda: |-
+              std::string s = id(ha_cover_solar_panel).state;
+              return s == "open" || s == "opening";
+          then:
+            - homeassistant.service:
+                service: cover.close_cover
+                data:
+                  entity_id: cover.solar_panel_awning
+          else:
+            - homeassistant.service:
+                service: cover.open_cover
+                data:
+                  entity_id: cover.solar_panel_awning
+
+  - id: toggle_main_awning
+    then:
+      - if:
+          condition:
+            lambda: |-
+              std::string s = id(ha_cover_main_awning).state;
+              return s == "open" || s == "opening";
+          then:
+            - homeassistant.service:
+                service: cover.close_cover
+                data:
+                  entity_id: cover.awning
+          else:
+            - homeassistant.service:
+                service: cover.open_cover
+                data:
+                  entity_id: cover.awning
 
   # ── Tab Highlight Scripts ──
   - id: highlight_tab_home
@@ -852,6 +990,36 @@ text_sensor:
               if (it != icons.end()) return it->second.c_str();
               return "\U000F0599";
 
+  # Cover state sensors (for dynamic awning buttons)
+  - platform: homeassistant
+    id: ha_cover_solar_panel
+    entity_id: cover.solar_panel_awning
+    internal: true
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: lbl_solar_awning_action
+            text: !lambda |-
+              if (x == "open" || x == "opening") return std::string("\U000F04CE");
+              return std::string("\U000F04CF");
+        - lvgl.label.update:
+            id: lbl_solar_awning_action_pwr
+            text: !lambda |-
+              if (x == "open" || x == "opening") return std::string("\U000F04CE");
+              return std::string("\U000F04CF");
+
+  - platform: homeassistant
+    id: ha_cover_main_awning
+    entity_id: cover.awning
+    internal: true
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: lbl_main_awning_action
+            text: !lambda |-
+              if (x == "open" || x == "opening") return std::string("\U000F04CE");
+              return std::string("\U000F04CF");
+
   # Light entity state sensors (detect unavailable to disable sliders)
   - platform: homeassistant
     id: ha_state_main_cans
@@ -1055,6 +1223,7 @@ sensor:
               static char buf[8];
               snprintf(buf, sizeof(buf), "%.0f%%", x);
               return buf;
+        - script.execute: update_water_tab
 
   - platform: homeassistant
     id: water_gallons
@@ -1083,29 +1252,38 @@ sensor:
     internal: true
     on_value:
       then:
+        - script.execute: update_power_tab
+
+  # Battery charging power (> 0 means charging)
+  - platform: homeassistant
+    id: ha_charging_power
+    entity_id: sensor.ecoflow_ac_charging_power
+    internal: true
+    on_value:
+      then:
+        - script.execute: update_power_tab
         - lvgl.label.update:
-            id: lbl_tab_power_pct
+            id: lbl_ac_watts
             text: !lambda |-
-              if (isnan(x)) return "";
-              static char buf[8];
-              snprintf(buf, sizeof(buf), "%.0f%%", x);
-              return buf;
+              if (isnan(x)) return std::string("-- W");
+              static char buf[16];
+              snprintf(buf, sizeof(buf), "%.0f W", x);
+              return std::string(buf);
+
+  # Solar input power
+  - platform: homeassistant
+    id: ha_solar_in_power
+    entity_id: sensor.ecoflow_solar_in_power
+    internal: true
+    on_value:
+      then:
         - lvgl.label.update:
-            id: lbl_tab_power_icon
+            id: lbl_solar_watts
             text: !lambda |-
-              if (isnan(x)) return "\U000F008E";
-              int pct = (int)x;
-              if (pct >= 95) return "\U000F0079";
-              if (pct >= 85) return "\U000F0082";
-              if (pct >= 75) return "\U000F0081";
-              if (pct >= 65) return "\U000F0080";
-              if (pct >= 55) return "\U000F007F";
-              if (pct >= 45) return "\U000F007E";
-              if (pct >= 35) return "\U000F007D";
-              if (pct >= 25) return "\U000F007C";
-              if (pct >= 15) return "\U000F007B";
-              if (pct >= 5)  return "\U000F007A";
-              return "\U000F008E";
+              if (isnan(x)) return std::string("-- W");
+              static char buf[16];
+              snprintf(buf, sizeof(buf), "%.0f W", x);
+              return std::string(buf);
 
   # TODO: Replace with real HA sensor once hooked up
   - platform: template
@@ -1214,6 +1392,10 @@ sensor:
         - lvgl.slider.update:
             id: sld_main_cans
             value: !lambda 'return isnan(x) ? 0 : (int)x;'
+        - lvgl.label.update:
+            id: lbl_icon_main_cans
+            text: !lambda 'return std::string((!isnan(x) && x > 0) ? "\U000F0336" : "\U000F0335");'
+            text_color: !lambda 'return (!isnan(x) && x > 0) ? lv_color_hex(0xFFD700) : lv_color_hex(0x808080);'
         - script.execute: update_lights_tab
 
   - platform: homeassistant
@@ -1226,6 +1408,10 @@ sensor:
         - lvgl.slider.update:
             id: sld_bed_cans
             value: !lambda 'return isnan(x) ? 0 : (int)x;'
+        - lvgl.label.update:
+            id: lbl_icon_bed_cans
+            text: !lambda 'return std::string((!isnan(x) && x > 0) ? "\U000F0336" : "\U000F0335");'
+            text_color: !lambda 'return (!isnan(x) && x > 0) ? lv_color_hex(0xFFD700) : lv_color_hex(0x808080);'
         - script.execute: update_lights_tab
 
   - platform: homeassistant
@@ -1238,6 +1424,10 @@ sensor:
         - lvgl.slider.update:
             id: sld_door
             value: !lambda 'return isnan(x) ? 0 : (int)x;'
+        - lvgl.label.update:
+            id: lbl_icon_door
+            text: !lambda 'return std::string((!isnan(x) && x > 0) ? "\U000F0336" : "\U000F0335");'
+            text_color: !lambda 'return (!isnan(x) && x > 0) ? lv_color_hex(0xFFD700) : lv_color_hex(0x808080);'
         - script.execute: update_lights_tab
 
   - platform: homeassistant
@@ -1250,6 +1440,10 @@ sensor:
         - lvgl.slider.update:
             id: sld_dog_crate
             value: !lambda 'return isnan(x) ? 0 : (int)x;'
+        - lvgl.label.update:
+            id: lbl_icon_dog_crate
+            text: !lambda 'return std::string((!isnan(x) && x > 0) ? "\U000F0336" : "\U000F0335");'
+            text_color: !lambda 'return (!isnan(x) && x > 0) ? lv_color_hex(0xFFD700) : lv_color_hex(0x808080);'
         - script.execute: update_lights_tab
 
   - platform: homeassistant
@@ -1262,6 +1456,10 @@ sensor:
         - lvgl.slider.update:
             id: sld_bed_capsule
             value: !lambda 'return isnan(x) ? 0 : (int)x;'
+        - lvgl.label.update:
+            id: lbl_icon_bed_capsule
+            text: !lambda 'return std::string((!isnan(x) && x > 0) ? "\U000F0336" : "\U000F0335");'
+            text_color: !lambda 'return (!isnan(x) && x > 0) ? lv_color_hex(0xFFD700) : lv_color_hex(0x808080);'
         - script.execute: update_lights_tab
 
   - platform: homeassistant
@@ -1274,6 +1472,10 @@ sensor:
         - lvgl.slider.update:
             id: sld_awning_out
             value: !lambda 'return isnan(x) ? 0 : (int)x;'
+        - lvgl.label.update:
+            id: lbl_icon_awning_out
+            text: !lambda 'return std::string((!isnan(x) && x > 0) ? "\U000F0336" : "\U000F0335");'
+            text_color: !lambda 'return (!isnan(x) && x > 0) ? lv_color_hex(0xFFD700) : lv_color_hex(0x808080);'
         - script.execute: update_lights_tab
 
   - platform: homeassistant
@@ -1286,6 +1488,10 @@ sensor:
         - lvgl.slider.update:
             id: sld_awning_in
             value: !lambda 'return isnan(x) ? 0 : (int)x;'
+        - lvgl.label.update:
+            id: lbl_icon_awning_in
+            text: !lambda 'return std::string((!isnan(x) && x > 0) ? "\U000F0336" : "\U000F0335");'
+            text_color: !lambda 'return (!isnan(x) && x > 0) ? lv_color_hex(0xFFD700) : lv_color_hex(0x808080);'
         - script.execute: update_lights_tab
 
   - platform: homeassistant
@@ -1298,6 +1504,10 @@ sensor:
         - lvgl.slider.update:
             id: sld_exterior
             value: !lambda 'return isnan(x) ? 0 : (int)x;'
+        - lvgl.label.update:
+            id: lbl_icon_exterior
+            text: !lambda 'return std::string((!isnan(x) && x > 0) ? "\U000F0336" : "\U000F0335");'
+            text_color: !lambda 'return (!isnan(x) && x > 0) ? lv_color_hex(0xFFD700) : lv_color_hex(0x808080);'
         - script.execute: update_lights_tab
 
   # ---- 7-Day Forecast Temperature Sensors ----
@@ -1492,6 +1702,7 @@ binary_sensor:
             id: lbl_heater_icon
             text: !lambda 'return std::string(x ? "\U000F0F92" : "\U000F0F91");'
             text_color: !lambda 'return x ? lv_color_hex(0xFF6600) : lv_color_hex(0x808080);'
+        - script.execute: update_water_tab
 
   - platform: homeassistant
     id: ha_water_pump_state
@@ -1507,6 +1718,7 @@ binary_sensor:
             id: lbl_pump_icon
             text: !lambda 'return std::string(x ? "\U000F058E" : "\U000F0F93");'
             text_color: !lambda 'return x ? lv_color_hex(0x00BFFF) : lv_color_hex(0x808080);'
+        - script.execute: update_water_tab
 
 # ---- 7-Day Forecast ----
 # Forecast sensors are defined above (text_sensor + sensor sections).
@@ -1556,6 +1768,8 @@ font:
       "\U000F0143", # chevron-up (open)
       "\U000F04DB", # stop
       "\U000F0140", # chevron-down (close)
+      "\U000F04CF", # unfold-more-horizontal (awning open)
+      "\U000F04CE", # unfold-less-horizontal (awning close)
       "\U000F11B3", # awning-outline
       "\U000F0425", # power
       "\U000F050F", # thermometer
@@ -1566,6 +1780,8 @@ font:
       "\U000F0F92", # water-boiler (on)
       "\U000F0F91", # water-boiler-off
       "\U000F0F93", # water-pump-off
+      "\U000F0A72", # solar-power
+      "\U000F06A5", # power-plug
       # Weather condition icons (for forecast cards)
       "\U000F0594", # clear-night
       "\U000F0590", # cloudy
@@ -1594,9 +1810,21 @@ font:
       "\U000F0590", # cloudy (weather)
       "\U000F0335", # lightbulb
       "\U000F0336", # lightbulb-on
+      "\U000F1A4E", # lightbulb-on-10
+      "\U000F1A4F", # lightbulb-on-20
+      "\U000F1A50", # lightbulb-on-30
+      "\U000F1A51", # lightbulb-on-40
+      "\U000F1A52", # lightbulb-on-50
+      "\U000F1A53", # lightbulb-on-60
+      "\U000F1A54", # lightbulb-on-70
+      "\U000F1A55", # lightbulb-on-80
+      "\U000F1A56", # lightbulb-on-90
       "\U000F12A3", # lightbulb-off
+      "\U000F12A4", # lightbulb-off-outline
+      "\U000F19E2", # lightbulb-alert-outline
       "\U000F0079", # battery (full)
       "\U000F008E", # battery-outline (empty)
+      "\U000F10CD", # battery-alert-variant-outline
       "\U000F007A", # battery-10
       "\U000F007B", # battery-20
       "\U000F007C", # battery-30
@@ -1606,7 +1834,22 @@ font:
       "\U000F0080", # battery-70
       "\U000F0081", # battery-80
       "\U000F0082", # battery-90
+      "\U000F0084", # battery-charging
+      "\U000F0085", # battery-charging-100
+      "\U000F089C", # battery-charging-10
+      "\U000F0086", # battery-charging-20
+      "\U000F0087", # battery-charging-30
+      "\U000F0088", # battery-charging-40
+      "\U000F089D", # battery-charging-50
+      "\U000F0089", # battery-charging-60
+      "\U000F089E", # battery-charging-70
+      "\U000F008A", # battery-charging-80
+      "\U000F008B", # battery-charging-90
       "\U000F058C", # water
+      "\U000F1503", # water-alert-outline
+      "\U000F1507", # water-minus-outline
+      "\U000F1508", # water-off-outline
+      "\U000F1A85", # water-thermometer
       # Weather condition icons (for dynamic tab icon)
       "\U000F0594", # clear-night
       "\U000F0F2F", # exceptional
@@ -1627,14 +1870,14 @@ font:
   # UI text font
   - file: "fonts/Roboto-Regular.ttf"
     id: roboto_small
-    size: 24
+    size: 28
     bpp: 4
     glyphs: " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~°"
 
   # Large value font
   - file: "fonts/Roboto-Regular.ttf"
     id: roboto_large
-    size: 38
+    size: 44
     bpp: 4
     glyphs: " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~°"
 
@@ -1668,6 +1911,46 @@ interval:
             static const char* months[] = {"January","February","March","April","May","June","July","August","September","October","November","December"};
             snprintf(buf, sizeof(buf), "%s, %s %d", days[time.day_of_week-1], months[time.month-1], time.day_of_month);
             return buf;
+  - interval: 60s
+    then:
+      - lambda: |-
+          static const int NUM_PTS = 60;
+          static const int CHART_W = 904;   // 920 - 16 padding
+          static const int CHART_H = 144;   // 160 - 16 padding
+          static lv_point_t solar_pts[NUM_PTS];
+          static lv_point_t batt_pts[NUM_PTS];
+          static bool initialized = false;
+
+          if (!initialized) {
+            initialized = true;
+            // Initialize all points at bottom
+            for (int i = 0; i < NUM_PTS; i++) {
+              solar_pts[i].x = (lv_coord_t)(i * CHART_W / (NUM_PTS - 1));
+              solar_pts[i].y = (lv_coord_t)CHART_H;
+              batt_pts[i].x = solar_pts[i].x;
+              batt_pts[i].y = (lv_coord_t)CHART_H;
+            }
+          }
+
+          // Shift y-values left (x stays fixed)
+          for (int i = 0; i < NUM_PTS - 1; i++) {
+            solar_pts[i].y = solar_pts[i + 1].y;
+            batt_pts[i].y = batt_pts[i + 1].y;
+          }
+
+          // Solar: 0-500W mapped to CHART_H..0 (y inverted)
+          float sv = id(ha_solar_in_power).state;
+          solar_pts[NUM_PTS - 1].y = (lv_coord_t)(isnan(sv) ? CHART_H
+              : CHART_H - (int)(fminf(sv, 500.0f) / 500.0f * CHART_H));
+
+          // Battery: 0-100% mapped to CHART_H..0
+          float bv = id(ha_battery_soc).state;
+          batt_pts[NUM_PTS - 1].y = (lv_coord_t)(isnan(bv) ? CHART_H
+              : CHART_H - (int)(fminf(bv, 100.0f) / 100.0f * CHART_H));
+
+          // Update the YAML-declared line widgets
+          lv_line_set_points(id(line_solar)->obj, solar_pts, NUM_PTS);
+          lv_line_set_points(id(line_battery)->obj, batt_pts, NUM_PTS);
 
 # LVGL tabbed dashboard
 # Layout: 90px left tab bar | 1830px content area (1920x480 total)
@@ -1698,6 +1981,8 @@ lvgl:
             pad_bottom: 0
             scrollbar_mode: "OFF"
             scrollable: false
+            pad_left: 0
+            pad_right: 0
             layout:
               type: FLEX
               flex_flow: COLUMN
@@ -1707,7 +1992,7 @@ lvgl:
               # ── Home Tab Button ──
               - button:
                   id: btn_tab_home
-                  width: 80
+                  width: 88
                   height: 86
                   bg_color: 0x3A506B
                   radius: 14
@@ -1730,7 +2015,7 @@ lvgl:
               # ── Weather Tab Button ──
               - button:
                   id: btn_tab_weather
-                  width: 80
+                  width: 88
                   height: 86
                   bg_color: 0x1A1A2E
                   radius: 14
@@ -1762,7 +2047,7 @@ lvgl:
               # ── Lights Tab Button ──
               - button:
                   id: btn_tab_lights
-                  width: 80
+                  width: 88
                   height: 86
                   bg_color: 0x1A1A2E
                   radius: 14
@@ -1780,7 +2065,7 @@ lvgl:
                         id: lbl_tab_lights_icon
                         text_font: mdi_tab
                         text_color: 0xB0B0B0
-                        text: "\U000F0335"
+                        text: "\U000F19E2"
                         align: CENTER
                         y: -6
                     - label:
@@ -1794,7 +2079,7 @@ lvgl:
               # ── Power Tab Button ──
               - button:
                   id: btn_tab_power
-                  width: 80
+                  width: 88
                   height: 86
                   bg_color: 0x1A1A2E
                   radius: 14
@@ -1812,7 +2097,7 @@ lvgl:
                         id: lbl_tab_power_icon
                         text_font: mdi_tab
                         text_color: 0xB0B0B0
-                        text: "\U000F0079"
+                        text: "\U000F10CD"
                         align: CENTER
                         y: -6
                     - label:
@@ -1826,7 +2111,7 @@ lvgl:
               # ── Water Tab Button ──
               - button:
                   id: btn_tab_water
-                  width: 80
+                  width: 88
                   height: 86
                   bg_color: 0x1A1A2E
                   radius: 14
@@ -1841,9 +2126,10 @@ lvgl:
                       - script.execute: highlight_tab_water
                   widgets:
                     - label:
+                        id: lbl_tab_water_icon
                         text_font: mdi_tab
                         text_color: 0xB0B0B0
-                        text: "\U000F058C"
+                        text: "\U000F1503"
                         align: CENTER
                         y: -6
                     - label:
@@ -2062,11 +2348,187 @@ lvgl:
                         x: 200
                         y: 303
 
+              # ── Scene Buttons Section ──
+              - obj:
+                  width: 300
+                  height: 480
+                  x: 1040
+                  y: 0
+                  bg_opa: TRANSP
+                  border_width: 0
+                  scrollbar_mode: "OFF"
+                  widgets:
+                    - label:
+                        text: "Scenes"
+                        text_font: roboto_small
+                        text_color: 0x808080
+                        x: 20
+                        y: 20
+
+                    # ── Cans On/Off ──
+                    - label:
+                        text: "Cans"
+                        text_font: roboto_small
+                        text_color: 0xB0B0B0
+                        x: 20
+                        y: 65
+                    - button:
+                        width: 120
+                        height: 55
+                        x: 15
+                        y: 100
+                        bg_color: 0x2E7D32
+                        radius: 10
+                        on_press:
+                          then:
+                            - homeassistant.service:
+                                service: light.turn_on
+                                data:
+                                  entity_id: light.main_cans
+                            - homeassistant.service:
+                                service: light.turn_on
+                                data:
+                                  entity_id: light.bed_cans
+                        widgets:
+                          - label:
+                              text: "On"
+                              text_font: roboto_small
+                              text_color: 0xFFFFFF
+                              align: CENTER
+                    - button:
+                        width: 120
+                        height: 55
+                        x: 155
+                        y: 100
+                        bg_color: 0xC62828
+                        radius: 10
+                        on_press:
+                          then:
+                            - homeassistant.service:
+                                service: light.turn_off
+                                data:
+                                  entity_id: light.main_cans
+                            - homeassistant.service:
+                                service: light.turn_off
+                                data:
+                                  entity_id: light.bed_cans
+                        widgets:
+                          - label:
+                              text: "Off"
+                              text_font: roboto_small
+                              text_color: 0xFFFFFF
+                              align: CENTER
+
+                    # ── Awning Lights On/Off ──
+                    - label:
+                        text: "Awning Lights"
+                        text_font: roboto_small
+                        text_color: 0xB0B0B0
+                        x: 20
+                        y: 185
+                    - button:
+                        width: 120
+                        height: 55
+                        x: 15
+                        y: 220
+                        bg_color: 0x2E7D32
+                        radius: 10
+                        on_press:
+                          then:
+                            - homeassistant.service:
+                                service: light.turn_on
+                                data:
+                                  entity_id: light.awning_out
+                            - homeassistant.service:
+                                service: light.turn_on
+                                data:
+                                  entity_id: light.awning_in
+                        widgets:
+                          - label:
+                              text: "On"
+                              text_font: roboto_small
+                              text_color: 0xFFFFFF
+                              align: CENTER
+                    - button:
+                        width: 120
+                        height: 55
+                        x: 155
+                        y: 220
+                        bg_color: 0xC62828
+                        radius: 10
+                        on_press:
+                          then:
+                            - homeassistant.service:
+                                service: light.turn_off
+                                data:
+                                  entity_id: light.awning_out
+                            - homeassistant.service:
+                                service: light.turn_off
+                                data:
+                                  entity_id: light.awning_in
+                        widgets:
+                          - label:
+                              text: "Off"
+                              text_font: roboto_small
+                              text_color: 0xFFFFFF
+                              align: CENTER
+
+                    # ── Bedtime ──
+                    - button:
+                        width: 260
+                        height: 60
+                        x: 15
+                        y: 320
+                        bg_color: 0x1565C0
+                        radius: 10
+                        on_press:
+                          then:
+                            - homeassistant.service:
+                                service: light.turn_on
+                                data:
+                                  entity_id: light.bed_capsule
+                                data_template:
+                                  brightness: "64"
+                            - homeassistant.service:
+                                service: light.turn_off
+                                data:
+                                  entity_id: light.main_cans
+                            - homeassistant.service:
+                                service: light.turn_off
+                                data:
+                                  entity_id: light.bed_cans
+                            - homeassistant.service:
+                                service: light.turn_off
+                                data:
+                                  entity_id: light.door
+                            - homeassistant.service:
+                                service: light.turn_off
+                                data:
+                                  entity_id: light.dog_crate
+                            - homeassistant.service:
+                                service: light.turn_off
+                                data:
+                                  entity_id: light.awning_out
+                            - homeassistant.service:
+                                service: light.turn_off
+                                data:
+                                  entity_id: light.awning_in
+                            - homeassistant.service:
+                                service: light.turn_off
+                                data:
+                                  entity_id: light.exterior_floods
+                        widgets:
+                          - label:
+                              text: "Bedtime"
+                              text_font: roboto_small
+                              text_color: 0xFFFFFF
+                              align: CENTER
+
               # ── Awning Controls Section (right) ──
               - obj:
-                  width: 760
+                  width: 490
                   height: 480
-                  x: 1060
+                  x: 1340
                   y: 0
                   bg_opa: TRANSP
                   border_width: 0
@@ -2080,7 +2542,7 @@ lvgl:
                         x: 40
                         y: 30
                     - button:
-                        width: 100
+                        width: 130
                         height: 60
                         x: 40
                         y: 65
@@ -2088,20 +2550,18 @@ lvgl:
                         radius: 10
                         on_press:
                           then:
-                            - homeassistant.service:
-                                service: cover.open_cover
-                                data:
-                                  entity_id: cover.solar_panel_awning
+                            - script.execute: toggle_solar_awning
                         widgets:
                           - label:
+                              id: lbl_solar_awning_action
                               text_font: mdi_small
                               text_color: 0x66BB6A
-                              text: "\U000F0143"
+                              text: "\U000F04CF"
                               align: CENTER
                     - button:
-                        width: 100
+                        width: 130
                         height: 60
-                        x: 160
+                        x: 190
                         y: 65
                         bg_color: 0x2D2D44
                         radius: 10
@@ -2116,25 +2576,6 @@ lvgl:
                               text_font: mdi_small
                               text_color: 0xFFA726
                               text: "\U000F04DB"
-                              align: CENTER
-                    - button:
-                        width: 100
-                        height: 60
-                        x: 280
-                        y: 65
-                        bg_color: 0x2D2D44
-                        radius: 10
-                        on_press:
-                          then:
-                            - homeassistant.service:
-                                service: cover.close_cover
-                                data:
-                                  entity_id: cover.solar_panel_awning
-                        widgets:
-                          - label:
-                              text_font: mdi_small
-                              text_color: 0xEF5350
-                              text: "\U000F0140"
                               align: CENTER
 
                     # ── Main Awning ──
@@ -2145,7 +2586,7 @@ lvgl:
                         x: 40
                         y: 180
                     - button:
-                        width: 100
+                        width: 130
                         height: 60
                         x: 40
                         y: 215
@@ -2153,20 +2594,18 @@ lvgl:
                         radius: 10
                         on_press:
                           then:
-                            - homeassistant.service:
-                                service: cover.open_cover
-                                data:
-                                  entity_id: cover.awning
+                            - script.execute: toggle_main_awning
                         widgets:
                           - label:
+                              id: lbl_main_awning_action
                               text_font: mdi_small
                               text_color: 0x66BB6A
-                              text: "\U000F0143"
+                              text: "\U000F04CF"
                               align: CENTER
                     - button:
-                        width: 100
+                        width: 130
                         height: 60
-                        x: 160
+                        x: 190
                         y: 215
                         bg_color: 0x2D2D44
                         radius: 10
@@ -2181,25 +2620,6 @@ lvgl:
                               text_font: mdi_small
                               text_color: 0xFFA726
                               text: "\U000F04DB"
-                              align: CENTER
-                    - button:
-                        width: 100
-                        height: 60
-                        x: 280
-                        y: 215
-                        bg_color: 0x2D2D44
-                        radius: 10
-                        on_press:
-                          then:
-                            - homeassistant.service:
-                                service: cover.close_cover
-                                data:
-                                  entity_id: cover.awning
-                        widgets:
-                          - label:
-                              text_font: mdi_small
-                              text_color: 0xEF5350
-                              text: "\U000F0140"
                               align: CENTER
 
         # ═══════════════════════════════════════════════════
@@ -2627,8 +3047,9 @@ lvgl:
                                   entity_id: light.main_cans
                         widgets:
                           - label:
+                              id: lbl_icon_main_cans
                               text_font: mdi_small
-                              text_color: 0xFFD700
+                              text_color: 0x808080
                               text: "\U000F0335"
                               align: CENTER
                     - slider:
@@ -2680,8 +3101,9 @@ lvgl:
                                   entity_id: light.bed_cans
                         widgets:
                           - label:
+                              id: lbl_icon_bed_cans
                               text_font: mdi_small
-                              text_color: 0xFFD700
+                              text_color: 0x808080
                               text: "\U000F0335"
                               align: CENTER
                     - slider:
@@ -2733,8 +3155,9 @@ lvgl:
                                   entity_id: light.door
                         widgets:
                           - label:
+                              id: lbl_icon_door
                               text_font: mdi_small
-                              text_color: 0xFFD700
+                              text_color: 0x808080
                               text: "\U000F0335"
                               align: CENTER
                     - slider:
@@ -2786,8 +3209,9 @@ lvgl:
                                   entity_id: light.dog_crate
                         widgets:
                           - label:
+                              id: lbl_icon_dog_crate
                               text_font: mdi_small
-                              text_color: 0xFFD700
+                              text_color: 0x808080
                               text: "\U000F0335"
                               align: CENTER
                     - slider:
@@ -2839,8 +3263,9 @@ lvgl:
                                   entity_id: light.bed_capsule
                         widgets:
                           - label:
+                              id: lbl_icon_bed_capsule
                               text_font: mdi_small
-                              text_color: 0xFFD700
+                              text_color: 0x808080
                               text: "\U000F0335"
                               align: CENTER
                     - slider:
@@ -2892,8 +3317,9 @@ lvgl:
                                   entity_id: light.awning_out
                         widgets:
                           - label:
+                              id: lbl_icon_awning_out
                               text_font: mdi_small
-                              text_color: 0xFFD700
+                              text_color: 0x808080
                               text: "\U000F0335"
                               align: CENTER
                     - slider:
@@ -2945,8 +3371,9 @@ lvgl:
                                   entity_id: light.awning_in
                         widgets:
                           - label:
+                              id: lbl_icon_awning_in
                               text_font: mdi_small
-                              text_color: 0xFFD700
+                              text_color: 0x808080
                               text: "\U000F0335"
                               align: CENTER
                     - slider:
@@ -2998,8 +3425,9 @@ lvgl:
                                   entity_id: light.exterior_floods
                         widgets:
                           - label:
+                              id: lbl_icon_exterior
                               text_font: mdi_small
-                              text_color: 0xFFD700
+                              text_color: 0x808080
                               text: "\U000F0335"
                               align: CENTER
                     - slider:
@@ -3087,6 +3515,48 @@ lvgl:
                         max_value: 100
                         value: 0
 
+                    # ── Solar Input ──
+                    - label:
+                        text_font: mdi_small
+                        text_color: 0xFFD700
+                        text: "\U000F0A72"
+                        x: 40
+                        y: 240
+                    - label:
+                        text: "Solar"
+                        text_font: roboto_small
+                        text_color: 0x808080
+                        x: 100
+                        y: 250
+                    - label:
+                        id: lbl_solar_watts
+                        text: "-- W"
+                        text_font: roboto_large
+                        text_color: 0xFFFFFF
+                        x: 220
+                        y: 245
+
+                    # ── A/C Charge Input ──
+                    - label:
+                        text_font: mdi_small
+                        text_color: 0x4FC3F7
+                        text: "\U000F06A5"
+                        x: 40
+                        y: 320
+                    - label:
+                        text: "A/C Input"
+                        text_font: roboto_small
+                        text_color: 0x808080
+                        x: 100
+                        y: 330
+                    - label:
+                        id: lbl_ac_watts
+                        text: "-- W"
+                        text_font: roboto_large
+                        text_color: 0xFFFFFF
+                        x: 220
+                        y: 325
+
               # ── Solar Panel Awning (right) ──
               - obj:
                   width: 1000
@@ -3110,37 +3580,28 @@ lvgl:
                         x: 40
                         y: 90
                     - button:
-                        width: 200
+                        width: 280
                         height: 80
                         x: 40
                         y: 160
-                        bg_color: 0x2E7D32
+                        bg_color: 0x2D2D44
                         radius: 12
                         on_press:
                           then:
-                            - homeassistant.service:
-                                service: cover.open_cover
-                                data:
-                                  entity_id: cover.solar_panel_awning
+                            - script.execute: toggle_solar_awning
                         widgets:
                           - label:
+                              id: lbl_solar_awning_action_pwr
                               text_font: mdi_small
-                              text_color: 0xFFFFFF
-                              text: "\U000F0143"
+                              text_color: 0x66BB6A
+                              text: "\U000F04CF"
                               align: CENTER
-                              x: -30
-                          - label:
-                              text: "Open"
-                              text_font: roboto_small
-                              text_color: 0xFFFFFF
-                              align: CENTER
-                              x: 20
                     - button:
-                        width: 200
+                        width: 280
                         height: 80
-                        x: 260
+                        x: 340
                         y: 160
-                        bg_color: 0xF57F17
+                        bg_color: 0x2D2D44
                         radius: 12
                         on_press:
                           then:
@@ -3151,42 +3612,64 @@ lvgl:
                         widgets:
                           - label:
                               text_font: mdi_small
-                              text_color: 0xFFFFFF
+                              text_color: 0xFFA726
                               text: "\U000F04DB"
                               align: CENTER
-                              x: -25
-                          - label:
-                              text: "Stop"
-                              text_font: roboto_small
-                              text_color: 0xFFFFFF
-                              align: CENTER
-                              x: 20
-                    - button:
-                        width: 200
-                        height: 80
-                        x: 480
-                        y: 160
-                        bg_color: 0xC62828
-                        radius: 12
-                        on_press:
-                          then:
-                            - homeassistant.service:
-                                service: cover.close_cover
-                                data:
-                                  entity_id: cover.solar_panel_awning
+
+                    # ── Power History Chart ──
+                    - label:
+                        text: "\U000F0A72"
+                        text_font: mdi_small
+                        text_color: 0xFFD700
+                        x: 40
+                        y: 270
+                    - label:
+                        text: "Solar W"
+                        text_font: roboto_small
+                        text_color: 0xFFD700
+                        x: 85
+                        y: 280
+                    - label:
+                        text: "\U000F0079"
+                        text_font: mdi_small
+                        text_color: 0x66BB6A
+                        x: 240
+                        y: 270
+                    - label:
+                        text: "Battery %"
+                        text_font: roboto_small
+                        text_color: 0x66BB6A
+                        x: 285
+                        y: 280
+                    - obj:
+                        id: power_chart_container
+                        width: 920
+                        height: 160
+                        x: 40
+                        y: 310
+                        bg_color: 0x2D2D44
+                        bg_opa: COVER
+                        radius: 8
+                        border_width: 0
+                        pad_all: 8
+                        scrollbar_mode: "OFF"
                         widgets:
-                          - label:
-                              text_font: mdi_small
-                              text_color: 0xFFFFFF
-                              text: "\U000F0140"
-                              align: CENTER
-                              x: -30
-                          - label:
-                              text: "Close"
-                              text_font: roboto_small
-                              text_color: 0xFFFFFF
-                              align: CENTER
-                              x: 20
+                          - line:
+                              id: line_solar
+                              line_color: 0xFFD700
+                              line_width: 2
+                              line_rounded: true
+                              points:
+                                - 0, 144
+                                - 904, 144
+                          - line:
+                              id: line_battery
+                              line_color: 0x66BB6A
+                              line_width: 2
+                              line_rounded: true
+                              points:
+                                - 0, 144
+                                - 904, 144
 
         # ═══════════════════════════════════════════════════
         # WATER TAB CONTENT
