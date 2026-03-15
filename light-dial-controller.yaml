@@ -11,7 +11,7 @@ substitutions:
   device_name: light-dial-controller
   friendly_name: Light Dial Controller
   project_name: light-dial-controller
-  project_version: "1.0.0"
+  project_version: "1.0.1"
   log_level: DEBUG
 
 packages:
@@ -63,7 +63,9 @@ font:
     id: mdi_icons_large
     size: 40
     bpp: 4
-    glyphs: []  # Will be populated dynamically by ESPHome
+    glyphs: [
+      "\U000F0335", # mdi-lightbulb-group
+    ]
 
 lvgl:
   on_boot:
@@ -81,7 +83,7 @@ lvgl:
           x: 5
           y: 5
           text: "\U000F05A9"  # mdi:wifi
-          text_font: battery_icons
+          text_font: wifi_icons
           text_color: 0xFFFFFF
 
       - label:
