@@ -4,6 +4,7 @@ esp32:
     type: esp-idf
 
 i2c:
+  id: i2c_bus
   sda: GPIO6
   scl: GPIO7
   scan: true

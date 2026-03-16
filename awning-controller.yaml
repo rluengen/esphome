@@ -68,12 +68,19 @@ packages:
       - path: packages/ota/http_update.yaml
 
 logger:
-  level: DEBUG
+  level: VERBOSE
   logs:
-    i2c: DEBUG
-    i2c.idf: DEBUG
-    ina260: DEBUG
+    i2c: VERBOSE
+    i2c.idf: VERBOSE
+    ina260: VERBOSE
     sensor: DEBUG
+    wifi: INFO
+    api: INFO
+    mdns: INFO
+    http_request: INFO
+    web_server: INFO
+    safe_mode: INFO
+    ota: INFO
 
 # added for debugging
 web_server:
