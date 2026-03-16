@@ -101,6 +101,8 @@ lvgl:
           align: CENTER
           x: 0
           y: 0
+          width: 360
+          height: 360
           clickable: false
           bg_opa: TRANSP
           arc_color: 0x444444
@@ -109,22 +111,24 @@ lvgl:
           max_value: 100
           value: 0
           adjustable: false
-          radius: 90
           indicator:
             arc_color: 0xFFC107
             arc_width: 14
 
   pages:
     - id: main_page
+      bg_color: 0x000000
       widgets:
         # Swipeable TileView (no headers; swipe horizontally between tiles)
         - tileview:
             id: light_tiles
+            bg_opa: TRANSP
             tiles:
               - id: tile_all_lights
                 row: 0
                 column: 0
                 dir: HOR
+                bg_opa: TRANSP
                 widgets:
                   - label:
                       id: tile_all_lights_icon
@@ -155,6 +159,7 @@ lvgl:
                 row: 0
                 column: 1
                 dir: HOR
+                bg_opa: TRANSP
                 widgets:
                   - label:
                       id: tile_bed_interior_icon
@@ -185,6 +190,7 @@ lvgl:
                 row: 0
                 column: 2
                 dir: HOR
+                bg_opa: TRANSP
                 widgets:
                   - label:
                       id: tile_main_can_icon
@@ -215,6 +221,7 @@ lvgl:
                 row: 0
                 column: 3
                 dir: HOR
+                bg_opa: TRANSP
                 widgets:
                   - label:
                       id: tile_bed_can_icon
@@ -245,6 +252,7 @@ lvgl:
                 row: 0
                 column: 4
                 dir: HOR
+                bg_opa: TRANSP
                 widgets:
                   - label:
                       id: tile_led_capsule_icon
@@ -275,6 +283,7 @@ lvgl:
                 row: 0
                 column: 5
                 dir: HOR
+                bg_opa: TRANSP
                 widgets:
                   - label:
                       id: tile_exterior_icon
@@ -305,6 +314,7 @@ lvgl:
                 row: 0
                 column: 6
                 dir: HOR
+                bg_opa: TRANSP
                 widgets:
                   - label:
                       id: tile_door_icon
@@ -335,6 +345,7 @@ lvgl:
                 row: 0
                 column: 7
                 dir: HOR
+                bg_opa: TRANSP
                 widgets:
                   - label:
                       id: tile_dog_crate_icon
