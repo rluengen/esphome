@@ -11,8 +11,18 @@ substitutions:
   device_name: light-dial-controller
   friendly_name: Light Dial Controller
   project_name: light-dial-controller
-  project_version: "1.0.1"
+  project_version: "1.0.2"
   log_level: DEBUG
+
+  # Theme colors
+  color_bg: "0x000000"
+  color_icon_on: "0xFFC107"
+  color_icon_off: "0x666666"
+  color_arc_bg: "0x444444"
+  color_arc_active: "0xFFC107"
+  color_text: "0xFFFFFF"
+  color_text_accent: "0xFFDD44"
+  color_dots: "0xAAAAAA"
 
 packages:
   remote_packages:
@@ -52,12 +62,7 @@ font:
   - file: "fonts/segoeui.ttf"
     id: segoeui_16
     size: 16
-    glyphs: "!%()+=,-_.:°0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz"
-
-  - file: "fonts/segoeui.ttf"
-    id: segoeui_24
-    size: 24
-    glyphs: "!%()+=,-_.:°0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz"
+    glyphs: "!%()+=,-_.:°●○0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz"
 
   - file: "fonts/materialdesignicons-webfont.ttf"
     id: mdi_icons_large
@@ -73,27 +78,27 @@ lvgl:
       - script.execute: restore_roller_position
       - lvgl.resume:
 
-  disp_bg_color: 0x000000
+  disp_bg_color: ${color_bg}
 
   top_layer:
     widgets:
       - label:
           id: wifi_icon
           align: TOP_LEFT
-          x: 5
-          y: 5
+          x: 35
+          y: 18
           text: "\U000F05A9"  # mdi:wifi
           text_font: wifi_icons
-          text_color: 0xFFFFFF
+          text_color: ${color_text}
 
       - label:
           id: ha_status_icon
           align: TOP_RIGHT
-          x: -25
-          y: 5
+          x: -50
+          y: 18
           text: "\U000F07D0"
           text_font: homeassistant_icons
-          text_color: 0xFFFFFF
+          text_color: ${color_text}
 
       # Stationary brightness arc overlay (non-interactive, transparent background)
       - arc:
@@ -105,19 +110,29 @@ lvgl:
           height: 360
           clickable: false
           bg_opa: TRANSP
-          arc_color: 0x444444
+          arc_color: ${color_arc_bg}
           arc_width: 12
           min_value: 0
           max_value: 100
           value: 0
           adjustable: false
           indicator:
-            arc_color: 0xFFC107
+            arc_color: ${color_arc_active}
             arc_width: 14
+
+      # Tile position dot indicators
+      - label:
+          id: tile_dots
+          align: CENTER
+          x: 0
+          y: 75
+          text: "● ○ ○ ○ ○ ○ ○ ○"
+          text_font: segoeui_16
+          text_color: ${color_dots}
 
   pages:
     - id: main_page
-      bg_color: 0x000000
+      bg_color: ${color_bg}
       widgets:
         # Swipeable TileView (no headers; swipe horizontally between tiles)
         - tileview:
@@ -137,7 +152,7 @@ lvgl:
                       y: -35
                       text: "\U000F0335"
                       text_font: mdi_icons_large
-                      text_color: 0xFFFFFF
+                      text_color: ${color_icon_off}
                   - label:
                       id: tile_all_lights_name
                       align: CENTER
@@ -145,7 +160,7 @@ lvgl:
                       y: 10
                       text: "All Lights"
                       text_font: segoeui_16
-                      text_color: 0xFFFFFF
+                      text_color: ${color_text}
                   - label:
                       id: tile_all_lights_pct
                       align: CENTER
@@ -153,7 +168,7 @@ lvgl:
                       y: 40
                       text: "%"
                       text_font: segoeui_16
-                      text_color: 0xFFDD44
+                      text_color: ${color_text_accent}
 
               - id: tile_bed_interior
                 row: 0
@@ -168,7 +183,7 @@ lvgl:
                       y: -35
                       text: "\U000F0335"
                       text_font: mdi_icons_large
-                      text_color: 0xFFFFFF
+                      text_color: ${color_icon_off}
                   - label:
                       id: tile_bed_interior_name
                       align: CENTER
@@ -176,7 +191,7 @@ lvgl:
                       y: 10
                       text: "Bed Interior"
                       text_font: segoeui_16
-                      text_color: 0xFFFFFF
+                      text_color: ${color_text}
                   - label:
                       id: tile_bed_interior_pct
                       align: CENTER
@@ -184,7 +199,7 @@ lvgl:
                       y: 40
                       text: "%"
                       text_font: segoeui_16
-                      text_color: 0xFFDD44
+                      text_color: ${color_text_accent}
 
               - id: tile_main_can
                 row: 0
@@ -199,7 +214,7 @@ lvgl:
                       y: -35
                       text: "\U000F0335"
                       text_font: mdi_icons_large
-                      text_color: 0xFFFFFF
+                      text_color: ${color_icon_off}
                   - label:
                       id: tile_main_can_name
                       align: CENTER
@@ -207,7 +222,7 @@ lvgl:
                       y: 10
                       text: "Main Can"
                       text_font: segoeui_16
-                      text_color: 0xFFFFFF
+                      text_color: ${color_text}
                   - label:
                       id: tile_main_can_pct
                       align: CENTER
@@ -215,7 +230,7 @@ lvgl:
                       y: 40
                       text: "%"
                       text_font: segoeui_16
-                      text_color: 0xFFDD44
+                      text_color: ${color_text_accent}
 
               - id: tile_bed_can
                 row: 0
@@ -230,7 +245,7 @@ lvgl:
                       y: -35
                       text: "\U000F0335"
                       text_font: mdi_icons_large
-                      text_color: 0xFFFFFF
+                      text_color: ${color_icon_off}
                   - label:
                       id: tile_bed_can_name
                       align: CENTER
@@ -238,7 +253,7 @@ lvgl:
                       y: 10
                       text: "Bed Can"
                       text_font: segoeui_16
-                      text_color: 0xFFFFFF
+                      text_color: ${color_text}
                   - label:
                       id: tile_bed_can_pct
                       align: CENTER
@@ -246,7 +261,7 @@ lvgl:
                       y: 40
                       text: "%"
                       text_font: segoeui_16
-                      text_color: 0xFFDD44
+                      text_color: ${color_text_accent}
 
               - id: tile_led_capsule
                 row: 0
@@ -261,7 +276,7 @@ lvgl:
                       y: -35
                       text: "\U000F0335"
                       text_font: mdi_icons_large
-                      text_color: 0xFFFFFF
+                      text_color: ${color_icon_off}
                   - label:
                       id: tile_led_capsule_name
                       align: CENTER
@@ -269,7 +284,7 @@ lvgl:
                       y: 10
                       text: "LED Capsule"
                       text_font: segoeui_16
-                      text_color: 0xFFFFFF
+                      text_color: ${color_text}
                   - label:
                       id: tile_led_capsule_pct
                       align: CENTER
@@ -277,7 +292,7 @@ lvgl:
                       y: 40
                       text: "%"
                       text_font: segoeui_16
-                      text_color: 0xFFDD44
+                      text_color: ${color_text_accent}
 
               - id: tile_exterior
                 row: 0
@@ -292,7 +307,7 @@ lvgl:
                       y: -35
                       text: "\U000F0335"
                       text_font: mdi_icons_large
-                      text_color: 0xFFFFFF
+                      text_color: ${color_icon_off}
                   - label:
                       id: tile_exterior_name
                       align: CENTER
@@ -300,7 +315,7 @@ lvgl:
                       y: 10
                       text: "Exterior"
                       text_font: segoeui_16
-                      text_color: 0xFFFFFF
+                      text_color: ${color_text}
                   - label:
                       id: tile_exterior_pct
                       align: CENTER
@@ -308,7 +323,7 @@ lvgl:
                       y: 40
                       text: "%"
                       text_font: segoeui_16
-                      text_color: 0xFFDD44
+                      text_color: ${color_text_accent}
 
               - id: tile_door
                 row: 0
@@ -323,7 +338,7 @@ lvgl:
                       y: -35
                       text: "\U000F0335"
                       text_font: mdi_icons_large
-                      text_color: 0xFFFFFF
+                      text_color: ${color_icon_off}
                   - label:
                       id: tile_door_name
                       align: CENTER
@@ -331,7 +346,7 @@ lvgl:
                       y: 10
                       text: "Door"
                       text_font: segoeui_16
-                      text_color: 0xFFFFFF
+                      text_color: ${color_text}
                   - label:
                       id: tile_door_pct
                       align: CENTER
@@ -339,7 +354,7 @@ lvgl:
                       y: 40
                       text: "%"
                       text_font: segoeui_16
-                      text_color: 0xFFDD44
+                      text_color: ${color_text_accent}
 
               - id: tile_dog_crate
                 row: 0
@@ -354,7 +369,7 @@ lvgl:
                       y: -35
                       text: "\U000F0335"
                       text_font: mdi_icons_large
-                      text_color: 0xFFFFFF
+                      text_color: ${color_icon_off}
                   - label:
                       id: tile_dog_crate_name
                       align: CENTER
@@ -362,7 +377,7 @@ lvgl:
                       y: 10
                       text: "Dog Crate"
                       text_font: segoeui_16
-                      text_color: 0xFFFFFF
+                      text_color: ${color_text}
                   - label:
                       id: tile_dog_crate_pct
                       align: CENTER
@@ -370,7 +385,7 @@ lvgl:
                       y: 40
                       text: "%"
                       text_font: segoeui_16
-                      text_color: 0xFFDD44
+                      text_color: ${color_text_accent}
 
             on_value:
               then:
@@ -396,6 +411,9 @@ lvgl:
                     id(selected_entity) = std::string(entities[idx]);
                     id(dial_selected_light).publish_state(entities[idx]);
                     ESP_LOGI("tileview", "Selected idx=%d entity=%s", idx, entities[idx]);
+                    
+                    // Mark swipe so tap handler can ignore it
+                    id(just_swiped) = true;
                 - script.execute: update_light_display
 
 select:
@@ -414,10 +432,31 @@ select:
       - light.door_light
       - light.cwww_led_dog_crate_lights
 
-    set_action: # The action that should be performed when the remote (like Home Assistant’s frontend) requests to set the Select option
+    set_action:
       - logger.log:
           format: "Selected light option (remote): %s"
           args: ["x.c_str()"]
+      - lambda: |-
+          const char* entities[] = {
+            "light.all_lights", "light.bed_interior_lights",
+            "light.main_can_lights", "light.bed_can_lights",
+            "light.cwww_led_capsule_lights", "light.exterior_lights",
+            "light.door_light", "light.cwww_led_dog_crate_lights"
+          };
+          for (int i = 0; i < 8; i++) {
+            if (x == entities[i]) {
+              id(selected_light_index) = i;
+              id(selected_entity) = std::string(entities[i]);
+              break;
+            }
+          }
+      - lvgl.tileview.select:
+          id: light_tiles
+          row: 0
+          column: !lambda 'return id(selected_light_index);'
+          animated: true
+      - lambda: 'id(just_swiped) = false;'
+      - script.execute: update_light_display
 
     on_value:
       then:
@@ -440,6 +479,10 @@ globals:
     initial_value: '"light.all_lights"'
     restore_value: yes
 
+  - id: just_swiped
+    type: bool
+    initial_value: "false"
+
 script:
   - id: restore_roller_position
     then:
@@ -448,6 +491,7 @@ script:
           row: 0
           column: !lambda 'return id(selected_light_index);'
           animated: false
+      - lambda: 'id(just_swiped) = false;'
       - script.execute: update_light_display
 
   - id: update_light_display
@@ -474,6 +518,19 @@ script:
           }
           id(current_brightness) = brightness;
           ESP_LOGI("ui", "update_light_display idx=%d -> %d%%", id(selected_light_index), id(current_brightness));
+          
+          // Update icon color: amber when on, dim gray when off
+          lv_obj_t* icons[] = {
+            id(tile_all_lights_icon), id(tile_bed_interior_icon), id(tile_main_can_icon),
+            id(tile_bed_can_icon), id(tile_led_capsule_icon), id(tile_exterior_icon),
+            id(tile_door_icon), id(tile_dog_crate_icon)
+          };
+          lv_color_t icon_color = (brightness > 0) ? lv_color_hex(${color_icon_on}) : lv_color_hex(${color_icon_off});
+          lv_obj_set_style_text_color(icons[idx], icon_color, 0);
+          
+          // Update arc indicator color
+          lv_color_t arc_ind_color = (brightness > 0) ? lv_color_hex(${color_arc_active}) : lv_color_hex(${color_arc_bg});
+          lv_obj_set_style_arc_color(id(brightness_arc), arc_ind_color, LV_PART_INDICATOR);
       - lvgl.arc.update:
           id: brightness_arc
           value: !lambda 'return id(current_brightness);'
@@ -491,12 +548,21 @@ script:
             case 7: lv_label_set_text(id(tile_dog_crate_pct), buf); break;
             default: break;
           }
+          
+          // Update dot indicators
+          int idx = id(selected_light_index);
+          std::string dots = "";
+          for (int i = 0; i < 8; i++) {
+            if (i > 0) dots += " ";
+            dots += (i == idx) ? "\u25CF" : "\u25CB";
+          }
+          lv_label_set_text(id(tile_dots), dots.c_str());
 
   - id: increase_light_brightness
     mode: restart
     then:
       - lambda: |-
-          int step = 2;
+          int step = 5;
           id(current_brightness) = std::min(100, id(current_brightness) + step);
       - script.execute: update_light_display
       - script.execute: publish_brightness_throttled
@@ -505,7 +571,7 @@ script:
     mode: restart
     then:
       - lambda: |-
-          int step = 2;
+          int step = 5;
           id(current_brightness) = std::max(0, id(current_brightness) - step);
       - script.execute: update_light_display
       - script.execute: publish_brightness_throttled
@@ -543,6 +609,9 @@ script:
     then:
       - lambda: |-
           ESP_LOGI("touch", "Toggle light: %s", id(selected_entity).c_str());
+          // Optimistic update: flip brightness
+          id(current_brightness) = (id(current_brightness) > 0) ? 0 : 100;
+      - script.execute: update_light_display
       - homeassistant.service:
           service: light.toggle
           data:
@@ -552,6 +621,8 @@ script:
     then:
       - lambda: |-
           ESP_LOGI("touch", "Turn ON light: %s", id(selected_entity).c_str());
+          if (id(current_brightness) == 0) id(current_brightness) = 100;
+      - script.execute: update_light_display
       - homeassistant.service:
           service: light.turn_on
           data:
@@ -561,6 +632,8 @@ script:
     then:
       - lambda: |-
           ESP_LOGI("touch", "Turn OFF light: %s", id(selected_entity).c_str());
+          id(current_brightness) = 0;
+      - script.execute: update_light_display
       - homeassistant.service:
           service: light.turn_off
           data:
@@ -569,21 +642,23 @@ script:
 binary_sensor:
   - id: !extend touch_input
     on_multi_click:
-      # Single tap: toggle the selected light (ignored if this is a wake touch)
+      # Single tap: toggle the selected light (ignored if wake touch or swipe)
       - timing:
           - ON for at most 500ms
           - OFF for at least 350ms
         then:
           - if:
               condition:
-                lambda: 'return id(wake_touch);'
+                lambda: 'return id(wake_touch) || id(just_swiped);'
               then:
-                - lambda: 'id(wake_touch) = false;'
-                - logger.log: "Wake touch consumed - no action"
+                - lambda: |-
+                    id(wake_touch) = false;
+                    id(just_swiped) = false;
+                - logger.log: "Touch consumed (wake or swipe) - no action"
               else:
                 - script.execute: toggle_selected_light
 
-      # Double tap: turn the light on (ignored if this is a wake touch)
+      # Double tap: turn the light on (ignored if wake touch or swipe)
       - timing:
           - ON for at most 500ms
           - OFF for at most 300ms
@@ -592,10 +667,12 @@ binary_sensor:
         then:
           - if:
               condition:
-                lambda: 'return id(wake_touch);'
+                lambda: 'return id(wake_touch) || id(just_swiped);'
               then:
-                - lambda: 'id(wake_touch) = false;'
-                - logger.log: "Wake double-tap consumed - no action"
+                - lambda: |-
+                    id(wake_touch) = false;
+                    id(just_swiped) = false;
+                - logger.log: "Touch consumed (wake or swipe) - no action"
               else:
                 - script.execute: turn_on_selected_light
 
@@ -605,10 +682,12 @@ binary_sensor:
         then:
           - if:
               condition:
-                lambda: 'return id(wake_touch);'
+                lambda: 'return id(wake_touch) || id(just_swiped);'
               then:
-                - lambda: 'id(wake_touch) = false;'
-                - logger.log: "Wake long-press consumed - no action"
+                - lambda: |-
+                    id(wake_touch) = false;
+                    id(just_swiped) = false;
+                - logger.log: "Touch consumed (wake or swipe) - no action"
               else:
                 - script.execute: turn_off_selected_light
 
