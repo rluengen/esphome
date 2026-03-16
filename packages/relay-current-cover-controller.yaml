@@ -19,6 +19,8 @@ substitutions:
   current_update_interval_ms: "100"  # How often to update current sensor during operation (milliseconds)
   open_duration_value: 100s
   close_duration_value: 100s
+  moving_current_threshold: "0.5"
+  obstacle_current_threshold: "3.5"
 
 cover:
   - platform: current_based
@@ -44,8 +46,8 @@ cover:
     # will stop the motor when it reaches the end position.
     open_duration: ${open_duration_value}
 
-    open_moving_current_threshold: 0.5
-    open_obstacle_current_threshold: 3.5
+    open_moving_current_threshold: ${moving_current_threshold}
+    open_obstacle_current_threshold: ${obstacle_current_threshold}
     open_sensor: ${current_sensor_id}
 
     close_action:
@@ -69,8 +71,8 @@ cover:
       - switch.turn_off: ${relay_2_id}
 
     close_sensor: ${current_sensor_id}
-    close_moving_current_threshold: 0.5
-    close_obstacle_current_threshold: 3.5
+    close_moving_current_threshold: ${moving_current_threshold}
+    close_obstacle_current_threshold: ${obstacle_current_threshold}
 
     malfunction_detection: false
     malfunction_action:

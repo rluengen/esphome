@@ -7,6 +7,7 @@ i2c:
   id: i2c_bus
   sda: GPIO6
   scl: GPIO7
+  frequency: 100kHz
   scan: true
 
 switch:

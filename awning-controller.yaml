@@ -56,6 +56,8 @@ packages:
           current_sensor_parent_id: nomadic_awning_cover_motor_current
           relay_1_id: relay1
           relay_2_id: relay2
+          moving_current_threshold: "0.01"
+          obstacle_current_threshold: "3.5"
 
       - path: packages/relay-current-cover-controller.yaml
         vars:
@@ -65,6 +67,8 @@ packages:
           current_sensor_parent_id: solar_panel_cover_motor_current
           relay_1_id: relay3
           relay_2_id: relay4
+          moving_current_threshold: "0.01"
+          obstacle_current_threshold: "3.5"
       - path: packages/ota/http_update.yaml
 
 logger:
@@ -99,51 +103,51 @@ switch:
 # GPIO buttons to control the awning covers.
 # Press to open/close. If moving in the opposite direction, stops first;
 # press again to reverse.
-binary_sensor:
-  - platform: gpio
-    name: "Open Nomadic Awning Button"
-    id: button1
-    internal: true
-    pin:
-      number: 4
-      inverted: true
-      mode:
-        input: true
-        pullup: true
-    filters:
-      - delayed_on: 10ms
-      - delayed_off: 10ms
-    on_press:
-      then:
-        - lambda: |-
-            auto op = id(nomadic_awning_cover).current_operation;
-            if (op == COVER_OPERATION_CLOSING) {
-              // Moving in opposite direction — stop first
-              id(nomadic_awning_cover).make_call().set_command_stop().perform();
-            } else if (op == COVER_OPERATION_IDLE) {
-              id(nomadic_awning_cover).make_call().set_command_open().perform();
-            }
+# binary_sensor:
+#   - platform: gpio
+#     name: "Open Nomadic Awning Button"
+#     id: button1
+#     internal: true
+#     pin:
+#       number: GPIO18
+#       inverted: true
+#       mode:
+#         input: true
+#         pullup: true
+#     filters:
+#       - delayed_on: 10ms
+#       - delayed_off: 10ms
+#     on_press:
+#       then:
+#         - lambda: |-
+#             auto op = id(nomadic_awning_cover).current_operation;
+#             if (op == COVER_OPERATION_CLOSING) {
+#               // Moving in opposite direction — stop first
+#               id(nomadic_awning_cover).make_call().set_command_stop().perform();
+#             } else if (op == COVER_OPERATION_IDLE) {
+#               id(nomadic_awning_cover).make_call().set_command_open().perform();
+#             }
 
-  - platform: gpio
-    name: "Close Nomadic Awning Button"
-    id: button2
-    internal: true
-    pin:
-      number: 5
-      inverted: true
-      mode:
-        input: true
-        pullup: true
-    filters:
-      - delayed_on: 10ms
-      - delayed_off: 10ms
-    on_press:
-      then:
-        - lambda: |-
-            auto op = id(nomadic_awning_cover).current_operation;
-            if (op == COVER_OPERATION_OPENING) {
-              // Moving in opposite direction — stop first
-              id(nomadic_awning_cover).make_call().set_command_stop().perform();
-            } else if (op == COVER_OPERATION_IDLE) {
-              id(nomadic_awning_cover).make_call().set_command_close().perform();
-            }
+#   - platform: gpio
+#     name: "Close Nomadic Awning Button"
+#     id: button2
+#     internal: true
+#     pin:
+#       number: GPIO19
+#       inverted: true
+#       mode:
+#         input: true
+#         pullup: true
+#     filters:
+#       - delayed_on: 10ms
+#       - delayed_off: 10ms
+#     on_press:
+#       then:
+#         - lambda: |-
+#             auto op = id(nomadic_awning_cover).current_operation;
+#             if (op == COVER_OPERATION_OPENING) {
+#               // Moving in opposite direction — stop first
+#               id(nomadic_awning_cover).make_call().set_command_stop().perform();
+#             } else if (op == COVER_OPERATION_IDLE) {
+#               id(nomadic_awning_cover).make_call().set_command_close().perform();
+#             }
