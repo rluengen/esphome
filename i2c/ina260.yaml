@@ -13,7 +13,7 @@ sensor:
   - platform: ina260
     address: ${i2c_address}
     id: ${ina260_sensor_id}
-    update_interval: never
+    update_interval: 5s  # Change back to 'never' after debugging
     current:
       id: ${ina260_current_sensor_id}
       name: ${ina260_current_sensor_name}
