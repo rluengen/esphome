@@ -8,6 +8,12 @@
 #   If CAN communication fails, short the P1 pad on the back of the breakout
 #   board to enable the 120 ohm termination resistor.
 #
+# EasyStart Pro Connector Wire Colors (AS3 D2L):
+#   RD   (red)        - +12V Power
+#   BN   (brown)      - Ground
+#   BURD (blue/red)   - CAN-H
+#   BUBK (blue/black) - CAN-L
+#
 # IMPORTANT - Before using commands:
 #   1. Start with sniff_mode: "true" to discover CAN IDs on your heater
 #   2. Monitor logs to identify the status broadcast and command IDs
@@ -17,6 +23,19 @@
 # The Espar AS3 D2L CAN bus protocol is proprietary. The CAN IDs and data byte
 # assignments below are typical starting points based on community findings.
 # Your specific heater firmware version may differ - always verify by sniffing first.
+#
+# Known CAN Message IDs (from community reverse engineering):
+#   Source: https://www.fordtransitusaforum.com/threads/101989/
+#
+#   0x625       - EasyStart Pro heartbeat/keep-alive (frequent, consistent data)
+#                 Example: 25 10 6F 3D 7C D3 E4 01
+#   0x2C4       - Heater status / temperature data
+#                 Bytes 5-6 appear to be temperature (e.g. 7E 04, 7B 04, 79 04)
+#   0x2C5       - Heater status update (additional parameters)
+#   0x2C6       - Heater operational state
+#                 Example: F4 01 84 03 (consistent during operation)
+#   0x7A0       - Diagnostic request (ISO-TP multi-frame protocol)
+#   0x73C       - Diagnostic response (ISO-TP multi-frame protocol)
 
 # https://romheat.romcomm.com/images/uploaded/Espar_CANBUS_Instructions.pdf
 
@@ -47,11 +66,13 @@ substitutions:
   mcp_clock: 8MHZ
 
   # --- Espar CAN IDs (update after sniffing your heater) ---
-  # These are placeholder IDs - replace with values discovered from your heater
-  heater_status_id: "0x100"       # Heater -> Controller: status broadcast
-  heater_temp_id: "0x101"         # Heater -> Controller: temperature data
-  heater_error_id: "0x102"        # Heater -> Controller: error/diagnostic data
-  heater_command_id: "0x620"      # Controller -> Heater: commands
+  # Based on community findings - verify by sniffing your specific unit
+  heater_status_id: "0x2C4"       # Heater -> Controller: status/temperature data
+  heater_temp_id: "0x2C5"         # Heater -> Controller: additional status
+  heater_error_id: "0x2C6"        # Heater -> Controller: operational state
+  heater_command_id: "0x625"      # Controller -> Heater: heartbeat/commands
+  heater_diag_req_id: "0x7A0"     # Diagnostic request (ISO-TP)
+  heater_diag_resp_id: "0x73C"    # Diagnostic response (ISO-TP)
 
 # --- Packages (remote with variable overrides) ---
 packages:
