@@ -186,13 +186,20 @@ media_player:
     announcement_pipeline:
       speaker: i2s_speaker
       num_channels: 1
+    on_announcement:
+      - delay: 250ms
+      - switch.turn_on: pa_enable
+    on_idle:
+      - switch.turn_off: pa_enable
 
 # NS4150B power amplifier enable (GPIO53, active high)
+# Kept OFF by default; enabled 250ms after DAC starts to avoid pop
 switch:
   - platform: gpio
     name: "Speaker Enable"
+    id: pa_enable
     pin: GPIO53
-    restore_mode: RESTORE_DEFAULT_ON
+    restore_mode: RESTORE_DEFAULT_OFF
 
 # Backlight brightness control as a light
 output:
