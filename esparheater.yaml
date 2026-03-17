@@ -1,4 +1,4 @@
-# Espar Airtronic AS3 D2L Diesel Heater - CAN Bus Controller
+# Espar (Eberspacher) Airtronic AS3 D2L Diesel Heater - CAN Bus Controller
 # Hardware: Seeed Studio XIAO ESP32-S3 + CAN Bus Breakout Board (MCP2515 + SN65HVD230)
 # https://wiki.seeedstudio.com/xiao-can-bus-expansion/
 #
