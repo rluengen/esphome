@@ -402,18 +402,14 @@ lvgl:
                     else if (tile == id(tile_dog_crate)) idx = 7;
                     id(selected_light_index) = idx;
                     
-                    const char* entities[] = {
-                      "light.all_lights", "light.bed_interior_lights",
-                      "light.main_can_lights", "light.bed_can_lights",
-                      "light.cwww_led_capsule_lights", "light.exterior_lights",
-                      "light.door_light", "light.cwww_led_dog_crate_lights"
-                    };
-                    id(selected_entity) = std::string(entities[idx]);
-                    id(dial_selected_light).publish_state(entities[idx]);
-                    ESP_LOGI("tileview", "Selected idx=%d entity=%s", idx, entities[idx]);
+                    auto &opts = id(dial_selected_light).traits.get_options();
+                    id(selected_entity) = std::string(opts[idx]);
+                    id(dial_selected_light).publish_state(std::string(opts[idx]));
+                    ESP_LOGI("tileview", "Selected idx=%d entity=%s", idx, opts[idx]);
                     
                     // Mark swipe so tap handler can ignore it
                     id(just_swiped) = true;
+                - script.execute: clear_swipe_flag
                 - script.execute: update_light_display
 
 select:
@@ -437,16 +433,11 @@ select:
           format: "Selected light option (remote): %s"
           args: ["x.c_str()"]
       - lambda: |-
-          const char* entities[] = {
-            "light.all_lights", "light.bed_interior_lights",
-            "light.main_can_lights", "light.bed_can_lights",
-            "light.cwww_led_capsule_lights", "light.exterior_lights",
-            "light.door_light", "light.cwww_led_dog_crate_lights"
-          };
-          for (int i = 0; i < 8; i++) {
-            if (x == entities[i]) {
+          auto &opts = id(dial_selected_light).traits.get_options();
+          for (int i = 0; i < (int)opts.size(); i++) {
+            if (x == std::string(opts[i])) {
               id(selected_light_index) = i;
-              id(selected_entity) = std::string(entities[i]);
+              id(selected_entity) = std::string(opts[i]);
               break;
             }
           }
@@ -479,11 +470,25 @@ globals:
     initial_value: '"light.all_lights"'
     restore_value: yes
 
+  - id: previous_brightness
+    type: int
+    initial_value: "100"
+
   - id: just_swiped
     type: bool
     initial_value: "false"
 
 script:
+  # Auto-clear the swipe guard flag after a short delay.
+  # This handles medium-duration swipes (500ms-2s) whose touch ON/OFF
+  # timing doesn't match any on_multi_click pattern and would otherwise
+  # leave the flag set, causing the next intentional tap to be consumed.
+  - id: clear_swipe_flag
+    mode: restart
+    then:
+      - delay: 1s
+      - lambda: 'id(just_swiped) = false;'
+
   - id: restore_roller_position
     then:
       - lvgl.tileview.select:
@@ -609,8 +614,12 @@ script:
     then:
       - lambda: |-
           ESP_LOGI("touch", "Toggle light: %s", id(selected_entity).c_str());
-          // Optimistic update: flip brightness
-          id(current_brightness) = (id(current_brightness) > 0) ? 0 : 100;
+          if (id(current_brightness) > 0) {
+            id(previous_brightness) = id(current_brightness);
+            id(current_brightness) = 0;
+          } else {
+            id(current_brightness) = id(previous_brightness);
+          }
       - script.execute: update_light_display
       - homeassistant.service:
           service: light.toggle
@@ -621,7 +630,7 @@ script:
     then:
       - lambda: |-
           ESP_LOGI("touch", "Turn ON light: %s", id(selected_entity).c_str());
-          if (id(current_brightness) == 0) id(current_brightness) = 100;
+          if (id(current_brightness) == 0) id(current_brightness) = id(previous_brightness);
       - script.execute: update_light_display
       - homeassistant.service:
           service: light.turn_on
