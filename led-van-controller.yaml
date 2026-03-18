@@ -10,16 +10,13 @@ substitutions:
   log_level: DEBUG
   default_transition: 500ms
 
-# added for debugging
-web_server:
-  port: 80
-
 packages:
   remote_packages:
     url: https://github.com/rluengen/esphome
     ref: main
     refresh: always
     files:
+      - path: packages/webserver.yaml
       - path: packages/common.yaml
         vars:
           api_encryption_key: !secret encryption_key
@@ -155,13 +152,13 @@ light:
   - platform: monochromatic
     id: door_light
     name: "Door Light"
-    icon: "mdi:door_light"
+    icon: "mdi:door"
     default_transition_length: ${default_transition}
     output: led_channel_3
 
   - platform: cwww
-    cold_white: led_channel_4
-    warm_white: led_channel_5
+    cold_white: led_channel_5
+    warm_white: led_channel_4
     id: cwww_led_dog_crate_lights
     name: "Dog Crate Lights"
     icon: "mdi:led-strip"
@@ -176,8 +173,8 @@ light:
     output: led_channel_6
 
   - platform: cwww
-    cold_white: led_channel_7
-    warm_white: led_channel_8
+    cold_white: led_channel_8
+    warm_white: led_channel_7
     id: cwww_led_capsule_lights
     name: "Bed Capsule Lights"
     icon: "mdi:led-strip"
@@ -953,7 +950,7 @@ binary_sensor:
           brightness: 100%
     on_release:
       - logger.log:
-          format: "PCF8574 Button 1 released - Turn off exterior passenger capsule light"
+          format: "PCF8574 Button 1 released - Turn off exterior driver capsule light"
           level: INFO
       - light.turn_off:
           id: light_exterior_driver_capsule
@@ -1290,7 +1287,6 @@ number:
     restore_value: true
     entity_category: config
     icon: "mdi:brightness-percent"
-    unit_of_measurement: "%"
     mode: slider
 
   - platform: template
