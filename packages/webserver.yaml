@@ -1,0 +1,6 @@
+# Web Server - Enables the built-in web interface for debugging
+# To disable globally: comment out the web_server block below
+# TODO: Turn off once all components are stabilized
+
+web_server:
+  port: 80

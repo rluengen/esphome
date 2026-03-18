@@ -76,10 +76,6 @@ substitutions:
   project_version: "1.0.0"
   log_level: VERBOSE
 
-# added for debugging
-web_server:
-  port: 80
-
 esphome:
   name: ${device_name}
   friendly_name: ${friendly_name}
@@ -94,6 +90,7 @@ packages:
     refresh: always
     files:
       - path: devices/xiao-esp32s3.yaml
+      - path: packages/webserver.yaml
       - path: packages/common.yaml
         vars:
           api_encryption_key: !secret encryption_key

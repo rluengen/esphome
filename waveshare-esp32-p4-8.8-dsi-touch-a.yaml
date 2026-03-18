@@ -3,7 +3,7 @@
 
 substitutions:
   device_name: touchpanel
-  friendly_name: Waveshare 8.8" Touch Panel Controller
+  friendly_name: Touch Panel Controller
   project_name: waveshare_88_touch_panel
   project_version: "1.0.11"
   log_level: DEBUG
@@ -16,9 +16,6 @@ external_components:
       type: local
       path: components
     components: [waveshare_dsi]
-
-web_server:
-  port: 80
 
 esphome:
   name: ${device_name}
@@ -88,6 +85,7 @@ packages:
     ref: main
     refresh: always
     files:
+      - path: packages/webserver.yaml
       - path: packages/common.yaml
         vars:
           api_encryption_key: !secret encryption_key
@@ -785,7 +783,7 @@ text_sensor:
             id: lbl_sunset_wx
             text: !lambda 'return x.empty() ? "--:--" : x.c_str();'
 
-  # ---- 7-Day Forecast Text Sensors (day name + condition) ----
+  # ---- Weather Forecast Text Sensors (day name + condition) ----
   # Day 1
   - platform: homeassistant
     id: ha_fc_day1_name
@@ -1253,6 +1251,12 @@ sensor:
     on_value:
       then:
         - script.execute: update_power_tab
+        - lvgl.bar.update:
+            id: bar_battery
+            value: !lambda 'return isnan(x) ? 0 : (int)x;'
+        - lvgl.bar.update:
+            id: bar_battery_pwr
+            value: !lambda 'return isnan(x) ? 0 : (int)x;'
 
   # Battery charging power (> 0 means charging)
   - platform: homeassistant
@@ -1285,7 +1289,9 @@ sensor:
               snprintf(buf, sizeof(buf), "%.0f W", x);
               return std::string(buf);
 
-  # TODO: Replace with real HA sensor once hooked up
+  # TODO: Replace with real HA sensor once hooked up.
+  # WARNING: This is a FAKE test sensor returning random values every 10s.
+  # It will cause the battery time bar/labels to jump erratically.
   - platform: template
     id: battery_time_remaining
     name: "Battery Time (Test)"
@@ -1294,27 +1300,37 @@ sensor:
     internal: true
     on_value:
       then:
-        - lvgl.bar.update:
-            id: bar_battery
-            value: !lambda 'return isnan(x) ? 0 : (int)fminf(x, 48);'
-        - lvgl.bar.update:
-            id: bar_battery_pwr
-            value: !lambda 'return isnan(x) ? 0 : (int)fminf(x, 48);'
         - lvgl.label.update:
             id: lbl_battery_time
             text: !lambda |-
-              if (isnan(x)) return "-- hrs";
-              static char buf[16];
-              if (x >= 24) snprintf(buf, sizeof(buf), "%.0f days", x / 24.0f);
-              else snprintf(buf, sizeof(buf), "%.1f hrs", x);
+              float soc = id(ha_battery_soc).state;
+              if (isnan(x) && isnan(soc)) return "--";
+              static char buf[32];
+              if (isnan(x)) {
+                snprintf(buf, sizeof(buf), "%.0f%%", soc);
+              } else if (isnan(soc)) {
+                if (x >= 24) snprintf(buf, sizeof(buf), "%.0f days", x / 24.0f);
+                else snprintf(buf, sizeof(buf), "%.1f hrs", x);
+              } else {
+                if (x >= 24) snprintf(buf, sizeof(buf), "%.0f%% · %.0f days", soc, x / 24.0f);
+                else snprintf(buf, sizeof(buf), "%.0f%% · %.1f hrs", soc, x);
+              }
               return buf;
         - lvgl.label.update:
             id: lbl_battery_time_pwr
             text: !lambda |-
-              if (isnan(x)) return "-- hrs remaining";
-              static char buf[32];
-              if (x >= 24) snprintf(buf, sizeof(buf), "%.0f days remaining", x / 24.0f);
-              else snprintf(buf, sizeof(buf), "%.1f hrs remaining", x);
+              float soc = id(ha_battery_soc).state;
+              if (isnan(x) && isnan(soc)) return "-- remaining";
+              static char buf[48];
+              if (isnan(x)) {
+                snprintf(buf, sizeof(buf), "%.0f%%", soc);
+              } else if (isnan(soc)) {
+                if (x >= 24) snprintf(buf, sizeof(buf), "%.0f days remaining", x / 24.0f);
+                else snprintf(buf, sizeof(buf), "%.1f hrs remaining", x);
+              } else {
+                if (x >= 24) snprintf(buf, sizeof(buf), "%.0f%% · %.0f days remaining", soc, x / 24.0f);
+                else snprintf(buf, sizeof(buf), "%.0f%% · %.1f hrs remaining", soc, x);
+              }
               return buf;
 
   # Interior climate sensors
@@ -1510,7 +1526,7 @@ sensor:
             text_color: !lambda 'return (!isnan(x) && x > 0) ? lv_color_hex(0xFFD700) : lv_color_hex(0x808080);'
         - script.execute: update_lights_tab
 
-  # ---- 7-Day Forecast Temperature Sensors ----
+  # ---- Weather Forecast Temperature Sensors ----
   # Day 1 (today)
   - platform: homeassistant
     id: ha_fc_day1_high
@@ -1720,7 +1736,7 @@ binary_sensor:
             text_color: !lambda 'return x ? lv_color_hex(0x00BFFF) : lv_color_hex(0x808080);'
         - script.execute: update_water_tab
 
-# ---- 7-Day Forecast ----
+# ---- Weather Forecast ----
 # Forecast sensors are defined above (text_sensor + sensor sections).
 # They expect HA trigger-based template sensors: sensor.forecast_day_0_date,
 # sensor.forecast_day_0_condition, sensor.forecast_day_0_high,
@@ -2747,7 +2763,7 @@ lvgl:
                   bg_opa: COVER
                   border_width: 0
 
-              # ── 7-Day Forecast (right 1320px) ──
+              # ── Weather Forecast (right 1320px) ──
               # Requires HA template sensors - see comments in sensor section
               - obj:
                   width: 1320
@@ -3069,8 +3085,9 @@ lvgl:
                         min_value: 0
                         max_value: 255
                         value: 0
-                        on_release:
+                        on_value:
                           then:
+                            - lambda: 'id(pending_bright_main_cans) = (int)x;'
                             - script.execute: debounce_main_cans
                     - label:
                         text: "Main Cans"
@@ -3123,8 +3140,9 @@ lvgl:
                         min_value: 0
                         max_value: 255
                         value: 0
-                        on_release:
+                        on_value:
                           then:
+                            - lambda: 'id(pending_bright_bed_cans) = (int)x;'
                             - script.execute: debounce_bed_cans
                     - label:
                         text: "Bed Cans"
@@ -3177,8 +3195,9 @@ lvgl:
                         min_value: 0
                         max_value: 255
                         value: 0
-                        on_release:
+                        on_value:
                           then:
+                            - lambda: 'id(pending_bright_door) = (int)x;'
                             - script.execute: debounce_door
                     - label:
                         text: "Door"
@@ -3231,8 +3250,9 @@ lvgl:
                         min_value: 0
                         max_value: 255
                         value: 0
-                        on_release:
+                        on_value:
                           then:
+                            - lambda: 'id(pending_bright_dog_crate) = (int)x;'
                             - script.execute: debounce_dog_crate
                     - label:
                         text: "Dog Crate"
@@ -3285,8 +3305,9 @@ lvgl:
                         min_value: 0
                         max_value: 255
                         value: 0
-                        on_release:
+                        on_value:
                           then:
+                            - lambda: 'id(pending_bright_bed_capsule) = (int)x;'
                             - script.execute: debounce_bed_capsule
                     - label:
                         text: "Bed Capsule"
@@ -3339,8 +3360,9 @@ lvgl:
                         min_value: 0
                         max_value: 255
                         value: 0
-                        on_release:
+                        on_value:
                           then:
+                            - lambda: 'id(pending_bright_awning_out) = (int)x;'
                             - script.execute: debounce_awning_out
                     - label:
                         text: "Awning Out"
@@ -3393,8 +3415,9 @@ lvgl:
                         min_value: 0
                         max_value: 255
                         value: 0
-                        on_release:
+                        on_value:
                           then:
+                            - lambda: 'id(pending_bright_awning_in) = (int)x;'
                             - script.execute: debounce_awning_in
                     - label:
                         text: "Awning In"
@@ -3447,8 +3470,9 @@ lvgl:
                         min_value: 0
                         max_value: 255
                         value: 0
-                        on_release:
+                        on_value:
                           then:
+                            - lambda: 'id(pending_bright_exterior) = (int)x;'
                             - script.execute: debounce_exterior
                     - label:
                         text: "Ext Floods"

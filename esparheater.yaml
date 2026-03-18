@@ -81,6 +81,7 @@ packages:
     ref: main
     refresh: always
     files:
+      - path: packages/webserver.yaml
       - path: packages/common.yaml
         vars:
           api_encryption_key: !secret encryption_key
@@ -105,10 +106,6 @@ esphome:
           ESP_LOGI("espar", "Espar Heater CAN Bus Controller booted");
           ESP_LOGI("espar", "Sniff mode: ${sniff_mode}");
           ESP_LOGI("espar", "CAN bit rate: ${can_bit_rate}");
-
-# Enable web server for debugging
-web_server:
-  port: 80
 
 # --- SPI Bus (XIAO ESP32-S3 default SPI pins) ---
 spi:

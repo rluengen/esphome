@@ -21,6 +21,7 @@ packages:
     ref: main
     refresh: always
     files:
+      - path: packages/webserver.yaml
       - path: packages/common.yaml
         vars:
           api_encryption_key: !secret encryption_key
@@ -85,10 +86,6 @@ logger:
     web_server: INFO
     safe_mode: INFO
     ota: INFO
-
-# added for debugging
-web_server:
-  port: 80
 
 switch:
   - id: !extend relay1

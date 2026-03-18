@@ -11,6 +11,7 @@ packages:
     ref: main
     refresh: always
     files:
+      - path: packages/webserver.yaml
       - path: packages/common.yaml
         vars:
           api_encryption_key: !secret encryption_key
@@ -245,5 +246,3 @@ logger:
   level: ${log_level}
   hardware_uart: USB_CDC
 
-web_server:
-  port: 80

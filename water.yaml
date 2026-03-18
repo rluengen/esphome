@@ -60,6 +60,7 @@ packages:
     ref: main
     refresh: always
     files:
+      - path: packages/webserver.yaml
       - path: packages/common.yaml
         vars:
           api_encryption_key: !secret encryption_key
@@ -87,10 +88,12 @@ esphome:
     name: smartvan.${project_name}
     version: ${project_version}
   on_boot:
-    # ensure that all the valves are closed on first start (should be the default)
-    - valve.close: valve_water_pump_supply
-    - valve.close: valve_fill
-    - switch.turn_off: water_pump_switch
+    priority: -100  # Run after I2C buses are initialized
+    then:
+      # ensure that all the valves are closed on first start (should be the default)
+      - valve.close: valve_water_pump_supply
+      - valve.close: valve_fill
+      - switch.turn_off: water_pump_switch
 
 globals:
   - id: fill_start_time
@@ -433,7 +436,7 @@ sensor:
               static char buf[16];
               if (isnan(id(tank_percent).state))
               {
-                snprintf(buf, sizeof(buf), "-.- gal", x);
+                snprintf(buf, sizeof(buf), "-.- gal");
               }
               else
               {
@@ -581,6 +584,10 @@ switch:
               - lambda: 'return id(valve_water_pump_supply).current_operation == VALVE_OPERATION_OPENING || id(valve_water_pump_supply).position == VALVE_OPEN;'
           then:
             - logger.log: "Dry-run protection: Cannot start pump - tank too low"
+            - lvgl.button.update:
+                id: btn_water_pump
+                state:
+                  checked: false
           else:
             - valve.open: valve_water_pump_supply
             - wait_until:
@@ -596,17 +603,31 @@ switch:
                       id: lbl_pump_status
                       text: "\U000F058E"  # water-pump icon (on)
                       text_color: 0x00BFFF  # Deep sky blue for running
+                  - script.execute: pump_timer_countdown
+                  - lvgl.button.update:
+                      id: btn_water_pump
+                      state:
+                        checked: true
                 else:
                   - logger.log: "ERROR: Valve failed to open - pump not started"
+                  - lvgl.button.update:
+                      id: btn_water_pump
+                      state:
+                        checked: false
     turn_off_action:
       - script.execute: screen_bump_activity
       - switch.turn_off: relay_water_pump
       - delay: 250ms  # Wait for pump to stop before closing valves
       - valve.close: valve_water_pump_supply
+      - script.stop: pump_timer_countdown
       - lvgl.label.update:
           id: lbl_pump_status
           text: "\U000F0F93"  # water-pump-off icon
           text_color: 0x888888  # Gray for off
+      - lvgl.button.update:
+          id: btn_water_pump
+          state:
+            checked: false
 
   - platform: template
     id: hot_water_heater_switch
@@ -621,6 +642,10 @@ switch:
           text: "\U000F0F92"  # water-boiler icon (on)
           text_color: 0xFF6600  # Orange for heating
       - script.execute: hot_water_heater_timer_countdown
+      - lvgl.button.update:
+          id: btn_hot_water
+          state:
+            checked: true
     turn_off_action:
       - switch.turn_off: hot_water_heater_relay
       - lvgl.label.update:
@@ -628,12 +653,17 @@ switch:
           text: "\U000F0F91"  # water-boiler-off icon
           text_color: 0x888888  # Gray for off
       - script.stop: hot_water_heater_timer_countdown
+      - lvgl.button.update:
+          id: btn_hot_water
+          state:
+            checked: false
 
   # XL9535 relay outputs
   - platform: gpio
     id: hot_water_heater_relay
     name: "Hot Water Heater Relay"
     internal: true
+    restore_mode: ALWAYS_OFF
     pin:
       xl9535: xl9535_hub
       number: 0
@@ -644,6 +674,7 @@ switch:
     id: relay_supply_valve
     name: "Supply Valve Relay"
     internal: true
+    restore_mode: ALWAYS_OFF
     pin:
       xl9535: xl9535_hub
       number: 1
@@ -654,6 +685,7 @@ switch:
     id: relay_fill_valve
     name: "Fill Valve Relay"
     internal: true
+    restore_mode: ALWAYS_OFF
     pin:
       xl9535: xl9535_hub
       number: 2
@@ -669,7 +701,7 @@ switch:
       number: 3
       mode: OUTPUT
       inverted: false
-    interlock_wait_time: 100ms
+    restore_mode: ALWAYS_OFF
     on_turn_on:
       - if:
           condition:
@@ -679,8 +711,6 @@ switch:
           then:
             - logger.log: "Dry-run protection: Cannot turn on pump - tank low and supply is tank"
             - switch.turn_off: relay_water_pump
-
-  # PCF8574 outputs
 
 font:
   - file: "fonts/segoeui.ttf"
@@ -760,12 +790,38 @@ lvgl:
         bg_color: 0x000000
         scrollbar_mode: "OFF"
         scrollable: false
-        on_click:
-          then:
-            - logger.log: "Pump UI on_click"
-            - switch.toggle: water_pump_switch
 
         widgets:
+        # Water Pump toggle button
+        - button:
+            id: btn_water_pump
+            align: TOP_LEFT
+            x: 30
+            y: 30
+            width: 80
+            height: 60
+            checkable: true
+            bg_color: 0x333333
+            on_click:
+              then:
+                - script.execute: screen_bump_activity
+                - if:
+                    condition:
+                      lambda: 'return lv_obj_has_state(id(btn_water_pump), LV_STATE_CHECKED);'
+                    then:
+                      - logger.log: "Water Pump button ON"
+                      - switch.turn_on: water_pump_switch
+                    else:
+                      - logger.log: "Water Pump button OFF"
+                      - switch.turn_off: water_pump_switch
+            widgets:
+              - label:
+                  id: lbl_water_pump_btn
+                  align: CENTER
+                  text: "Pump"
+                  text_color: 0xFFFFFF
+                  text_font: f_text_24
+
         # Water Fill toggle button
         - button:
             id: btn_water_fill
@@ -777,6 +833,7 @@ lvgl:
             bg_color: 0x333333
             on_click:
               then:
+                - script.execute: screen_bump_activity
                 - if:
                     condition:
                       lambda: 'return lv_obj_has_state(id(btn_water_fill), LV_STATE_CHECKED);'
@@ -824,12 +881,42 @@ lvgl:
             text_align: CENTER
             clickable: false
 
+        # Hot Water Heater toggle button
+        - button:
+            id: btn_hot_water
+            align: TOP_RIGHT
+            x: -30
+            y: 30
+            width: 80
+            height: 60
+            checkable: true
+            bg_color: 0x333333
+            on_click:
+              then:
+                - script.execute: screen_bump_activity
+                - if:
+                    condition:
+                      lambda: 'return lv_obj_has_state(id(btn_hot_water), LV_STATE_CHECKED);'
+                    then:
+                      - logger.log: "Hot Water Heater button ON"
+                      - switch.turn_on: hot_water_heater_switch
+                    else:
+                      - logger.log: "Hot Water Heater button OFF"
+                      - switch.turn_off: hot_water_heater_switch
+            widgets:
+              - label:
+                  id: lbl_hot_water_btn
+                  align: CENTER
+                  text: "Hot"
+                  text_color: 0xFFFFFF
+                  text_font: f_text_24
+
         # Timer countdown display - visible when pump is running
         - label:
             id: lbl_timer
             text: ""
             align: TOP_MID
-            y: 50
+            y: 100
             text_font: f_text_24
             text_color: 0xFFAA00
             text_align: CENTER
@@ -897,7 +984,7 @@ lvgl:
             x: 240
             y: -60
             text_font: valve_icon_40
-            text_color: 0x00FF00  # Green for fill
+            text_color: 0x888888  # Gray for closed
             text_align: LEFT
             clickable: false
 
@@ -982,13 +1069,16 @@ script:
                               checked: false
                         - script.stop: water_fill
 
-                  # Check if level is increasing after 30 seconds
+                  # Update fill rate calculation
                   - lambda: |-
                       uint32_t elapsed_ms = millis() - id(fill_start_time);
                       float elapsed_min = elapsed_ms / 60000.0;
                       
-                      if (elapsed_min > 0.5) {  // After 30 seconds
+                      // Update fill rate after enough time has passed
+                      if (elapsed_min > 0.5) {
                         float level_change = id(tank_percent).state - id(fill_start_level);
+                        float gallons_filled = id(tank_capacity_in_gallons) * (level_change / 100.0);
+                        id(fill_rate_gpm) = gallons_filled / elapsed_min;
                         
                         // If level hasn't increased by at least 0.5% in 30 seconds, stop
                         if (level_change < 0.5) {
@@ -997,6 +1087,20 @@ script:
                           id(water_fill).stop();
                         }
                       }
+
+            # Fill loop ended (30 min max or stopped) - clean up
+            - logger.log: "Water Fill: Complete or timed out"
+            - switch.turn_off: relay_water_pump
+            - valve.close: valve_fill
+            - lambda: 'id(fill_rate_gpm) = 0.0;'
+            - lvgl.label.update:
+                id: lbl_pump_status
+                text: "\U000F0F93"
+                text_color: 0x888888
+            - lvgl.button.update:
+                id: btn_water_fill
+                state:
+                  checked: false
 
   - id: pump_timer_countdown
     mode: restart
