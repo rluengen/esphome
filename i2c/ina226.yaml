@@ -1,0 +1,35 @@
+# The ina226 sensor platform allows you to use your INA226 DC Current and Power Sensor 
+# sensors with ESPHome. Requires an external shunt resistor.
+# https://esphome.io/components/sensor/ina226/
+
+substitutions:
+  i2c_bus_id: i2c_bus
+  i2c_address: 0x40
+  ina226_sensor_id: ina226_sensor
+  ina226_current_sensor_id: ina226_current_sensor
+  ina226_current_sensor_name: INA226 Current
+  ina226_shunt_resistance: "0.001"   # 1mΩ shunt for 20A+ range
+  ina226_max_current: "20A"
+
+sensor:
+  - platform: ina226
+    address: ${i2c_address}
+    id: ${ina226_sensor_id}
+    shunt_resistance: ${ina226_shunt_resistance}
+    max_current: ${ina226_max_current}
+    update_interval: 5s  # Change back to 'never' after debugging
+    current:
+      id: ${ina226_current_sensor_id}
+      name: ${ina226_current_sensor_name}
+      state_class: measurement
+      filters:
+        - lambda: return abs(x);  # Convert negative current to positive for threshold detection
+    power:
+      name: "${ina226_current_sensor_name} Power"
+      state_class: measurement
+    bus_voltage:
+      name: "${ina226_current_sensor_name} Bus Voltage"
+      state_class: measurement
+    shunt_voltage:
+      name: "${ina226_current_sensor_name} Shunt Voltage"
+      state_class: measurement
