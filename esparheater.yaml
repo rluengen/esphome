@@ -67,12 +67,13 @@ substitutions:
 
   # --- Espar CAN IDs (update after sniffing your heater) ---
   # Based on community findings - verify by sniffing your specific unit
-  heater_status_id: "0x2C4"       # Heater -> Controller: status/temperature data
-  heater_temp_id: "0x2C5"         # Heater -> Controller: additional status
-  heater_error_id: "0x2C6"        # Heater -> Controller: operational state
-  heater_command_id: "0x625"      # Controller -> Heater: heartbeat/commands
-  heater_diag_req_id: "0x7A0"     # Diagnostic request (ISO-TP)
-  heater_diag_resp_id: "0x73C"    # Diagnostic response (ISO-TP)
+  # TODO: Uncomment and update these after sniffing your heater's CAN bus
+  # heater_status_id: "0x2C4"       # Heater -> Controller: status/temperature data
+  # heater_temp_id: "0x2C5"         # Heater -> Controller: additional status
+  # heater_error_id: "0x2C6"        # Heater -> Controller: operational state
+  # heater_command_id: "0x625"      # Controller -> Heater: heartbeat/commands
+  # heater_diag_req_id: "0x7A0"     # Diagnostic request (ISO-TP)
+  # heater_diag_resp_id: "0x73C"    # Diagnostic response (ISO-TP)
 
 # --- Packages (remote with variable overrides) ---
 packages:
@@ -144,289 +145,296 @@ canbus:
 
       # ---------------------------------------------------------------
       # HEATER STATUS: Parse status broadcast frame
-      # Update the can_id below after sniffing your heater
+      # TODO: Uncomment after sniffing - update can_id and byte assignments
       # ---------------------------------------------------------------
-      - can_id: ${heater_status_id}
-        then:
-          - lambda: |-
-              if (std::string("${sniff_mode}") == "true") return;
-              if (x.size() < 8) return;
-
-              // --- Typical status frame byte assignments ---
-              // NOTE: These are EXAMPLES - verify against your sniffed data!
-              // Byte 0: Heater operating state
-              //   0x00 = Off
-              //   0x01 = Starting (glow plug preheat)
-              //   0x02 = Starting (fuel priming)
-              //   0x03 = Ignition
-              //   0x04 = Running / Heating
-              //   0x05 = Cooldown / Shutdown
-              //   0x06 = Error / Lockout
-              uint8_t state = x[0];
-
-              const char* state_str;
-              switch (state) {
-                case 0x00: state_str = "Off"; break;
-                case 0x01: state_str = "Glow Plug Preheat"; break;
-                case 0x02: state_str = "Fuel Priming"; break;
-                case 0x03: state_str = "Ignition"; break;
-                case 0x04: state_str = "Running"; break;
-                case 0x05: state_str = "Cooldown"; break;
-                case 0x06: state_str = "Error"; break;
-                default: state_str = "Unknown"; break;
-              }
-
-              ESP_LOGI("espar", "Heater state: %s (0x%02X)", state_str, state);
-              id(heater_state).publish_state(state_str);
-              id(heater_running).publish_state(state == 0x04);
-
-              // Byte 1: Heat output level / power percentage
-              if (x.size() > 1) {
-                float power_pct = (float)x[1] / 255.0 * 100.0;
-                id(heater_power).publish_state(power_pct);
-              }
-
-              // Byte 2-3: Fan speed (RPM, big-endian)
-              if (x.size() > 3) {
-                uint16_t fan_rpm = (x[2] << 8) | x[3];
-                id(heater_fan_speed).publish_state(fan_rpm);
-              }
+      # - can_id: ${heater_status_id}
+      #   then:
+      #     - lambda: |-
+      #         if (std::string("${sniff_mode}") == "true") return;
+      #         if (x.size() < 8) return;
+      #
+      #         // --- Typical status frame byte assignments ---
+      #         // NOTE: These are EXAMPLES - verify against your sniffed data!
+      #         // Byte 0: Heater operating state
+      #         //   0x00 = Off
+      #         //   0x01 = Starting (glow plug preheat)
+      #         //   0x02 = Starting (fuel priming)
+      #         //   0x03 = Ignition
+      #         //   0x04 = Running / Heating
+      #         //   0x05 = Cooldown / Shutdown
+      #         //   0x06 = Error / Lockout
+      #         uint8_t state = x[0];
+      #
+      #         const char* state_str;
+      #         switch (state) {
+      #           case 0x00: state_str = "Off"; break;
+      #           case 0x01: state_str = "Glow Plug Preheat"; break;
+      #           case 0x02: state_str = "Fuel Priming"; break;
+      #           case 0x03: state_str = "Ignition"; break;
+      #           case 0x04: state_str = "Running"; break;
+      #           case 0x05: state_str = "Cooldown"; break;
+      #           case 0x06: state_str = "Error"; break;
+      #           default: state_str = "Unknown"; break;
+      #         }
+      #
+      #         ESP_LOGI("espar", "Heater state: %s (0x%02X)", state_str, state);
+      #         id(heater_state).publish_state(state_str);
+      #         id(heater_running).publish_state(state == 0x04);
+      #
+      #         // Byte 1: Heat output level / power percentage
+      #         if (x.size() > 1) {
+      #           float power_pct = (float)x[1] / 255.0 * 100.0;
+      #           id(heater_power).publish_state(power_pct);
+      #         }
+      #
+      #         // Byte 2-3: Fan speed (RPM, big-endian)
+      #         if (x.size() > 3) {
+      #           uint16_t fan_rpm = (x[2] << 8) | x[3];
+      #           id(heater_fan_speed).publish_state(fan_rpm);
+      #         }
 
       # ---------------------------------------------------------------
       # HEATER TEMPERATURE: Parse temperature data frame
+      # TODO: Uncomment after sniffing - update can_id and byte assignments
       # ---------------------------------------------------------------
-      - can_id: ${heater_temp_id}
-        then:
-          - lambda: |-
-              if (std::string("${sniff_mode}") == "true") return;
-              if (x.size() < 4) return;
-
-              // Byte 0-1: Exhaust temperature (°C * 10, big-endian)
-              int16_t exhaust_raw = (x[0] << 8) | x[1];
-              float exhaust_temp = exhaust_raw / 10.0;
-              id(heater_exhaust_temp).publish_state(exhaust_temp);
-
-              // Byte 2-3: Supply voltage (mV, big-endian)
-              if (x.size() > 3) {
-                uint16_t voltage_mv = (x[2] << 8) | x[3];
-                float voltage = voltage_mv / 1000.0;
-                id(heater_voltage).publish_state(voltage);
-              }
-
-              ESP_LOGD("espar", "Exhaust: %.1f°C  Supply: %.1fV",
-                exhaust_temp, (x.size() > 3) ? ((x[2] << 8) | x[3]) / 1000.0 : 0.0);
+      # - can_id: ${heater_temp_id}
+      #   then:
+      #     - lambda: |-
+      #         if (std::string("${sniff_mode}") == "true") return;
+      #         if (x.size() < 4) return;
+      #
+      #         // Byte 0-1: Exhaust temperature (°C * 10, big-endian)
+      #         int16_t exhaust_raw = (x[0] << 8) | x[1];
+      #         float exhaust_temp = exhaust_raw / 10.0;
+      #         id(heater_exhaust_temp).publish_state(exhaust_temp);
+      #
+      #         // Byte 2-3: Supply voltage (mV, big-endian)
+      #         if (x.size() > 3) {
+      #           uint16_t voltage_mv = (x[2] << 8) | x[3];
+      #           float voltage = voltage_mv / 1000.0;
+      #           id(heater_voltage).publish_state(voltage);
+      #         }
+      #
+      #         ESP_LOGD("espar", "Exhaust: %.1f°C  Supply: %.1fV",
+      #           exhaust_temp, (x.size() > 3) ? ((x[2] << 8) | x[3]) / 1000.0 : 0.0);
 
       # ---------------------------------------------------------------
       # HEATER ERRORS: Parse diagnostic/error frame
+      # TODO: Uncomment after sniffing - update can_id and byte assignments
       # ---------------------------------------------------------------
-      - can_id: ${heater_error_id}
-        then:
-          - lambda: |-
-              if (std::string("${sniff_mode}") == "true") return;
-              if (x.size() < 2) return;
+      # - can_id: ${heater_error_id}
+      #   then:
+      #     - lambda: |-
+      #         if (std::string("${sniff_mode}") == "true") return;
+      #         if (x.size() < 2) return;
+      #
+      #         uint16_t error_code = (x[0] << 8) | x[1];
+      #         if (error_code != 0) {
+      #           ESP_LOGW("espar", "Heater error code: %d (0x%04X)", error_code, error_code);
+      #         }
+      #         id(heater_error_code).publish_state(error_code);
 
-              uint16_t error_code = (x[0] << 8) | x[1];
-              if (error_code != 0) {
-                ESP_LOGW("espar", "Heater error code: %d (0x%04X)", error_code, error_code);
-              }
-              id(heater_error_code).publish_state(error_code);
+# ==============================================================================
+# TODO: Uncomment the sections below after sniffing your heater's CAN bus
+# and discovering the actual CAN IDs, data byte assignments, and commands.
+# ==============================================================================
 
 # --- Sensors ---
-sensor:
-  - platform: template
-    name: "Exhaust Temperature"
-    id: heater_exhaust_temp
-    unit_of_measurement: "°C"
-    device_class: temperature
-    state_class: measurement
-    accuracy_decimals: 1
-    icon: mdi:thermometer-high
-
-  - platform: template
-    name: "Supply Voltage"
-    id: heater_voltage
-    unit_of_measurement: "V"
-    device_class: voltage
-    state_class: measurement
-    accuracy_decimals: 1
-    icon: mdi:car-battery
-
-  - platform: template
-    name: "Fan Speed"
-    id: heater_fan_speed
-    unit_of_measurement: "RPM"
-    state_class: measurement
-    accuracy_decimals: 0
-    icon: mdi:fan
-
-  - platform: template
-    name: "Power Level"
-    id: heater_power
-    unit_of_measurement: "%"
-    state_class: measurement
-    accuracy_decimals: 0
-    icon: mdi:fire
-
-  - platform: template
-    name: "Error Code"
-    id: heater_error_code
-    accuracy_decimals: 0
-    icon: mdi:alert-circle
+# sensor:
+#   - platform: template
+#     name: "Exhaust Temperature"
+#     id: heater_exhaust_temp
+#     unit_of_measurement: "°C"
+#     device_class: temperature
+#     state_class: measurement
+#     accuracy_decimals: 1
+#     icon: mdi:thermometer-high
+#
+#   - platform: template
+#     name: "Supply Voltage"
+#     id: heater_voltage
+#     unit_of_measurement: "V"
+#     device_class: voltage
+#     state_class: measurement
+#     accuracy_decimals: 1
+#     icon: mdi:car-battery
+#
+#   - platform: template
+#     name: "Fan Speed"
+#     id: heater_fan_speed
+#     unit_of_measurement: "RPM"
+#     state_class: measurement
+#     accuracy_decimals: 0
+#     icon: mdi:fan
+#
+#   - platform: template
+#     name: "Power Level"
+#     id: heater_power
+#     unit_of_measurement: "%"
+#     state_class: measurement
+#     accuracy_decimals: 0
+#     icon: mdi:fire
+#
+#   - platform: template
+#     name: "Error Code"
+#     id: heater_error_code
+#     accuracy_decimals: 0
+#     icon: mdi:alert-circle
 
 # --- Text Sensors ---
-text_sensor:
-  - platform: template
-    name: "State"
-    id: heater_state
-    icon: mdi:radiator
+# text_sensor:
+#   - platform: template
+#     name: "State"
+#     id: heater_state
+#     icon: mdi:radiator
 
 # --- Binary Sensors ---
-binary_sensor:
-  - platform: template
-    name: "Running"
-    id: heater_running
-    device_class: running
-    icon: mdi:fire-circle
+# binary_sensor:
+#   - platform: template
+#     name: "Running"
+#     id: heater_running
+#     device_class: running
+#     icon: mdi:fire-circle
 
 # --- Controls ---
-switch:
-  - platform: template
-    name: "Power"
-    id: heater_switch
-    icon: mdi:radiator
-    optimistic: true
-    turn_on_action:
-      - logger.log: "Sending heater START command"
-      - canbus.send:
-          canbus_id: espar_can
-          can_id: ${heater_command_id}
-          data: [0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
-    turn_off_action:
-      - logger.log: "Sending heater STOP command"
-      - canbus.send:
-          canbus_id: espar_can
-          can_id: ${heater_command_id}
-          data: [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
+# switch:
+#   - platform: template
+#     name: "Power"
+#     id: heater_switch
+#     icon: mdi:radiator
+#     optimistic: true
+#     turn_on_action:
+#       - logger.log: "Sending heater START command"
+#       - canbus.send:
+#           canbus_id: espar_can
+#           can_id: ${heater_command_id}
+#           data: [0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
+#     turn_off_action:
+#       - logger.log: "Sending heater STOP command"
+#       - canbus.send:
+#           canbus_id: espar_can
+#           can_id: ${heater_command_id}
+#           data: [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
 
 # --- Buttons ---
-button:
-  - platform: template
-    name: "Start"
-    icon: mdi:play
-    on_press:
-      - logger.log: "Sending heater START command"
-      - canbus.send:
-          canbus_id: espar_can
-          can_id: ${heater_command_id}
-          data: [0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
-
-  - platform: template
-    name: "Stop"
-    icon: mdi:stop
-    on_press:
-      - logger.log: "Sending heater STOP command"
-      - canbus.send:
-          canbus_id: espar_can
-          can_id: ${heater_command_id}
-          data: [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
+# button:
+#   - platform: template
+#     name: "Start"
+#     icon: mdi:play
+#     on_press:
+#       - logger.log: "Sending heater START command"
+#       - canbus.send:
+#           canbus_id: espar_can
+#           can_id: ${heater_command_id}
+#           data: [0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
+#
+#   - platform: template
+#     name: "Stop"
+#     icon: mdi:stop
+#     on_press:
+#       - logger.log: "Sending heater STOP command"
+#       - canbus.send:
+#           canbus_id: espar_can
+#           can_id: ${heater_command_id}
+#           data: [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
 
 # --- Number: Heat level adjustment ---
-number:
-  - platform: template
-    name: "Heat Level"
-    id: heater_heat_level
-    icon: mdi:thermometer-lines
-    min_value: 0
-    max_value: 100
-    step: 10
-    initial_value: 0
-    optimistic: true
-    unit_of_measurement: "%"
-    set_action:
-      - logger.log:
-          format: "Setting heater level to %.0f%%"
-          args: ['x']
-      - canbus.send:
-          canbus_id: espar_can
-          can_id: ${heater_command_id}
-          data: !lambda |-
-            uint8_t level = (uint8_t)(x * 255.0 / 100.0);
-            return {0x02, level, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+# number:
+#   - platform: template
+#     name: "Heat Level"
+#     id: heater_heat_level
+#     icon: mdi:thermometer-lines
+#     min_value: 0
+#     max_value: 100
+#     step: 10
+#     initial_value: 0
+#     optimistic: true
+#     unit_of_measurement: "%"
+#     set_action:
+#       - logger.log:
+#           format: "Setting heater level to %.0f%%"
+#           args: ['x']
+#       - canbus.send:
+#           canbus_id: espar_can
+#           can_id: ${heater_command_id}
+#           data: !lambda |-
+#             uint8_t level = (uint8_t)(x * 255.0 / 100.0);
+#             return {0x02, level, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
 # --- Climate: Thin wrapper that forwards mode/setpoint to the CAN bus ---
 # The heater has its own thermostat - this just sends commands when you
 # change mode or target temperature from the HA UI.
-climate:
-  - platform: thermostat
-    name: "Climate"
-    id: heater_climate
-    icon: mdi:radiator
-    sensor: heater_exhaust_temp  # Display-only; the heater controls its own loop
-    visual:
-      min_temperature: 10
-      max_temperature: 35
-      temperature_step: 1.0
-    min_idle_time: 10s
-    min_heating_off_time: 60s     # Prevent rapid cycling - heater needs cooldown
-    min_heating_run_time: 120s    # Let heater run at least 2 min per cycle
-    heat_deadband: 0.5
-    heat_overrun: 0.5
-    heat_action:
-      - lambda: |-
-          if (std::string("${sniff_mode}") == "true") {
-            ESP_LOGW("espar", "Sniff mode active - not sending heat command");
-            return;
-          }
-          float setpoint = id(heater_climate).target_temperature;
-          uint8_t temp_byte = (uint8_t)clamp((int)setpoint, 0, 255);
-          ESP_LOGI("espar", "Climate HEAT: sending start + setpoint %.0f°C", setpoint);
-      - if:
-          condition:
-            lambda: 'return std::string("${sniff_mode}") != "true";'
-          then:
-            - canbus.send:
-                canbus_id: espar_can
-                can_id: ${heater_command_id}
-                data: !lambda |-
-                  float setpoint = id(heater_climate).target_temperature;
-                  uint8_t temp_byte = (uint8_t)clamp((int)setpoint, 0, 255);
-                  return {0x01, temp_byte, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-    idle_action:
-      - lambda: |-
-          if (std::string("${sniff_mode}") == "true") {
-            ESP_LOGW("espar", "Sniff mode active - not sending idle/off command");
-            return;
-          }
-          ESP_LOGI("espar", "Climate IDLE: sending stop command");
-      - if:
-          condition:
-            lambda: 'return std::string("${sniff_mode}") != "true";'
-          then:
-            - canbus.send:
-                canbus_id: espar_can
-                can_id: ${heater_command_id}
-                data: [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
-    off_mode:
-      - lambda: 'ESP_LOGI("espar", "Climate mode set to OFF");'
-    heat_mode:
-      - lambda: 'ESP_LOGI("espar", "Climate mode set to HEAT");'
-    target_temperature_change_action:
-      - lambda: |-
-          if (std::string("${sniff_mode}") == "true") return;
-          float setpoint = id(heater_climate).target_temperature;
-          ESP_LOGI("espar", "Target temperature changed to %.0f°C", setpoint);
-      - if:
-          condition:
-            lambda: 'return std::string("${sniff_mode}") != "true";'
-          then:
-            - canbus.send:
-                canbus_id: espar_can
-                can_id: ${heater_command_id}
-                data: !lambda |-
-                  float setpoint = id(heater_climate).target_temperature;
-                  uint8_t temp_byte = (uint8_t)clamp((int)setpoint, 0, 255);
-                  return {0x02, temp_byte, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-    default_preset: Home
-    preset:
-      - name: Home
-        default_target_temperature_low: 20
+# climate:
+#   - platform: thermostat
+#     name: "Climate"
+#     id: heater_climate
+#     icon: mdi:radiator
+#     sensor: heater_exhaust_temp  # Display-only; the heater controls its own loop
+#     visual:
+#       min_temperature: 10
+#       max_temperature: 35
+#       temperature_step: 1.0
+#     min_idle_time: 10s
+#     min_heating_off_time: 60s     # Prevent rapid cycling - heater needs cooldown
+#     min_heating_run_time: 120s    # Let heater run at least 2 min per cycle
+#     heat_deadband: 0.5
+#     heat_overrun: 0.5
+#     heat_action:
+#       - lambda: |-
+#           if (std::string("${sniff_mode}") == "true") {
+#             ESP_LOGW("espar", "Sniff mode active - not sending heat command");
+#             return;
+#           }
+#           float setpoint = id(heater_climate).target_temperature;
+#           uint8_t temp_byte = (uint8_t)clamp((int)setpoint, 0, 255);
+#           ESP_LOGI("espar", "Climate HEAT: sending start + setpoint %.0f°C", setpoint);
+#       - if:
+#           condition:
+#             lambda: 'return std::string("${sniff_mode}") != "true";'
+#           then:
+#             - canbus.send:
+#                 canbus_id: espar_can
+#                 can_id: ${heater_command_id}
+#                 data: !lambda |-
+#                   float setpoint = id(heater_climate).target_temperature;
+#                   uint8_t temp_byte = (uint8_t)clamp((int)setpoint, 0, 255);
+#                   return {0x01, temp_byte, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+#     idle_action:
+#       - lambda: |-
+#           if (std::string("${sniff_mode}") == "true") {
+#             ESP_LOGW("espar", "Sniff mode active - not sending idle/off command");
+#             return;
+#           }
+#           ESP_LOGI("espar", "Climate IDLE: sending stop command");
+#       - if:
+#           condition:
+#             lambda: 'return std::string("${sniff_mode}") != "true";'
+#           then:
+#             - canbus.send:
+#                 canbus_id: espar_can
+#                 can_id: ${heater_command_id}
+#                 data: [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
+#     off_mode:
+#       - lambda: 'ESP_LOGI("espar", "Climate mode set to OFF");'
+#     heat_mode:
+#       - lambda: 'ESP_LOGI("espar", "Climate mode set to HEAT");'
+#     target_temperature_change_action:
+#       - lambda: |-
+#           if (std::string("${sniff_mode}") == "true") return;
+#           float setpoint = id(heater_climate).target_temperature;
+#           ESP_LOGI("espar", "Target temperature changed to %.0f°C", setpoint);
+#       - if:
+#           condition:
+#             lambda: 'return std::string("${sniff_mode}") != "true";'
+#           then:
+#             - canbus.send:
+#                 canbus_id: espar_can
+#                 can_id: ${heater_command_id}
+#                 data: !lambda |-
+#                   float setpoint = id(heater_climate).target_temperature;
+#                   uint8_t temp_byte = (uint8_t)clamp((int)setpoint, 0, 255);
+#                   return {0x02, temp_byte, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+#     default_preset: Home
+#     preset:
+#       - name: Home
+#         default_target_temperature_low: 20
