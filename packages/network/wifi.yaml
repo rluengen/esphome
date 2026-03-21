@@ -6,10 +6,10 @@ wifi:
   # Benefits: Faster boot time (~3-5s savings), lower power consumption during connection
   # Drawbacks: Won't roam between APs in mesh networks, breaks if router changes channel
   # Recommendation: Enable for stationary devices with single AP, disable for mobile/multi-AP setups
-  fast_connect: true
+  fast_connect: false
   ssid: ${wifi_ssid}
   password: ${wifi_password}
-  min_auth_mode: WPA2
+  # min_auth_mode: WPA2  # Commented out - can cause 'Probe Request Unsuccessful' with WPA3/PMF routers
   on_connect: 
     then:
     - logger.log: "Connected to WiFi"
