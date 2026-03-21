@@ -207,6 +207,6 @@ display:
   - platform: mipi_spi
     id: main_display
     model: JC3636W518V2
-    rotation: 180
+    rotation: 0
     cs_pin: 14
     reset_pin: 21
