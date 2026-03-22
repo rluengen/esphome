@@ -11,7 +11,7 @@ substitutions:
   device_name: light-dial-controller
   friendly_name: Light Dial Controller
   project_name: light-dial-controller
-  project_version: "1.0.4"
+  project_version: "1.0.5"
   log_level: DEBUG
 
   # Theme colors
@@ -53,6 +53,7 @@ packages:
 esphome:
   name: ${device_name}
   friendly_name: ${friendly_name}
+  name_add_mac_suffix: true
   project:
     name: smartvan.${project_name}
     version: ${project_version}
@@ -60,12 +61,12 @@ esphome:
 font:
   - file: "fonts/segoeui.ttf"
     id: segoeui_16
-    size: 16
+    size: 24
     glyphs: "!%()+=,-_.:°●○0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz"
 
   - file: "fonts/materialdesignicons-webfont.ttf"
     id: mdi_icons_large
-    size: 40
+    size: 64
     bpp: 4
     glyphs: [
       "\U000F0335", # mdi-lightbulb-group
@@ -110,14 +111,14 @@ lvgl:
           clickable: false
           bg_opa: TRANSP
           arc_color: ${color_arc_bg}
-          arc_width: 12
+          arc_width: 20
           min_value: 0
           max_value: 100
           value: 0
           adjustable: false
           indicator:
             arc_color: ${color_arc_active}
-            arc_width: 14
+            arc_width: 22
 
       # Tile position dot indicators
       - label:
