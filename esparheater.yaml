@@ -50,7 +50,7 @@ substitutions:
   device_name: esparheater
   friendly_name: Espar Heater
   project_name: Van Espar Heater Controller
-  project_version: "1.0.2"
+  project_version: "1.0.3"
   log_level: DEBUG
 
   # --- CAN Bus Configuration ---
@@ -107,6 +107,39 @@ esphome:
           ESP_LOGI("espar", "Espar Heater CAN Bus Controller booted");
           ESP_LOGI("espar", "Sniff mode: ${sniff_mode}");
           ESP_LOGI("espar", "CAN bit rate: ${can_bit_rate}");
+          ESP_LOGI("espar", "MCP2515 clock: ${mcp_clock}");
+          ESP_LOGI("espar", "SPI pins - CLK: GPIO7, MISO: GPIO8, MOSI: GPIO9");
+          ESP_LOGI("espar", "MCP2515 CS pin: GPIO44");
+
+interval:
+  - interval: 10s
+    then:
+      - lambda: |-
+          static uint32_t can_check_count = 0;
+          can_check_count++;
+
+          // Read MCP2515 error flags via SPI
+          // Register 0x2D = EFLG (Error Flag Register)
+          // Register 0x0E = CANSTAT (CAN Status Register)
+          auto *spi_dev = (spi::SPIDevice *)id(espar_can);
+
+          ESP_LOGI("espar_diag", "--- CAN Bus Health Check #%d ---", can_check_count);
+
+          // Check if any frames have been received
+          static uint32_t last_frame_count = 0;
+          uint32_t current = id(can_frame_counter);
+          if (current == last_frame_count) {
+            ESP_LOGW("espar_diag", "No new CAN frames received since last check (total: %d)", current);
+          } else {
+            ESP_LOGI("espar_diag", "CAN frames received: %d (delta: +%d)", current, current - last_frame_count);
+          }
+          last_frame_count = current;
+
+globals:
+  - id: can_frame_counter
+    type: uint32_t
+    restore_value: no
+    initial_value: '0'
 
 # --- SPI Bus (XIAO ESP32-S3 default SPI pins) ---
 spi:
@@ -132,6 +165,9 @@ canbus:
           - lambda: |-
               // Always log in sniff mode, skip in normal mode
               if (std::string("${sniff_mode}") != "true") return;
+
+              // Increment frame counter for diagnostics
+              id(can_frame_counter) += 1;
 
               // Format data bytes as hex string
               std::string data_hex = "";
