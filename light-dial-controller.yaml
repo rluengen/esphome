@@ -11,7 +11,7 @@ substitutions:
   device_name: light-dial-controller
   friendly_name: Light Dial Controller
   project_name: light-dial-controller
-  project_version: "1.0.5"
+  project_version: "1.0.6"
   log_level: DEBUG
 
   # Theme colors
@@ -30,6 +30,7 @@ packages:
     ref: main
     refresh: always
     files:
+      - path: packages/webserver.yaml
       - path: packages/common.yaml
         vars:
           api_encryption_key: !secret encryption_key

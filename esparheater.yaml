@@ -60,7 +60,7 @@ substitutions:
 
   # CAN bus bit rate - Espar AS3 typically uses 25kbps
   # If no frames appear, try: 10kbps, 20kbps, 50kbps, 100kbps
-  can_bit_rate: 25kbps
+  can_bit_rate: 50kbps
 
   # MCP2515 crystal frequency (8MHz on the Seeed breakout board)
   mcp_clock: 8MHZ
@@ -117,11 +117,6 @@ interval:
       - lambda: |-
           static uint32_t can_check_count = 0;
           can_check_count++;
-
-          // Read MCP2515 error flags via SPI
-          // Register 0x2D = EFLG (Error Flag Register)
-          // Register 0x0E = CANSTAT (CAN Status Register)
-          auto *spi_dev = (spi::SPIDevice *)id(espar_can);
 
           ESP_LOGI("espar_diag", "--- CAN Bus Health Check #%d ---", can_check_count);
 
