@@ -81,12 +81,6 @@ sensor:
       number: GPIO7
       mode: INPUT_PULLUP
     resolution: 2
-    on_clockwise:
-      then:
-        - logger.log: "Knob turned ? CLOCKWISE"
-    on_anticlockwise:
-      then:
-        - logger.log: "Knob turned ? COUNTER-CLOCKWISE"
 
   - platform: template
     id: battery_percentage
