@@ -141,6 +141,46 @@ if (-not $SkipRelease) {
     Write-Host "✅ GitHub CLI authenticated" -ForegroundColor Green
 }
 
+# Ensure ESPHome is up to date before compiling release firmware
+Write-Host "`n🔍 Checking ESPHome version..." -ForegroundColor Cyan
+$installedRaw = (esphome version 2>&1) | Select-String -Pattern "(\d+\.\d+\.\d+)" | ForEach-Object { $_.Matches[0].Value }
+if (-not $installedRaw) {
+    Write-Error "❌ Could not determine installed ESPHome version. Is esphome installed?"
+    exit 1
+}
+
+try {
+    $latestRaw = (Invoke-RestMethod -Uri "https://pypi.org/pypi/esphome/json" -TimeoutSec 10).info.version
+} catch {
+    Write-Host "⚠️  Could not check PyPI for latest version (offline?). Continuing with $installedRaw" -ForegroundColor Yellow
+    $latestRaw = $installedRaw
+}
+
+if ($installedRaw -ne $latestRaw) {
+    Write-Host "⬆️  ESPHome update available: $installedRaw → $latestRaw" -ForegroundColor Yellow
+    $answer = Read-Host "Upgrade now? [Y/n]"
+    if ($answer -eq '' -or $answer -match '^[Yy]') {
+        Write-Host "📦 Upgrading ESPHome..." -ForegroundColor Cyan
+        pip install --upgrade esphome
+        if ($LASTEXITCODE -ne 0) {
+            Write-Error "❌ ESPHome upgrade failed"
+            exit 1
+        }
+        Write-Host "✅ ESPHome upgraded to $latestRaw" -ForegroundColor Green
+
+        # Clean build cache after upgrade to avoid stale artifacts
+        $buildDir = Join-Path $RepoRoot ".esphome\build"
+        if (Test-Path $buildDir) {
+            Write-Host "🧹 Clearing build cache after upgrade..." -ForegroundColor DarkGray
+            Remove-Item -Recurse -Force $buildDir -ErrorAction SilentlyContinue
+        }
+    } else {
+        Write-Host "Continuing with ESPHome $installedRaw" -ForegroundColor DarkGray
+    }
+} else {
+    Write-Host "✅ ESPHome $installedRaw is the latest version" -ForegroundColor Green
+}
+
 if (-not $Version) {
     $currentVersion = Get-CurrentVersion
     if ($Major -or $Minor -or -not $PSBoundParameters.ContainsKey('Version')) {
