@@ -65,9 +65,22 @@ font:
     size: 24
     glyphs: "!%()+=,-_.:°●○0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz"
 
+  - file: "fonts/segoeui.ttf"
+    id: segoeui_32
+    size: 32
+    glyphs: "!%()+=,-_.:°●○0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz"
+
   - file: "fonts/materialdesignicons-webfont.ttf"
     id: mdi_icons_large
     size: 64
+    bpp: 4
+    glyphs: [
+      "\U000F0335", # mdi-lightbulb-group
+    ]
+
+  - file: "fonts/materialdesignicons-webfont.ttf"
+    id: mdi_icons_xlarge
+    size: 80
     bpp: 4
     glyphs: [
       "\U000F0335", # mdi-lightbulb-group
@@ -209,28 +222,28 @@ lvgl:
                 bg_opa: TRANSP
                 widgets:
                   - label:
-                      id: tile_main_can_icon
-                      align: CENTER
-                      x: 0
-                      y: -35
-                      text: "\U000F0335"
-                      text_font: mdi_icons_large
-                      text_color: ${color_icon_off}
-                  - label:
                       id: tile_main_can_name
                       align: CENTER
                       x: 0
-                      y: 10
+                      y: -60
                       text: "Main Can"
                       text_font: segoeui_16
                       text_color: ${color_text}
                   - label:
+                      id: tile_main_can_icon
+                      align: CENTER
+                      x: 0
+                      y: -10
+                      text: "\U000F0335"
+                      text_font: mdi_icons_xlarge
+                      text_color: ${color_icon_off}
+                  - label:
                       id: tile_main_can_pct
                       align: CENTER
                       x: 0
-                      y: 40
+                      y: 50
                       text: "%"
-                      text_font: segoeui_16
+                      text_font: segoeui_32
                       text_color: ${color_text_accent}
 
               - id: tile_bed_can
@@ -421,13 +434,13 @@ select:
     restore_value: false
     options:
       - light.all_lights
-      - light.bed_interior_lights
-      - light.main_can_lights
-      - light.bed_can_lights
-      - light.cwww_led_capsule_lights
-      - light.exterior_lights
-      - light.door_light
-      - light.cwww_led_dog_crate_lights
+      - light.quinled_van_lightcontroller_bed_interior_lights
+      - light.quinled_van_lightcontroller_main_can_lights
+      - light.quinled_van_lightcontroller_bed_can_lights
+      - light.quinled_van_lightcontroller_cwww_led_capsule_lights
+      - light.quinled_van_lightcontroller_exterior_lights
+      - light.quinled_van_lightcontroller_door_light
+      - light.quinled_van_lightcontroller_cwww_led_dog_crate_lights
 
     set_action:
       - logger.log:
@@ -506,7 +519,7 @@ script:
           // Compute brightness based on currently selected tab index
           int idx = id(selected_light_index);
           auto pct_from_attr = [](float attr) -> int {
-            if (isnan(attr)) return 0;
+            if (isnan(attr)) return -1;  // -1 = entity not available
             int v = (int)roundf((attr / 255.0f) * 100.0f);
             if (v < 0) v = 0; if (v > 100) v = 100; return v;
           };
@@ -523,7 +536,11 @@ script:
             default: brightness = 0; break;
           }
           id(current_brightness) = brightness;
-          ESP_LOGI("ui", "update_light_display idx=%d -> %d%%", id(selected_light_index), id(current_brightness));
+          if (brightness < 0) {
+            ESP_LOGW("ui", "update_light_display idx=%d -> entity not available in HA", idx);
+          } else {
+            ESP_LOGI("ui", "update_light_display idx=%d -> %d%%", idx, brightness);
+          }
           
           // Update icon color: amber when on, dim gray when off
           lv_obj_t* icons[] = {
@@ -539,10 +556,15 @@ script:
           lv_obj_set_style_arc_color(id(brightness_arc), arc_ind_color, LV_PART_INDICATOR);
       - lvgl.arc.update:
           id: brightness_arc
-          value: !lambda 'return id(current_brightness);'
+          value: !lambda 'return std::max(0, id(current_brightness));'
       - lambda: |-
           // Update visible tab percent label text
-          char buf[8]; snprintf(buf, sizeof(buf), "%d%%", id(current_brightness));
+          char buf[8];
+          if (id(current_brightness) < 0) {
+            snprintf(buf, sizeof(buf), "-%%");
+          } else {
+            snprintf(buf, sizeof(buf), "%d%%", id(current_brightness));
+          }
           switch (id(selected_light_index)) {
             case 0: lv_label_set_text(id(tile_all_lights_pct), buf); break;
             case 1: lv_label_set_text(id(tile_bed_interior_pct), buf); break;
@@ -730,7 +752,7 @@ sensor:
 
   - platform: homeassistant
     id: light_bed_interior_lights_brightness
-    entity_id: light.bed_interior_lights
+    entity_id: light.quinled_van_lightcontroller_bed_interior_lights
     attribute: brightness
     internal: true
     on_value:
@@ -742,7 +764,7 @@ sensor:
 
   - platform: homeassistant
     id: light_main_can_lights_brightness
-    entity_id: light.main_can_lights
+    entity_id: light.quinled_van_lightcontroller_main_can_lights
     attribute: brightness
     internal: true
     on_value:
@@ -754,7 +776,7 @@ sensor:
 
   - platform: homeassistant
     id: light_bed_can_lights_brightness
-    entity_id: light.bed_can_lights
+    entity_id: light.quinled_van_lightcontroller_bed_can_lights
     attribute: brightness
     internal: true
     on_value:
@@ -766,7 +788,7 @@ sensor:
 
   - platform: homeassistant
     id: light_cwww_led_capsule_lights_brightness
-    entity_id: light.cwww_led_capsule_lights
+    entity_id: light.quinled_van_lightcontroller_cwww_led_capsule_lights
     attribute: brightness
     internal: true
     on_value:
@@ -778,7 +800,7 @@ sensor:
 
   - platform: homeassistant
     id: light_exterior_lights_brightness
-    entity_id: light.exterior_lights
+    entity_id: light.quinled_van_lightcontroller_exterior_lights
     attribute: brightness
     internal: true
     on_value:
@@ -790,7 +812,7 @@ sensor:
 
   - platform: homeassistant
     id: light_door_light_brightness
-    entity_id: light.door_light
+    entity_id: light.quinled_van_lightcontroller_door_light
     attribute: brightness
     internal: true
     on_value:
@@ -802,7 +824,7 @@ sensor:
 
   - platform: homeassistant
     id: light_cwww_led_dog_crate_lights_brightness
-    entity_id: light.cwww_led_dog_crate_lights
+    entity_id: light.quinled_van_lightcontroller_cwww_led_dog_crate_lights
     attribute: brightness
     internal: true
     on_value:
