@@ -7,7 +7,7 @@ uart:
   id: gps_uart
   tx_pin: ${tx_pin}
   rx_pin: ${rx_pin}
-  baud_rate: 115200
+  baud_rate: 9600
 
 gps:
   latitude:
@@ -53,20 +53,27 @@ select:
     initial_option: "1Hz (Low Power)"
     restore_value: true  # Persist across reboots
     set_action:
-      - lambda: |-
-          if (x == "1Hz (Low Power)") {
-            id(gps_uart).write_str("\x24PCAS04,3*1A\r\n");  // Multi-GNSS
-            delay(50);
-            id(gps_uart).write_str("\x24PCAS02,1000*2E\r\n");
-          } else if (x == "5Hz (Normal)") {
-            id(gps_uart).write_str("\x24PCAS04,1*18\r\n");  // GPS only
-            delay(50);
-            id(gps_uart).write_str("\x24PCAS02,200*18\r\n");
-          } else if (x == "10Hz (High Speed)") {
-            id(gps_uart).write_str("\x24PCAS04,1*18\r\n");  // GPS only
-            delay(50);
-            id(gps_uart).write_str("\x24PCAS02,100*1F\r\n");
-          }
+      - if:
+          condition:
+            lambda: 'return x == "1Hz (Low Power)";'
+          then:
+            - lambda: 'id(gps_uart).write_str("\x24PCAS04,3*1A\r\n");'
+            - delay: 50ms
+            - lambda: 'id(gps_uart).write_str("\x24PCAS02,1000*2E\r\n");'
+      - if:
+          condition:
+            lambda: 'return x == "5Hz (Normal)";'
+          then:
+            - lambda: 'id(gps_uart).write_str("\x24PCAS04,1*18\r\n");'
+            - delay: 50ms
+            - lambda: 'id(gps_uart).write_str("\x24PCAS02,200*1D\r\n");'
+      - if:
+          condition:
+            lambda: 'return x == "10Hz (High Speed)";'
+          then:
+            - lambda: 'id(gps_uart).write_str("\x24PCAS04,1*18\r\n");'
+            - delay: 50ms
+            - lambda: 'id(gps_uart).write_str("\x24PCAS02,100*1E\r\n");'
 
 text_sensor:
   - platform: template
