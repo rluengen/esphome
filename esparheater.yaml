@@ -60,7 +60,7 @@ substitutions:
 
   # CAN bus bit rate - Espar AS3 typically uses 25kbps
   # If no frames appear, try: 10kbps, 20kbps, 50kbps, 100kbps
-  can_bit_rate: 100kbps
+  can_bit_rate: 25kbps
 
   # MCP2515 crystal frequency (16MHz on the Seeed CAN Bus Expansion Board)
   mcp_clock: 16MHZ
@@ -146,10 +146,11 @@ spi:
 canbus:
   - platform: mcp2515
     id: espar_can
-    cs_pin: GPIO44   # D7 - CS pin on the CAN Bus Breakout Board
+    cs_pin: GPIO44       # D7 - CS pin on the CAN Bus Breakout Board
     clock: ${mcp_clock}
     can_id: 0
     bit_rate: ${can_bit_rate}
+    interrupt_pin: GPIO3   # D2 - INT pin on the CAN Bus Breakout Board
     on_frame:
       # ---------------------------------------------------------------
       # SNIFF MODE: Log all CAN frames for protocol discovery
