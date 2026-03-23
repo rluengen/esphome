@@ -109,11 +109,6 @@ globals:
     restore_value: false
     initial_value: '0.0'
 
-  - id: tank_capacity_in_gallons
-    type: float
-    restore_value: false
-    initial_value: '16.0'  # 16 gallon tank
-
   - id: pump_timer_remaining
     type: int
     restore_value: false
@@ -133,12 +128,9 @@ number:
     step: 0.5
     initial_value: 16.0
     optimistic: true
+    restore_value: true
     entity_category: config
     mode: box
-    set_action:
-      - globals.set:
-          id: tank_capacity_in_gallons
-          value: !lambda 'return x;'
 
   - platform: template
     id: pump_timer_duration
@@ -149,6 +141,7 @@ number:
     initial_value: 30
     entity_category: config
     optimistic: true
+    restore_value: true
     mode: box
     unit_of_measurement: "minutes"
 
@@ -161,6 +154,7 @@ number:
     initial_value: 30
     entity_category: config
     optimistic: true
+    restore_value: true
     mode: box
     unit_of_measurement: "minutes"
 
@@ -173,6 +167,7 @@ number:
     initial_value: 4.0
     entity_category: config
     optimistic: true
+    restore_value: true
     mode: box
     unit_of_measurement: "s"
     icon: "mdi:timer-cog"
@@ -186,6 +181,7 @@ number:
     initial_value: 5.0
     entity_category: config
     optimistic: true
+    restore_value: true
     mode: box
     unit_of_measurement: "%"
     icon: "mdi:percent"
@@ -199,6 +195,7 @@ number:
     initial_value: 240.0
     entity_category: config
     optimistic: true
+    restore_value: true
     mode: box
     unit_of_measurement: "Ohms"
     icon: "mdi:omega"
@@ -212,6 +209,7 @@ number:
     initial_value: 33.0
     entity_category: config
     optimistic: true
+    restore_value: true
     mode: box
     unit_of_measurement: "Ohms"
     icon: "mdi:omega"
@@ -239,8 +237,14 @@ binary_sensor:
     on_press:
       then:
         - logger.log: "Tank full - stopping fill operations"
+        - switch.turn_off: relay_water_pump
         - script.stop: water_fill
         - valve.close: valve_fill
+        - lambda: 'id(fill_rate_gpm) = 0.0;'
+        - lvgl.button.update:
+            id: btn_water_fill
+            state:
+              checked: false
 
   - platform: template
     id: water_tank_low
@@ -371,7 +375,7 @@ sensor:
             float gallons = NAN;
             if (!isnan(id(tank_percent).state))
             {
-              gallons = id(tank_capacity_in_gallons) * (id(tank_percent).state / 100.0f);
+              gallons = id(tank_capacity_setting).state * (id(tank_percent).state / 100.0f);
             }
             id(tank_gallons).publish_state(gallons);
 
@@ -453,7 +457,7 @@ sensor:
     lambda: |-
       if (id(fill_rate_gpm) <= 0.0 || isnan(id(tank_percent).state)) return NAN;
       
-      float remaining_gallons = id(tank_capacity_in_gallons) * (100.0 - id(tank_percent).state) / 100.0;
+      float remaining_gallons = id(tank_capacity_setting).state * (100.0 - id(tank_percent).state) / 100.0;
       float minutes = remaining_gallons / id(fill_rate_gpm);
       return minutes;
 
@@ -480,6 +484,10 @@ valve:
             binary_sensor.is_on: water_tank_low
           then:
             - logger.log: "Cannot open water pump Supply Valve - tank is too low"
+            - valve.template.publish:
+                id: valve_water_pump_supply
+                current_operation: IDLE
+                position: !lambda "return VALVE_CLOSED;"
           else:
             - logger.log: "Water Pump Supply Valve Opening"
             - switch.turn_on: relay_supply_valve
@@ -579,9 +587,7 @@ switch:
       - script.execute: screen_bump_activity
       - if:
           condition:
-            and:
-              - binary_sensor.is_on: water_tank_low
-              - lambda: 'return id(valve_water_pump_supply).current_operation == VALVE_OPERATION_OPENING || id(valve_water_pump_supply).position == VALVE_OPEN;'
+            binary_sensor.is_on: water_tank_low
           then:
             - logger.log: "Dry-run protection: Cannot start pump - tank too low"
             - lvgl.button.update:
@@ -705,31 +711,29 @@ switch:
     on_turn_on:
       - if:
           condition:
-            and:
-              - binary_sensor.is_on: water_tank_low
-              - lambda: 'return id(valve_water_pump_supply).current_operation == VALVE_OPERATION_OPENING || id(valve_water_pump_supply).position == VALVE_OPEN;'
+            binary_sensor.is_on: water_tank_low
           then:
-            - logger.log: "Dry-run protection: Cannot turn on pump - tank low and supply is tank"
+            - logger.log: "Dry-run protection: Cannot turn on pump - tank low"
             - switch.turn_off: relay_water_pump
 
 font:
   - file: "fonts/segoeui.ttf"
-    id: f_text_32
+    id: f_medium
     size: 32
     bpp: 4
 
   - file: "fonts/segoeui.ttf"
-    id: f_value_90
+    id: f_large
     size: 60
     bpp: 4
 
   - file: "fonts/segoeui.ttf"
-    id: f_text_24
+    id: f_small
     size: 24
     bpp: 4
 
   - file: "fonts/materialdesignicons-webfont.ttf"
-    id: valve_icon_40
+    id: f_icon
     size: 30
     bpp: 4
     glyphs: [
@@ -820,7 +824,7 @@ lvgl:
                   align: CENTER
                   text: "Pump"
                   text_color: 0xFFFFFF
-                  text_font: f_text_24
+                  text_font: f_small
 
         # Water Fill toggle button
         - button:
@@ -844,9 +848,10 @@ lvgl:
                     else:
                       # Turning OFF
                       - logger.log: "Water Fill button OFF"
-                      - script.stop: water_fill
                       - switch.turn_off: relay_water_pump
+                      - script.stop: water_fill
                       - valve.close: valve_fill
+                      - lambda: 'id(fill_rate_gpm) = 0.0;'
                       - lvgl.label.update:
                           id: lbl_pump_status
                           text: "\U000F0F93"
@@ -857,7 +862,7 @@ lvgl:
                   align: CENTER
                   text: "Fill"
                   text_color: 0xFFFFFF
-                  text_font: f_text_24
+                  text_font: f_small
 
         # Center gallons display
         - label:
@@ -865,7 +870,7 @@ lvgl:
             text: "-.- gal"
             align: CENTER
             y: -15
-            text_font: f_value_90
+            text_font: f_large
             text_color: 0xFFFFFF
             text_align: CENTER
             clickable: false
@@ -876,7 +881,7 @@ lvgl:
             text: "- %"
             align: CENTER
             y: 80
-            text_font: f_text_32
+            text_font: f_medium
             text_color: 0xAAAAAA
             text_align: CENTER
             clickable: false
@@ -909,7 +914,7 @@ lvgl:
                   align: CENTER
                   text: "Hot"
                   text_color: 0xFFFFFF
-                  text_font: f_text_24
+                  text_font: f_small
 
         # Timer countdown display - visible when pump is running
         - label:
@@ -917,7 +922,7 @@ lvgl:
             text: ""
             align: TOP_MID
             y: 100
-            text_font: f_text_24
+            text_font: f_small
             text_color: 0xFFAA00
             text_align: CENTER
             clickable: false
@@ -949,7 +954,7 @@ lvgl:
             text: ""
             align: BOTTOM_MID
             y: -15
-            text_font: f_text_32
+            text_font: f_medium
             text_color: 0x888888
             text_align: CENTER
             clickable: false
@@ -972,7 +977,7 @@ lvgl:
             align: BOTTOM_LEFT
             x: 180
             y: -60
-            text_font: valve_icon_40
+            text_font: f_icon
             text_color: 0x888888  # Gray for supply
             text_align: LEFT
             clickable: false
@@ -983,7 +988,7 @@ lvgl:
             align: BOTTOM_LEFT
             x: 240
             y: -60
-            text_font: valve_icon_40
+            text_font: f_icon
             text_color: 0x888888  # Gray for closed
             text_align: LEFT
             clickable: false
@@ -995,7 +1000,7 @@ lvgl:
             align: BOTTOM_LEFT
             x: 300
             y: -60
-            text_font: valve_icon_40
+            text_font: f_icon
             text_color: 0x888888  # Gray for off
             text_align: LEFT
             clickable: false
@@ -1007,7 +1012,7 @@ lvgl:
             align: BOTTOM_LEFT
             x: 360
             y: -60
-            text_font: valve_icon_40
+            text_font: f_icon
             text_color: 0x888888  # Gray for off
             text_align: LEFT
             clickable: false
@@ -1045,51 +1050,31 @@ script:
                 text: "\U000F058E"  # water-pump icon (on)
                 text_color: 0x00BFFF  # Deep sky blue for running
             
-            # Monitor fill progress
-            - repeat:
-                count: 1800 # 30 minutes * 60 seconds
+            # Monitor fill progress - loop exits when tank full, pump off, or 30 min elapsed
+            - while:
+                condition:
+                  and:
+                    - binary_sensor.is_off: water_tank_full
+                    - switch.is_on: relay_water_pump
+                    - lambda: 'return (millis() - id(fill_start_time)) < 1800000;'
                 then:
                   - delay: 1s
-
-                  # Check if tank is full and auto-stop
-                  - if:
-                      condition:
-                        binary_sensor.is_on: water_tank_full
-                      then:
-                        - logger.log: "Water Fill: Tank full - auto-stopping"
-                        - switch.turn_off: relay_water_pump
-                        - valve.close: valve_fill
-                        - lvgl.label.update:
-                            id: lbl_pump_status
-                            text: "\U000F0F93"
-                            text_color: 0x888888
-                        - lvgl.button.update:
-                            id: btn_water_fill
-                            state:
-                              checked: false
-                        - script.stop: water_fill
-
-                  # Update fill rate calculation
+                  # Update fill rate and stale detection
                   - lambda: |-
                       uint32_t elapsed_ms = millis() - id(fill_start_time);
                       float elapsed_min = elapsed_ms / 60000.0;
-                      
-                      // Update fill rate after enough time has passed
-                      if (elapsed_min > 0.5) {
+                      if (elapsed_min > 5.0) {
                         float level_change = id(tank_percent).state - id(fill_start_level);
-                        float gallons_filled = id(tank_capacity_in_gallons) * (level_change / 100.0);
+                        float gallons_filled = id(tank_capacity_setting).state * (level_change / 100.0);
                         id(fill_rate_gpm) = gallons_filled / elapsed_min;
-                        
-                        // If level hasn't increased by at least 0.5% in 30 seconds, stop
-                        if (level_change < 0.5) {
-                          ESP_LOGW("water_fill", "Tank level not increasing - stopping pump");
-                          id(water_pump_switch).turn_off();
-                          id(water_fill).stop();
+                        if (level_change < 1.0) {
+                          ESP_LOGW("water_fill", "Tank level not increasing after 5 min - stopping");
+                          id(relay_water_pump).turn_off();
                         }
                       }
 
-            # Fill loop ended (30 min max or stopped) - clean up
-            - logger.log: "Water Fill: Complete or timed out"
+            # Cleanup always runs when loop exits
+            - logger.log: "Water Fill: Complete"
             - switch.turn_off: relay_water_pump
             - valve.close: valve_fill
             - lambda: 'id(fill_rate_gpm) = 0.0;'
