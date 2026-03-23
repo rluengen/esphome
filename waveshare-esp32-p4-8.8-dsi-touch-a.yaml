@@ -231,7 +231,7 @@ waveshare_dsi:
 touchscreen:
   - platform: gt911
     id: dsi_touchscreen
-    update_interval: 200ms
+    update_interval: 16ms
     transform:
       swap_xy: true
       mirror_x: true
@@ -436,113 +436,201 @@ script:
     mode: restart
     then:
       - delay: 300ms
-      - homeassistant.service:
-          service: light.turn_on
-          data:
-            entity_id: light.light_controller_main_can_lights
-          data_template:
-            brightness: !lambda 'return id(pending_bright_main_cans);'
+      - if:
+          condition:
+            lambda: 'return id(pending_bright_main_cans) <= 0;'
+          then:
+            - homeassistant.service:
+                service: light.turn_off
+                data:
+                  entity_id: light.light_controller_main_can_lights
+          else:
+            - homeassistant.service:
+                service: light.turn_on
+                data:
+                  entity_id: light.light_controller_main_can_lights
+                data_template:
+                  brightness: !lambda 'return id(pending_bright_main_cans);'
 
   - id: debounce_bed_cans
     mode: restart
     then:
       - delay: 300ms
-      - homeassistant.service:
-          service: light.turn_on
-          data:
-            entity_id: light.light_controller_bed_can_lights
-          data_template:
-            brightness: !lambda 'return id(pending_bright_bed_cans);'
+      - if:
+          condition:
+            lambda: 'return id(pending_bright_bed_cans) <= 0;'
+          then:
+            - homeassistant.service:
+                service: light.turn_off
+                data:
+                  entity_id: light.light_controller_bed_can_lights
+          else:
+            - homeassistant.service:
+                service: light.turn_on
+                data:
+                  entity_id: light.light_controller_bed_can_lights
+                data_template:
+                  brightness: !lambda 'return id(pending_bright_bed_cans);'
 
   - id: debounce_door
     mode: restart
     then:
       - delay: 300ms
-      - homeassistant.service:
-          service: light.turn_on
-          data:
-            entity_id: light.light_controller_door_light
-          data_template:
-            brightness: !lambda 'return id(pending_bright_door);'
+      - if:
+          condition:
+            lambda: 'return id(pending_bright_door) <= 0;'
+          then:
+            - homeassistant.service:
+                service: light.turn_off
+                data:
+                  entity_id: light.light_controller_door_light
+          else:
+            - homeassistant.service:
+                service: light.turn_on
+                data:
+                  entity_id: light.light_controller_door_light
+                data_template:
+                  brightness: !lambda 'return id(pending_bright_door);'
 
   - id: debounce_dog_crate
     mode: restart
     then:
       - delay: 300ms
-      - homeassistant.service:
-          service: light.turn_on
-          data:
-            entity_id: light.light_controller_dog_crate_lights
-          data_template:
-            brightness: !lambda 'return id(pending_bright_dog_crate);'
+      - if:
+          condition:
+            lambda: 'return id(pending_bright_dog_crate) <= 0;'
+          then:
+            - homeassistant.service:
+                service: light.turn_off
+                data:
+                  entity_id: light.light_controller_dog_crate_lights
+          else:
+            - homeassistant.service:
+                service: light.turn_on
+                data:
+                  entity_id: light.light_controller_dog_crate_lights
+                data_template:
+                  brightness: !lambda 'return id(pending_bright_dog_crate);'
 
   - id: debounce_bed_capsule
     mode: restart
     then:
       - delay: 300ms
-      - homeassistant.service:
-          service: light.turn_on
-          data:
-            entity_id: light.light_controller_bed_capsule_lights
-          data_template:
-            brightness: !lambda 'return id(pending_bright_bed_capsule);'
+      - if:
+          condition:
+            lambda: 'return id(pending_bright_bed_capsule) <= 0;'
+          then:
+            - homeassistant.service:
+                service: light.turn_off
+                data:
+                  entity_id: light.light_controller_bed_capsule_lights
+          else:
+            - homeassistant.service:
+                service: light.turn_on
+                data:
+                  entity_id: light.light_controller_bed_capsule_lights
+                data_template:
+                  brightness: !lambda 'return id(pending_bright_bed_capsule);'
 
   - id: debounce_awning_out
     mode: restart
     then:
       - delay: 300ms
-      - homeassistant.service:
-          service: light.turn_on
-          data:
-            entity_id: light.light_controller_awning_outside_light_strip
-          data_template:
-            brightness: !lambda 'return id(pending_bright_awning_out);'
+      - if:
+          condition:
+            lambda: 'return id(pending_bright_awning_out) <= 0;'
+          then:
+            - homeassistant.service:
+                service: light.turn_off
+                data:
+                  entity_id: light.light_controller_awning_outside_light_strip
+          else:
+            - homeassistant.service:
+                service: light.turn_on
+                data:
+                  entity_id: light.light_controller_awning_outside_light_strip
+                data_template:
+                  brightness: !lambda 'return id(pending_bright_awning_out);'
 
   - id: debounce_awning_in
     mode: restart
     then:
       - delay: 300ms
-      - homeassistant.service:
-          service: light.turn_on
-          data:
-            entity_id: light.light_controller_awning_inside_light_strip
-          data_template:
-            brightness: !lambda 'return id(pending_bright_awning_in);'
+      - if:
+          condition:
+            lambda: 'return id(pending_bright_awning_in) <= 0;'
+          then:
+            - homeassistant.service:
+                service: light.turn_off
+                data:
+                  entity_id: light.light_controller_awning_inside_light_strip
+          else:
+            - homeassistant.service:
+                service: light.turn_on
+                data:
+                  entity_id: light.light_controller_awning_inside_light_strip
+                data_template:
+                  brightness: !lambda 'return id(pending_bright_awning_in);'
 
   - id: debounce_exterior
     mode: restart
     then:
       - delay: 300ms
-      - homeassistant.service:
-          service: light.turn_on
-          data:
-            entity_id: light.light_controller_exterior_capsule_passenger_flood_light
-          data_template:
-            brightness: !lambda 'return id(pending_bright_exterior);'
-      - homeassistant.service:
-          service: light.turn_on
-          data:
-            entity_id: light.light_controller_exterior_capsule_driver_flood_light
-          data_template:
-            brightness: !lambda 'return id(pending_bright_exterior);'
-      - homeassistant.service:
-          service: light.turn_on
-          data:
-            entity_id: light.light_controller_exterior_roof_passenger_flood_light
-          data_template:
-            brightness: !lambda 'return id(pending_bright_exterior);'
-      - homeassistant.service:
-          service: light.turn_on
-          data:
-            entity_id: light.light_controller_exterior_roof_driver_flood_light
-          data_template:
-            brightness: !lambda 'return id(pending_bright_exterior);'
-      - homeassistant.service:
-          service: light.turn_on
-          data:
-            entity_id: light.light_controller_exterior_roof_rear_flood_light
-          data_template:
-            brightness: !lambda 'return id(pending_bright_exterior);'
+      - if:
+          condition:
+            lambda: 'return id(pending_bright_exterior) <= 0;'
+          then:
+            - homeassistant.service:
+                service: light.turn_off
+                data:
+                  entity_id: light.light_controller_exterior_capsule_passenger_flood_light
+            - homeassistant.service:
+                service: light.turn_off
+                data:
+                  entity_id: light.light_controller_exterior_capsule_driver_flood_light
+            - homeassistant.service:
+                service: light.turn_off
+                data:
+                  entity_id: light.light_controller_exterior_roof_passenger_flood_light
+            - homeassistant.service:
+                service: light.turn_off
+                data:
+                  entity_id: light.light_controller_exterior_roof_driver_flood_light
+            - homeassistant.service:
+                service: light.turn_off
+                data:
+                  entity_id: light.light_controller_exterior_roof_rear_flood_light
+          else:
+            - homeassistant.service:
+                service: light.turn_on
+                data:
+                  entity_id: light.light_controller_exterior_capsule_passenger_flood_light
+                data_template:
+                  brightness: !lambda 'return id(pending_bright_exterior);'
+            - homeassistant.service:
+                service: light.turn_on
+                data:
+                  entity_id: light.light_controller_exterior_capsule_driver_flood_light
+                data_template:
+                  brightness: !lambda 'return id(pending_bright_exterior);'
+            - homeassistant.service:
+                service: light.turn_on
+                data:
+                  entity_id: light.light_controller_exterior_roof_passenger_flood_light
+                data_template:
+                  brightness: !lambda 'return id(pending_bright_exterior);'
+            - homeassistant.service:
+                service: light.turn_on
+                data:
+                  entity_id: light.light_controller_exterior_roof_driver_flood_light
+                data_template:
+                  brightness: !lambda 'return id(pending_bright_exterior);'
+            - homeassistant.service:
+                service: light.turn_on
+                data:
+                  entity_id: light.light_controller_exterior_roof_rear_flood_light
+                data_template:
+                  brightness: !lambda 'return id(pending_bright_exterior);'
 
   # ── Awning Toggle Scripts ──
   # Single-button logic: closed→open, open→close, opening/closing→stop
@@ -1433,14 +1521,11 @@ sensor:
               snprintf(buf, sizeof(buf), "%.0f W", x);
               return std::string(buf);
 
-  # TODO: Replace with real HA sensor once hooked up.
-  # WARNING: This is a FAKE test sensor returning random values every 10s.
-  # It will cause the battery time bar/labels to jump erratically.
-  - platform: template
+  # Battery time remaining from EcoFlow integration
+  # TODO: Update entity_id to match your actual HA sensor
+  - platform: homeassistant
     id: battery_time_remaining
-    name: "Battery Time (Test)"
-    update_interval: 10s
-    lambda: 'return (float)(rand() % 49);'  # 0-48 hours
+    entity_id: sensor.ecoflow_battery_time_remaining
     internal: true
     on_value:
       then:
@@ -3194,8 +3279,12 @@ lvgl:
                         value: 0
                         on_value:
                           then:
-                            - lambda: 'id(pending_bright_main_cans) = (int)x;'
-                            - script.execute: debounce_main_cans
+                            - if:
+                                condition:
+                                  lambda: 'return (int)x != (isnan(id(ha_bright_main_cans).state) ? 0 : (int)id(ha_bright_main_cans).state);'
+                                then:
+                                  - lambda: 'id(pending_bright_main_cans) = (int)x;'
+                                  - script.execute: debounce_main_cans
                     - label:
                         text: "Main Cans"
                         text_font: roboto_small
@@ -3249,8 +3338,12 @@ lvgl:
                         value: 0
                         on_value:
                           then:
-                            - lambda: 'id(pending_bright_bed_cans) = (int)x;'
-                            - script.execute: debounce_bed_cans
+                            - if:
+                                condition:
+                                  lambda: 'return (int)x != (isnan(id(ha_bright_bed_cans).state) ? 0 : (int)id(ha_bright_bed_cans).state);'
+                                then:
+                                  - lambda: 'id(pending_bright_bed_cans) = (int)x;'
+                                  - script.execute: debounce_bed_cans
                     - label:
                         text: "Bed Cans"
                         text_font: roboto_small
@@ -3304,8 +3397,12 @@ lvgl:
                         value: 0
                         on_value:
                           then:
-                            - lambda: 'id(pending_bright_door) = (int)x;'
-                            - script.execute: debounce_door
+                            - if:
+                                condition:
+                                  lambda: 'return (int)x != (isnan(id(ha_bright_door).state) ? 0 : (int)id(ha_bright_door).state);'
+                                then:
+                                  - lambda: 'id(pending_bright_door) = (int)x;'
+                                  - script.execute: debounce_door
                     - label:
                         text: "Door"
                         text_font: roboto_small
@@ -3359,8 +3456,12 @@ lvgl:
                         value: 0
                         on_value:
                           then:
-                            - lambda: 'id(pending_bright_dog_crate) = (int)x;'
-                            - script.execute: debounce_dog_crate
+                            - if:
+                                condition:
+                                  lambda: 'return (int)x != (isnan(id(ha_bright_dog_crate).state) ? 0 : (int)id(ha_bright_dog_crate).state);'
+                                then:
+                                  - lambda: 'id(pending_bright_dog_crate) = (int)x;'
+                                  - script.execute: debounce_dog_crate
                     - label:
                         text: "Dog Crate"
                         text_font: roboto_small
@@ -3414,8 +3515,12 @@ lvgl:
                         value: 0
                         on_value:
                           then:
-                            - lambda: 'id(pending_bright_bed_capsule) = (int)x;'
-                            - script.execute: debounce_bed_capsule
+                            - if:
+                                condition:
+                                  lambda: 'return (int)x != (isnan(id(ha_bright_bed_capsule).state) ? 0 : (int)id(ha_bright_bed_capsule).state);'
+                                then:
+                                  - lambda: 'id(pending_bright_bed_capsule) = (int)x;'
+                                  - script.execute: debounce_bed_capsule
                     - label:
                         text: "Bed Capsule"
                         text_font: roboto_small
@@ -3469,8 +3574,12 @@ lvgl:
                         value: 0
                         on_value:
                           then:
-                            - lambda: 'id(pending_bright_awning_out) = (int)x;'
-                            - script.execute: debounce_awning_out
+                            - if:
+                                condition:
+                                  lambda: 'return (int)x != (isnan(id(ha_bright_awning_out).state) ? 0 : (int)id(ha_bright_awning_out).state);'
+                                then:
+                                  - lambda: 'id(pending_bright_awning_out) = (int)x;'
+                                  - script.execute: debounce_awning_out
                     - label:
                         text: "Awning Out"
                         text_font: roboto_small
@@ -3524,8 +3633,12 @@ lvgl:
                         value: 0
                         on_value:
                           then:
-                            - lambda: 'id(pending_bright_awning_in) = (int)x;'
-                            - script.execute: debounce_awning_in
+                            - if:
+                                condition:
+                                  lambda: 'return (int)x != (isnan(id(ha_bright_awning_in).state) ? 0 : (int)id(ha_bright_awning_in).state);'
+                                then:
+                                  - lambda: 'id(pending_bright_awning_in) = (int)x;'
+                                  - script.execute: debounce_awning_in
                     - label:
                         text: "Awning In"
                         text_font: roboto_small
@@ -3579,8 +3692,12 @@ lvgl:
                         value: 0
                         on_value:
                           then:
-                            - lambda: 'id(pending_bright_exterior) = (int)x;'
-                            - script.execute: debounce_exterior
+                            - if:
+                                condition:
+                                  lambda: 'return (int)x != (isnan(id(ha_bright_exterior).state) ? 0 : (int)id(ha_bright_exterior).state);'
+                                then:
+                                  - lambda: 'id(pending_bright_exterior) = (int)x;'
+                                  - script.execute: debounce_exterior
                     - label:
                         text: "Ext Floods"
                         text_font: roboto_small
