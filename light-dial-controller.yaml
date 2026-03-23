@@ -11,7 +11,7 @@ substitutions:
   device_name: light-dial-controller
   friendly_name: Light Dial Controller
   project_name: light-dial-controller
-  project_version: "1.0.6"
+  project_version: "1.0.7"
   log_level: DEBUG
 
   # Theme colors

@@ -60,10 +60,10 @@ substitutions:
 
   # CAN bus bit rate - Espar AS3 typically uses 25kbps
   # If no frames appear, try: 10kbps, 20kbps, 50kbps, 100kbps
-  can_bit_rate: 50kbps
+  can_bit_rate: 100kbps
 
-  # MCP2515 crystal frequency (8MHz on the Seeed breakout board)
-  mcp_clock: 8MHZ
+  # MCP2515 crystal frequency (16MHz on the Seeed CAN Bus Expansion Board)
+  mcp_clock: 16MHZ
 
   # --- Espar CAN IDs (update after sniffing your heater) ---
   # Based on community findings - verify by sniffing your specific unit
