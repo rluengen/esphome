@@ -1177,27 +1177,31 @@ text_sensor:
         - lambda: |-
             if (x == "opening") id(solar_awning_was_opening) = true;
             else if (x == "closing") id(solar_awning_was_opening) = false;
-        # Icon: closed→expand(green), open→collapse(green), opening/closing→stop(orange)
+        # Icon: closed→expand(green), open→collapse(green), opening/closing→stop(orange), unavailable→gray
         - lvgl.label.update:
             id: lbl_solar_awning_action
             text: !lambda |-
+              if (x == "unavailable") return std::string("\U000F11B3");
               if (x == "opening" || x == "closing") return std::string("\U000F04DB");
               if (x == "open") return std::string("\U000F0760");
               return std::string("\U000F0761");
         - lvgl.label.update:
             id: lbl_solar_awning_action
             text_color: !lambda |-
+              if (x == "unavailable") return lv_color_hex(0x555555);
               if (x == "opening" || x == "closing") return lv_color_hex(0xFFA726);
               return lv_color_hex(0x66BB6A);
         - lvgl.label.update:
             id: lbl_solar_awning_action_pwr
             text: !lambda |-
+              if (x == "unavailable") return std::string("\U000F11B3");
               if (x == "opening" || x == "closing") return std::string("\U000F04DB");
               if (x == "open") return std::string("\U000F0760");
               return std::string("\U000F0761");
         - lvgl.label.update:
             id: lbl_solar_awning_action_pwr
             text_color: !lambda |-
+              if (x == "unavailable") return lv_color_hex(0x555555);
               if (x == "opening" || x == "closing") return lv_color_hex(0xFFA726);
               return lv_color_hex(0x66BB6A);
 
@@ -1213,12 +1217,14 @@ text_sensor:
         - lvgl.label.update:
             id: lbl_main_awning_action
             text: !lambda |-
+              if (x == "unavailable") return std::string("\U000F11B3");
               if (x == "opening" || x == "closing") return std::string("\U000F04DB");
               if (x == "open") return std::string("\U000F0760");
               return std::string("\U000F0761");
         - lvgl.label.update:
             id: lbl_main_awning_action
             text_color: !lambda |-
+              if (x == "unavailable") return lv_color_hex(0x555555);
               if (x == "opening" || x == "closing") return lv_color_hex(0xFFA726);
               return lv_color_hex(0x66BB6A);
 
@@ -1232,21 +1238,25 @@ text_sensor:
         - lvgl.label.update:
             id: lbl_inverter_icon
             text: !lambda |-
+              if (x == "unavailable") return std::string("\U000F06A6");
               if (x == "on") return std::string("\U000F06A5");
               return std::string("\U000F06A6");
         - lvgl.label.update:
             id: lbl_inverter_icon
             text_color: !lambda |-
+              if (x == "unavailable") return lv_color_hex(0x555555);
               if (x == "on") return lv_color_hex(0x66BB6A);
               return lv_color_hex(0x808080);
         - lvgl.label.update:
             id: lbl_inverter_text
             text: !lambda |-
+              if (x == "unavailable") return std::string("AC Inverter N/A");
               if (x == "on") return std::string("AC Inverter On");
               return std::string("AC Inverter Off");
         - lvgl.label.update:
             id: lbl_inverter_text
             text_color: !lambda |-
+              if (x == "unavailable") return lv_color_hex(0x555555);
               if (x == "on") return lv_color_hex(0xFFFFFF);
               return lv_color_hex(0x808080);
 
@@ -1437,22 +1447,32 @@ sensor:
             id: bar_water
             value: !lambda 'return isnan(x) ? 0 : (int)x;'
         - lvgl.bar.update:
+            id: bar_water
+            indicator:
+              bg_color: !lambda 'return isnan(x) ? lv_color_hex(0x3A3A3A) : lv_color_hex(0x4FC3F7);'
+        - lvgl.bar.update:
             id: bar_water_wtr
             value: !lambda 'return isnan(x) ? 0 : (int)x;'
+        - lvgl.bar.update:
+            id: bar_water_wtr
+            indicator:
+              bg_color: !lambda 'return isnan(x) ? lv_color_hex(0x3A3A3A) : lv_color_hex(0x4FC3F7);'
         - lvgl.label.update:
             id: lbl_tab_water_pct
             text: !lambda |-
-              if (isnan(x)) return "";
+              if (isnan(x)) return "N/A";
               static char buf[8];
               snprintf(buf, sizeof(buf), "%.0f%%", x);
               return buf;
+            text_color: !lambda 'return isnan(x) ? lv_color_hex(0x555555) : lv_color_hex(0x808080);'
         - lvgl.label.update:
             id: lbl_water_pct_wtr
             text: !lambda |-
-              if (isnan(x)) return "0%";
+              if (isnan(x)) return "N/A";
               static char buf[8];
               snprintf(buf, sizeof(buf), "%.0f%%", x);
               return buf;
+            text_color: !lambda 'return isnan(x) ? lv_color_hex(0x555555) : lv_color_hex(0xFFFFFF);'
         - script.execute: update_water_tab
 
   - platform: homeassistant
@@ -1467,6 +1487,7 @@ sensor:
               static char buf[16];
               snprintf(buf, sizeof(buf), "%.1f gal", x);
               return buf;
+            text_color: !lambda 'return isnan(x) ? lv_color_hex(0x555555) : lv_color_hex(0xFFFFFF);'
         - lvgl.label.update:
             id: lbl_water_gallons_wtr
             text: !lambda |-
@@ -1474,6 +1495,7 @@ sensor:
               static char buf[16];
               snprintf(buf, sizeof(buf), "%.1f gal", x);
               return buf;
+            text_color: !lambda 'return isnan(x) ? lv_color_hex(0x555555) : lv_color_hex(0xB0B0B0);'
 
   # Battery state of charge
   - platform: homeassistant
@@ -1487,8 +1509,16 @@ sensor:
             id: bar_battery
             value: !lambda 'return isnan(x) ? 0 : (int)x;'
         - lvgl.bar.update:
+            id: bar_battery
+            indicator:
+              bg_color: !lambda 'return isnan(x) ? lv_color_hex(0x3A3A3A) : lv_color_hex(0x66BB6A);'
+        - lvgl.bar.update:
             id: bar_battery_pwr
             value: !lambda 'return isnan(x) ? 0 : (int)x;'
+        - lvgl.bar.update:
+            id: bar_battery_pwr
+            indicator:
+              bg_color: !lambda 'return isnan(x) ? lv_color_hex(0x3A3A3A) : lv_color_hex(0x66BB6A);'
 
   # Battery charging power (> 0 means charging)
   - platform: homeassistant
@@ -1505,6 +1535,7 @@ sensor:
               static char buf[16];
               snprintf(buf, sizeof(buf), "%.0f W", x);
               return std::string(buf);
+            text_color: !lambda 'return isnan(x) ? lv_color_hex(0x555555) : lv_color_hex(0xFFFFFF);'
 
   # Solar input power
   - platform: homeassistant
@@ -1520,6 +1551,7 @@ sensor:
               static char buf[16];
               snprintf(buf, sizeof(buf), "%.0f W", x);
               return std::string(buf);
+            text_color: !lambda 'return isnan(x) ? lv_color_hex(0x555555) : lv_color_hex(0xFFFFFF);'
 
   # Battery time remaining from EcoFlow integration
   # TODO: Update entity_id to match your actual HA sensor
@@ -1541,10 +1573,11 @@ sensor:
                 if (x >= 24) snprintf(buf, sizeof(buf), "%.0f days", x / 24.0f);
                 else snprintf(buf, sizeof(buf), "%.1f hrs", x);
               } else {
-                if (x >= 24) snprintf(buf, sizeof(buf), "%.0f%% · %.0f days", soc, x / 24.0f);
-                else snprintf(buf, sizeof(buf), "%.0f%% · %.1f hrs", soc, x);
+                if (x >= 24) snprintf(buf, sizeof(buf), "%.0f%% \u00B7 %.0f days", soc, x / 24.0f);
+                else snprintf(buf, sizeof(buf), "%.0f%% \u00B7 %.1f hrs", soc, x);
               }
               return buf;
+            text_color: !lambda 'return (isnan(x) && isnan(id(ha_battery_soc).state)) ? lv_color_hex(0x555555) : lv_color_hex(0xFFFFFF);'
         - lvgl.label.update:
             id: lbl_battery_time_pwr
             text: !lambda |-
@@ -1557,10 +1590,11 @@ sensor:
                 if (x >= 24) snprintf(buf, sizeof(buf), "%.0f days remaining", x / 24.0f);
                 else snprintf(buf, sizeof(buf), "%.1f hrs remaining", x);
               } else {
-                if (x >= 24) snprintf(buf, sizeof(buf), "%.0f%% · %.0f days remaining", soc, x / 24.0f);
-                else snprintf(buf, sizeof(buf), "%.0f%% · %.1f hrs remaining", soc, x);
+                if (x >= 24) snprintf(buf, sizeof(buf), "%.0f%% \u00B7 %.0f days remaining", soc, x / 24.0f);
+                else snprintf(buf, sizeof(buf), "%.0f%% \u00B7 %.1f hrs remaining", soc, x);
               }
               return buf;
+            text_color: !lambda 'return (isnan(x) && isnan(id(ha_battery_soc).state)) ? lv_color_hex(0x555555) : lv_color_hex(0xFFFFFF);'
 
   # Interior climate sensors
   - platform: homeassistant
@@ -1572,17 +1606,19 @@ sensor:
         - lvgl.label.update:
             id: lbl_interior_temp
             text: !lambda |-
-              if (isnan(x)) return "--°";
+              if (isnan(x)) return "--\u00B0";
               static char buf[12];
-              snprintf(buf, sizeof(buf), "%.1f°", x);
+              snprintf(buf, sizeof(buf), "%.1f\u00B0", x);
               return buf;
+            text_color: !lambda 'return isnan(x) ? lv_color_hex(0x555555) : lv_color_hex(0xFFFFFF);'
         - lvgl.label.update:
             id: lbl_interior_temp_wx
             text: !lambda |-
-              if (isnan(x)) return "--°";
+              if (isnan(x)) return "--\u00B0";
               static char buf[12];
-              snprintf(buf, sizeof(buf), "%.1f°", x);
+              snprintf(buf, sizeof(buf), "%.1f\u00B0", x);
               return buf;
+            text_color: !lambda 'return isnan(x) ? lv_color_hex(0x555555) : lv_color_hex(0xFFFFFF);'
 
   - platform: homeassistant
     id: ha_interior_humidity
@@ -1597,6 +1633,7 @@ sensor:
               static char buf[12];
               snprintf(buf, sizeof(buf), "%.0f%%", x);
               return buf;
+            text_color: !lambda 'return isnan(x) ? lv_color_hex(0x555555) : lv_color_hex(0xFFFFFF);'
         - lvgl.label.update:
             id: lbl_interior_hum_wx
             text: !lambda |-
@@ -1604,6 +1641,7 @@ sensor:
               static char buf[12];
               snprintf(buf, sizeof(buf), "%.0f%%", x);
               return buf;
+            text_color: !lambda 'return isnan(x) ? lv_color_hex(0x555555) : lv_color_hex(0xFFFFFF);'
 
   - platform: homeassistant
     id: ha_fridge_temp
@@ -1614,17 +1652,19 @@ sensor:
         - lvgl.label.update:
             id: lbl_fridge_temp
             text: !lambda |-
-              if (isnan(x)) return "--°";
+              if (isnan(x)) return "--\u00B0";
               static char buf[12];
-              snprintf(buf, sizeof(buf), "%.1f°", x);
+              snprintf(buf, sizeof(buf), "%.1f\u00B0", x);
               return buf;
+            text_color: !lambda 'return isnan(x) ? lv_color_hex(0x555555) : lv_color_hex(0xFFFFFF);'
         - lvgl.label.update:
             id: lbl_fridge_temp_wx
             text: !lambda |-
-              if (isnan(x)) return "--°";
+              if (isnan(x)) return "--\u00B0";
               static char buf[12];
-              snprintf(buf, sizeof(buf), "%.1f°", x);
+              snprintf(buf, sizeof(buf), "%.1f\u00B0", x);
               return buf;
+            text_color: !lambda 'return isnan(x) ? lv_color_hex(0x555555) : lv_color_hex(0xFFFFFF);'
 
   # Light brightness sensors (HA brightness is 0-255)
   - platform: homeassistant
@@ -1964,6 +2004,68 @@ binary_sensor:
             text: !lambda 'return std::string(x ? "\U000F058E" : "\U000F0F93");'
             text_color: !lambda 'return x ? lv_color_hex(0x00BFFF) : lv_color_hex(0x808080);'
         - script.execute: update_water_tab
+
+  # Detect unavailable water control devices via text_sensor
+text_sensor:
+  - platform: homeassistant
+    id: ha_heater_state_raw
+    entity_id: switch.water_tank_display_hot_water_heater
+    internal: true
+    on_value:
+      then:
+        - if:
+            condition:
+              lambda: 'return x == "unavailable";'
+            then:
+              - lvgl.label.update:
+                  id: lbl_heater_status
+                  text: "N/A"
+                  text_color: 0x555555
+              - lvgl.label.update:
+                  id: lbl_heater_icon
+                  text: "\U000F0F91"
+                  text_color: 0x555555
+              - lvgl.widget.update:
+                  id: btn_hot_water
+                  state:
+                    disabled: true
+                  opa: 40%
+            else:
+              - lvgl.widget.update:
+                  id: btn_hot_water
+                  state:
+                    disabled: false
+                  opa: 100%
+
+  - platform: homeassistant
+    id: ha_pump_state_raw
+    entity_id: switch.water_tank_display_water_pump
+    internal: true
+    on_value:
+      then:
+        - if:
+            condition:
+              lambda: 'return x == "unavailable";'
+            then:
+              - lvgl.label.update:
+                  id: lbl_pump_status
+                  text: "N/A"
+                  text_color: 0x555555
+              - lvgl.label.update:
+                  id: lbl_pump_icon
+                  text: "\U000F0F93"
+                  text_color: 0x555555
+              - lvgl.widget.update:
+                  id: btn_water_pump
+                  state:
+                    disabled: true
+                  opa: 40%
+            else:
+              - lvgl.widget.update:
+                  id: btn_water_pump
+                  state:
+                    disabled: false
+                  opa: 100%
 
 # ---- Weather Forecast ----
 # Forecast sensors are defined above (text_sensor + sensor sections).
