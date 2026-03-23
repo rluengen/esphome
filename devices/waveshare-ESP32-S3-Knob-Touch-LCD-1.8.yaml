@@ -71,7 +71,7 @@ sensor:
       then:
         - component.update: battery_percentage
 
-  - platform: rotary_encoder
+  - platform: rotary_encoder_custom
     id: ${rotary_encoder_id}
     name: "Rotary Encoder Knob"
     pin_a:
@@ -80,7 +80,6 @@ sensor:
     pin_b:
       number: GPIO7
       mode: INPUT_PULLUP
-    resolution: 2
 
   - platform: template
     id: battery_percentage
@@ -169,6 +168,9 @@ light:
 external_components:
   - source: github://pr#10392
     components: [mipi_spi]
+    refresh: 1d
+  - source: github://KrX3D/WaveShare-Knob-Esp32S3@main
+    components: [rotary_encoder_custom]
     refresh: 1d
 
 spi:

@@ -11,7 +11,7 @@ substitutions:
   device_name: light-dial-controller
   friendly_name: Light Dial Controller
   project_name: light-dial-controller
-  project_version: "1.0.8"
+  project_version: "1.0.9"
   log_level: DEBUG
 
   # Theme colors
@@ -492,6 +492,10 @@ globals:
     type: bool
     initial_value: "false"
 
+  - id: user_adjusting
+    type: bool
+    initial_value: "false"
+
 script:
   # Auto-clear the swipe guard flag after a short delay.
   # This handles medium-duration swipes (500ms-2s) whose touch ON/OFF
@@ -514,28 +518,32 @@ script:
       - script.execute: update_light_display
 
   - id: update_light_display
+    mode: restart
     then:
       - lambda: |-
-          // Compute brightness based on currently selected tab index
           int idx = id(selected_light_index);
-          auto pct_from_attr = [](float attr) -> int {
-            if (isnan(attr)) return -1;  // -1 = entity not available
-            int v = (int)roundf((attr / 255.0f) * 100.0f);
-            if (v < 0) v = 0; if (v > 100) v = 100; return v;
-          };
-          int brightness = 0;
-          switch (idx) {
-            case 0: brightness = pct_from_attr(id(light_all_lights_brightness).state); break;
-            case 1: brightness = pct_from_attr(id(light_bed_interior_lights_brightness).state); break;
-            case 2: brightness = pct_from_attr(id(light_main_can_lights_brightness).state); break;
-            case 3: brightness = pct_from_attr(id(light_bed_can_lights_brightness).state); break;
-            case 4: brightness = pct_from_attr(id(light_cwww_led_capsule_lights_brightness).state); break;
-            case 5: brightness = pct_from_attr(id(light_exterior_lights_brightness).state); break;
-            case 6: brightness = pct_from_attr(id(light_door_light_brightness).state); break;
-            case 7: brightness = pct_from_attr(id(light_cwww_led_dog_crate_lights_brightness).state); break;
-            default: brightness = 0; break;
+          // Only sync from HA when the user is NOT actively turning the dial
+          if (!id(user_adjusting)) {
+            auto pct_from_attr = [](float attr) -> int {
+              if (isnan(attr)) return -1;  // -1 = entity not available
+              int v = (int)roundf((attr / 255.0f) * 100.0f);
+              if (v < 0) v = 0; if (v > 100) v = 100; return v;
+            };
+            int brightness = 0;
+            switch (idx) {
+              case 0: brightness = pct_from_attr(id(light_all_lights_brightness).state); break;
+              case 1: brightness = pct_from_attr(id(light_bed_interior_lights_brightness).state); break;
+              case 2: brightness = pct_from_attr(id(light_main_can_lights_brightness).state); break;
+              case 3: brightness = pct_from_attr(id(light_bed_can_lights_brightness).state); break;
+              case 4: brightness = pct_from_attr(id(light_cwww_led_capsule_lights_brightness).state); break;
+              case 5: brightness = pct_from_attr(id(light_exterior_lights_brightness).state); break;
+              case 6: brightness = pct_from_attr(id(light_door_light_brightness).state); break;
+              case 7: brightness = pct_from_attr(id(light_cwww_led_dog_crate_lights_brightness).state); break;
+              default: brightness = 0; break;
+            }
+            id(current_brightness) = brightness;
           }
-          id(current_brightness) = brightness;
+          int brightness = id(current_brightness);
           if (brightness < 0) {
             ESP_LOGW("ui", "update_light_display idx=%d -> entity not available in HA", idx);
           } else {
@@ -590,8 +598,10 @@ script:
     mode: restart
     then:
       - lambda: |-
+          id(user_adjusting) = true;
           int step = 5;
           id(current_brightness) = std::min(100, id(current_brightness) + step);
+          ESP_LOGI("dial", "Increase brightness -> %d%%", id(current_brightness));
       - script.execute: update_light_display
       - script.execute: publish_brightness_throttled
 
@@ -599,8 +609,10 @@ script:
     mode: restart
     then:
       - lambda: |-
+          id(user_adjusting) = true;
           int step = 5;
           id(current_brightness) = std::max(0, id(current_brightness) - step);
+          ESP_LOGI("dial", "Decrease brightness -> %d%%", id(current_brightness));
       - script.execute: update_light_display
       - script.execute: publish_brightness_throttled
 
@@ -608,6 +620,7 @@ script:
     mode: restart
     then:
       - delay: 300ms
+      - lambda: 'id(user_adjusting) = false;'
       - if:
           condition:
             lambda: 'return id(current_brightness) == 0;'
@@ -723,18 +736,58 @@ binary_sensor:
               else:
                 - script.execute: turn_off_selected_light
 
+# Software quadrature decoder — the stock ESPHome rotary_encoder platform
+# (PCNT-based) only fires once then goes silent on this device.
+# This is a known issue with the Waveshare ESP32-S3 Knob Touch LCD 1.8:
+#   https://community.home-assistant.io/t/display-knob/905249/11
+# KrX3D's custom polling component works around it the same way:
+#   https://github.com/KrX3D/WaveShare-Knob-Esp32S3/tree/main/components/rotary_encoder_custom
+# Polls GPIO7/GPIO8 every 5ms and fires on full-detent completion.
+interval:
+  - interval: 5ms
+    then:
+      - lambda: |-
+          static uint8_t prev_state = 0xFF;   // uninitialized sentinel
+          static int8_t accumulated = 0;
+
+          uint8_t a = gpio_get_level(GPIO_NUM_8);   // pin_a
+          uint8_t b = gpio_get_level(GPIO_NUM_7);   // pin_b
+          uint8_t curr = (a << 1) | b;               // 2-bit gray code
+
+          if (prev_state == 0xFF) { prev_state = curr; return; }  // first run
+          if (curr == prev_state) return;                          // no change
+
+          // Standard quadrature lookup: +1 = CW, -1 = CCW, 0 = invalid/skip
+          static const int8_t lut[4][4] = {
+            /*          to: 00  01  10  11 */
+            /* from 00 */ {  0, -1,  1,  0 },
+            /* from 01 */ {  1,  0,  0, -1 },
+            /* from 10 */ { -1,  0,  0,  1 },
+            /* from 11 */ {  0,  1, -1,  0 }
+          };
+          accumulated += lut[prev_state][curr];
+          prev_state = curr;
+
+          // Fire once the encoder returns to the detent position (both HIGH = state 3)
+          if (curr == 3 && accumulated != 0) {
+            if (accumulated > 0) {
+              ESP_LOGI("encoder", "SW CLOCKWISE  (acc=%d)", accumulated);
+              id(screen_bump_activity).execute();
+              id(increase_light_brightness).execute();
+            } else {
+              ESP_LOGI("encoder", "SW ANTICLOCKWISE  (acc=%d)", accumulated);
+              id(screen_bump_activity).execute();
+              id(decrease_light_brightness).execute();
+            }
+            accumulated = 0;
+          }
+
 sensor:
+  # Keep the PCNT-based sensor for HA visibility but strip its handlers —
+  # actual rotation is handled by the software decoder above.
   - id: !extend rotary_encoder_id
     name: "Rotary Encoder"
-    on_clockwise:
-      then:
-        - script.execute: screen_bump_activity
-        - script.execute: increase_light_brightness
-
-    on_anticlockwise:
-      then:
-        - script.execute: screen_bump_activity
-        - script.execute: decrease_light_brightness
+    internal: true
 
   # Home Assistant brightness attribute sensors for each selectable light.
   # Each sensor only triggers a display update when it matches the currently selected light.
