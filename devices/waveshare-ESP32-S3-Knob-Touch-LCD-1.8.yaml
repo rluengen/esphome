@@ -20,24 +20,6 @@ psram:
   mode: octal
   speed: 80MHz
 
-api:
-
-ota:
-  - platform: esphome
-    id: ota_esphome
-
-logger:
-  level: DEBUG
-
-wifi:
-  ssid: !secret wifi_ssid
-  password: !secret wifi_password
-  ap:
-    ssid: "Xiaozhi 3.5 Hotspot"
-    password: "RZ7D3EzJdPM6"
-
-captive_portal:
-
 uart:
   id: audio_uart
   tx_pin: GPIO41
@@ -166,9 +148,7 @@ light:
     default_transition_length: 250ms
 
 external_components:
-  - source: github://pr#10392
-    components: [mipi_spi]
-    refresh: 1d
+  # mipi_spi with JC3636W518V2 model is built-in since ESPHome 2025.9.0 (PR #10392 merged Aug 2025)
   - source: github://KrX3D/WaveShare-Knob-Esp32S3@main
     components: [rotary_encoder_custom]
     refresh: 1d
