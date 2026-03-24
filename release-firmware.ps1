@@ -53,6 +53,70 @@ function Get-DeviceName($config) {
     throw "Could not find device_name substitution in $config"
 }
 
+# Extract build metadata from ESPHome build artifacts
+function Get-BuildMetadata($deviceName) {
+    $buildDir = Join-Path $RepoRoot ".esphome\build\$deviceName"
+    $meta = @{
+        esphome_version = $null
+        esp_idf_version = $null
+        platform_version = $null
+        build_time = $null
+        config_hash = $null
+        git_sha = $null
+    }
+
+    # build_info.json — ESPHome version, build time, config hash
+    $buildInfo = Join-Path $buildDir "build_info.json"
+    if (Test-Path $buildInfo) {
+        $info = Get-Content $buildInfo -Raw | ConvertFrom-Json
+        $meta.esphome_version = $info.esphome_version
+        $meta.build_time = $info.build_time_str
+        $meta.config_hash = $info.config_hash
+    }
+
+    # dependencies.lock — ESP-IDF version
+    $depsLock = Join-Path $buildDir "dependencies.lock"
+    if (Test-Path $depsLock) {
+        $depsContent = Get-Content $depsLock -Raw
+        if ($depsContent -match '(?ms)^  idf:.*?version:\s*([\d\.]+)') {
+            $meta.esp_idf_version = $Matches[1]
+        }
+    }
+
+    # platformio.ini — PlatformIO platform version
+    $pioIni = Join-Path $buildDir "platformio.ini"
+    if (Test-Path $pioIni) {
+        $pioContent = Get-Content $pioIni -Raw
+        if ($pioContent -match 'platform-espressif32/releases/download/([\d\.]+)/') {
+            $meta.platform_version = $Matches[1]
+        }
+    }
+
+    # Git SHA of current commit
+    $meta.git_sha = (git rev-parse --short HEAD 2>$null)
+
+    return $meta
+}
+
+# Check if a previous build exists and warn about staleness
+function Test-BuildStaleness($deviceName) {
+    $buildInfo = Join-Path $RepoRoot ".esphome\build\$deviceName\build_info.json"
+    if (Test-Path $buildInfo) {
+        $info = Get-Content $buildInfo -Raw | ConvertFrom-Json
+        $buildEsphome = $info.esphome_version
+        if ($buildEsphome -and $buildEsphome -ne $installedRaw) {
+            Write-Host "⚠️  Existing build cache for $deviceName was compiled with ESPHome $buildEsphome (current: $installedRaw)" -ForegroundColor Yellow
+            Write-Host "   Recommend: clean build to avoid stale artifacts" -ForegroundColor Yellow
+            $answer = Read-Host "   Clean build cache and recompile? [Y/n]"
+            if ($answer -eq '' -or $answer -match '^[Yy]') {
+                $buildDir = Join-Path $RepoRoot ".esphome\build\$deviceName"
+                Remove-Item -Recurse -Force $buildDir -ErrorAction SilentlyContinue
+                Write-Host "   🧹 Cleared build cache for $deviceName" -ForegroundColor DarkGray
+            }
+        }
+    }
+}
+
 # Detect chip family from ESPHome build output (sdkconfig)
 # Maps IDF target names to ESP-Web-Tools chipFamily values
 function Get-ChipFamily($deviceName) {
@@ -227,6 +291,9 @@ foreach ($config in $Configs) {
     }
 
     $deviceName = Get-DeviceName $config
+    # Check for stale build cache (compiled with different ESPHome version)
+    Test-BuildStaleness $deviceName
+
     Write-Host "`n🔨 Compiling $config (device: $deviceName)..." -ForegroundColor Cyan
 
     Push-Location $RepoRoot
@@ -249,8 +316,11 @@ foreach ($config in $Configs) {
     $size = [math]::Round((Get-Item $destBin).Length / 1KB, 1)
     $md5 = (Get-FileHash $destBin -Algorithm MD5).Hash.ToLower()
 
-    # Detect chip family and generate manifest.json
+    # Detect chip family and extract build metadata
     $chipFamily = Get-ChipFamily $deviceName
+    $buildMeta = Get-BuildMetadata $deviceName
+
+    # Generate manifest.json with build metadata
     $manifest = @{
         name = $deviceName
         version = $Version
@@ -264,13 +334,23 @@ foreach ($config in $Configs) {
                 }
             }
         )
+        build_metadata = @{
+            esphome_version = $buildMeta.esphome_version
+            esp_idf_version = $buildMeta.esp_idf_version
+            platform_version = $buildMeta.platform_version
+            build_time = $buildMeta.build_time
+            config_hash = "$($buildMeta.config_hash)"
+            git_sha = $buildMeta.git_sha
+        }
     } | ConvertTo-Json -Depth 4
 
     $manifestPath = Join-Path $RepoRoot "$deviceName.manifest.json"
     Set-Content $manifestPath $manifest -NoNewline
-    Write-Host "✅ $deviceName.ota.bin ($size KB, md5: $md5, chip: $chipFamily)" -ForegroundColor Green
 
-    $artifacts += @{ Name = $deviceName; BinPath = $destBin; ManifestPath = $manifestPath }
+    Write-Host "✅ $deviceName.ota.bin ($size KB, md5: $md5, chip: $chipFamily)" -ForegroundColor Green
+    Write-Host "   ESPHome: $($buildMeta.esphome_version) | ESP-IDF: $($buildMeta.esp_idf_version) | Platform: $($buildMeta.platform_version) | Git: $($buildMeta.git_sha)" -ForegroundColor DarkGray
+
+    $artifacts += @{ Name = $deviceName; BinPath = $destBin; ManifestPath = $manifestPath; BuildMeta = $buildMeta }
 }
 
 if ($SkipRelease) {
@@ -292,11 +372,21 @@ $assetArgs = $artifacts | ForEach-Object { $_.BinPath; $_.ManifestPath }
 Write-Host "`n🚀 Creating release $tag..." -ForegroundColor Cyan
 
 $deviceList = ($artifacts | ForEach-Object { "- ``$($_.Name).ota.bin``" }) -join "`n"
+$primaryMeta = $artifacts[0].BuildMeta
 $notes = @"
 ## $primaryDevice Firmware Release $Version
 
 ### Devices
 $deviceList
+
+### Build Environment
+| Component | Version |
+|-----------|--------|
+| ESPHome | $($primaryMeta.esphome_version) |
+| ESP-IDF | $($primaryMeta.esp_idf_version) |
+| PlatformIO Platform | $($primaryMeta.platform_version) |
+| Git Commit | $($primaryMeta.git_sha) |
+| Build Time | $($primaryMeta.build_time) |
 
 ### Update
 Devices with ``update: platform: http_request`` can check for and install this release via the Check/Install Firmware Update buttons in Home Assistant.
