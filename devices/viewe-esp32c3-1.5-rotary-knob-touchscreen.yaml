@@ -15,7 +15,7 @@ psram:
   mode: octal
   speed: 120MHz
 
-  spi:
+spi:
   - id: display_qspi
     type: quad
     clk_pin: 10

@@ -7,9 +7,9 @@ esp32:
     type: esp-idf
     version: recommended
     sdkconfig_options:
-      CONFIG_ESP32S3_DATA_CACHE_64KB: "y"
-      CONFIG_ESP32S3_DATA_CACHE_LINE_64B: "y"
-      CONFIG_ESP32S3_INSTRUCTION_CACHE_32KB: "y"
+      CONFIG_ESP32P4_DATA_CACHE_64KB: "y"
+      CONFIG_ESP32P4_DATA_CACHE_LINE_64B: "y"
+      CONFIG_ESP32P4_INSTRUCTION_CACHE_32KB: "y"
       # Moves instructions and read only data from flash into PSRAM on boot.
       # Both enabled allows instructions to execute while a flash operation is in progress without needing to be placed in IRAM.
       # Considerably speeds up mWW at the cost of using more PSRAM.

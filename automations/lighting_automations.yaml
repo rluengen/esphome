@@ -65,10 +65,10 @@
       attribute: elevation
       below: -3
   condition:
-    # Only turn on if van is parked
+    # Only turn on if van is parked (sensor is ON when speed = 0 mph)
     - condition: state
       entity_id: binary_sensor.mercedes_sprinter_psm_vehicle_speed_0_mph
-      state: "off"
+      state: "on"
   action:
     - service: light.turn_on
       target:

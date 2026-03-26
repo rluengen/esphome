@@ -112,11 +112,6 @@ microphone:
     sample_rate: 16000
     bits_per_sample: 32bit
 
-time:
-  - platform: sntp
-    id: sntp_time
-    timezone: "Europe/Berlin"
-
 font:
   - file: "gfonts://Roboto"
     id: my_font

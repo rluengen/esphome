@@ -9,7 +9,7 @@ globals:
 sensor:
   - platform: homeassistant
     id: ha_light_${light_id}_brightness_raw
-    entity_id: ${entity_id}}
+    entity_id: ${entity_id}
     attribute: brightness                   # returns 0..255 or null if off
     on_value:
       then:
