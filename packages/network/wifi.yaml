@@ -9,6 +9,7 @@ wifi:
   fast_connect: false
   ssid: ${wifi_ssid}
   password: ${wifi_password}
+  reboot_timeout: 0s  # Don't reboot if WiFi is unavailable; keep retrying
   # min_auth_mode: WPA2  # Commented out - can cause 'Probe Request Unsuccessful' with WPA3/PMF routers
   on_connect: 
     then:

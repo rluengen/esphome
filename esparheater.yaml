@@ -150,7 +150,6 @@ canbus:
     clock: ${mcp_clock}
     can_id: 0
     bit_rate: ${can_bit_rate}
-    interrupt_pin: GPIO3   # D2 - INT pin on the CAN Bus Breakout Board
     on_frame:
       # ---------------------------------------------------------------
       # SNIFF MODE: Log all CAN frames for protocol discovery
