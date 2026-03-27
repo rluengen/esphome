@@ -75,8 +75,11 @@ font:
     size: 48
     bpp: 4
     glyphs: [
-      "\U000F0335", # mdi-lightbulb-group
-      "\U000F12CD", # mdi-lightbulb-group-off
+      "\U000F0335", # mdi-lightbulb (group on)
+      "\U000F12CD", # mdi-lightbulb-group-off (group unavailable)
+      "\U000F06E8", # mdi-lightbulb-on (individual on)
+      "\U000F0336", # mdi-lightbulb-outline (individual off)
+      "\U000F0E4F", # mdi-lightbulb-off (individual unavailable)
     ]
 
   - file: "fonts/materialdesignicons-webfont.ttf"
@@ -84,8 +87,11 @@ font:
     size: 80
     bpp: 4
     glyphs: [
-      "\U000F0335", # mdi-lightbulb-group
-      "\U000F12CD", # mdi-lightbulb-group-off
+      "\U000F0335", # mdi-lightbulb (group on)
+      "\U000F12CD", # mdi-lightbulb-group-off (group unavailable)
+      "\U000F06E8", # mdi-lightbulb-on (individual on)
+      "\U000F0336", # mdi-lightbulb-outline (individual off)
+      "\U000F0E4F", # mdi-lightbulb-off (individual unavailable)
     ]
 
 lvgl:
@@ -197,7 +203,7 @@ lvgl:
                       align: CENTER
                       x: 0
                       y: -10
-                      text: "\U000F0335"
+                      text: "\U000F0336"
                       text_font: mdi_icons_large
                       text_color: ${color_icon_off}
                   - label:
@@ -228,7 +234,7 @@ lvgl:
                       align: CENTER
                       x: 0
                       y: -10
-                      text: "\U000F0335"
+                      text: "\U000F0336"
                       text_font: mdi_icons_xlarge
                       text_color: ${color_icon_off}
                   - label:
@@ -259,7 +265,7 @@ lvgl:
                       align: CENTER
                       x: 0
                       y: -10
-                      text: "\U000F0335"
+                      text: "\U000F0336"
                       text_font: mdi_icons_large
                       text_color: ${color_icon_off}
                   - label:
@@ -290,7 +296,7 @@ lvgl:
                       align: CENTER
                       x: 0
                       y: -10
-                      text: "\U000F0335"
+                      text: "\U000F0336"
                       text_font: mdi_icons_large
                       text_color: ${color_icon_off}
                   - label:
@@ -321,7 +327,7 @@ lvgl:
                       align: CENTER
                       x: 0
                       y: -10
-                      text: "\U000F0335"
+                      text: "\U000F0336"
                       text_font: mdi_icons_large
                       text_color: ${color_icon_off}
                   - label:
@@ -352,7 +358,7 @@ lvgl:
                       align: CENTER
                       x: 0
                       y: -10
-                      text: "\U000F0335"
+                      text: "\U000F0336"
                       text_font: mdi_icons_large
                       text_color: ${color_icon_off}
                   - label:
@@ -383,7 +389,7 @@ lvgl:
                       align: CENTER
                       x: 0
                       y: -10
-                      text: "\U000F0335"
+                      text: "\U000F0336"
                       text_font: mdi_icons_large
                       text_color: ${color_icon_off}
                   - label:
@@ -563,25 +569,26 @@ script:
             ESP_LOGI("ui", "update_light_display idx=%d -> %d%%", idx, brightness);
           }
           
-          // Update icon: amber when on, dim gray when off, gray slashed when unavailable
+          // Update icon per type: group (idx 0) vs individual (idx 1-7)
           lv_obj_t* icons[] = {
             id(tile_all_lights_icon), id(tile_bed_interior_icon), id(tile_main_can_icon),
             id(tile_bed_can_icon), id(tile_led_capsule_icon), id(tile_exterior_icon),
             id(tile_door_icon), id(tile_dog_crate_icon)
           };
           lv_color_t icon_color;
+          bool is_group = (idx == 0);
           if (brightness < 0) {
+            // Unavailable: gray + slashed icon
             icon_color = lv_color_hex(${color_icon_off});
-            // Swap to slashed-off icon glyph
-            lv_label_set_text(icons[idx], "\U000F12CD");
+            lv_label_set_text(icons[idx], is_group ? "\U000F12CD" : "\U000F0E4F");
+          } else if (brightness > 0) {
+            // On: amber + lit icon
+            icon_color = lv_color_hex(${color_icon_on});
+            lv_label_set_text(icons[idx], is_group ? "\U000F0335" : "\U000F06E8");
           } else {
-            if (brightness > 0) {
-              icon_color = lv_color_hex(${color_icon_on});
-            } else {
-              icon_color = lv_color_hex(${color_icon_off});
-            }
-            // Restore normal icon glyph
-            lv_label_set_text(icons[idx], "\U000F0335");
+            // Off: gray + outline icon
+            icon_color = lv_color_hex(${color_icon_off});
+            lv_label_set_text(icons[idx], is_group ? "\U000F0335" : "\U000F0336");
           }
           lv_obj_set_style_text_color(icons[idx], icon_color, 0);
           
