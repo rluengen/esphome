@@ -518,7 +518,8 @@ script:
           // Only sync from HA when the user is NOT actively turning the dial
           if (!id(user_adjusting)) {
             auto pct_from_attr = [](float attr) -> int {
-              if (isnan(attr)) return -1;  // -1 = entity not available
+              // When a light is OFF, HA reports brightness as NaN — treat as 0%
+              if (isnan(attr)) return 0;
               int v = (int)roundf((attr / 255.0f) * 100.0f);
               if (v < 0) v = 0; if (v > 100) v = 100; return v;
             };
@@ -529,7 +530,6 @@ script:
                 int cap = pct_from_attr(id(light_bed_capsule_lights_brightness).state);
                 int bed = pct_from_attr(id(light_bed_can_lights_brightness).state);
                 int mc  = pct_from_attr(id(light_main_can_lights_brightness).state);
-                if (cap < 0 && bed < 0 && mc < 0) { brightness = -1; break; }
                 brightness = 0;
                 if (cap > brightness) brightness = cap;
                 if (bed > brightness) brightness = bed;
