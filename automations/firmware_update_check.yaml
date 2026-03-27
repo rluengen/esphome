@@ -1,0 +1,42 @@
+# =============================================================================
+# Firmware Update Check Automation for Home Assistant
+# =============================================================================
+#
+# Automatically presses the "Check for Update" button on all ESPHome devices
+# that expose one. Runs daily at 3:00 AM and can be triggered manually.
+#
+# This automation dynamically discovers all button.*_check_for_update entities
+# so new devices are included automatically — no need to maintain a list.
+#
+# Installation:
+#   1. Paste into configuration.yaml under the 'automation:' key, OR
+#   2. Place this file in your automations directory and include it, OR
+#   3. Import via the HA UI (Settings > Automations > ⋮ > Import from YAML)
+# =============================================================================
+
+- id: esphome_daily_firmware_update_check
+  alias: "ESPHome - Daily Firmware Update Check"
+  description: >-
+    Press the "Check for Update" button on every ESPHome device once daily.
+    Devices that are offline will simply not respond — no error is raised.
+  mode: single
+
+  trigger:
+    # Run daily at 3:00 AM
+    - platform: time
+      at: "03:00:00"
+
+  action:
+    - repeat:
+        for_each: >-
+          {{ states.button
+             | selectattr('entity_id', 'search', '_check_for_update$')
+             | map(attribute='entity_id')
+             | list }}
+        sequence:
+          - service: button.press
+            target:
+              entity_id: "{{ repeat.item }}"
+          # Small delay between presses to avoid flooding the network
+          - delay:
+              seconds: 5
