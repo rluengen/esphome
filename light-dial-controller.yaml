@@ -79,6 +79,14 @@ font:
       "\U000F0335", # mdi-lightbulb-group
     ]
 
+  - file: "fonts/materialdesignicons-webfont.ttf"
+    id: mdi_icons_xlarge
+    size: 80
+    bpp: 4
+    glyphs: [
+      "\U000F0335", # mdi-lightbulb-group
+    ]
+
 lvgl:
   on_boot:
     then:
@@ -132,7 +140,7 @@ lvgl:
           id: tile_dots
           align: CENTER
           x: 0
-          y: 75
+          y: 90
           text: "● ○ ○ ○ ○ ○ ○ ○"
           text_font: segoeui_16
           text_color: ${color_dots}
@@ -220,13 +228,13 @@ lvgl:
                       x: 0
                       y: -10
                       text: "\U000F0335"
-                      text_font: mdi_icons_large
+                      text_font: mdi_icons_xlarge
                       text_color: ${color_icon_off}
                   - label:
                       id: tile_main_can_name
                       align: CENTER
                       x: 0
-                      y: 30
+                      y: 35
                       text: "Main Can"
                       text_font: segoeui_16
                       text_color: ${color_text}
@@ -234,9 +242,9 @@ lvgl:
                       id: tile_main_can_pct
                       align: CENTER
                       x: 0
-                      y: 55
+                      y: 60
                       text: "%"
-                      text_font: segoeui_16
+                      text_font: segoeui_32
                       text_color: ${color_text_accent}
 
               - id: tile_bed_can
