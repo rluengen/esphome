@@ -11,7 +11,7 @@ substitutions:
   device_name: light-dial-controller
   friendly_name: Light Dial Controller
   project_name: light-dial-controller
-  project_version: "1.0.11"
+  project_version: "1.0.12"
   log_level: DEBUG
 
   # Theme colors
@@ -736,58 +736,44 @@ binary_sensor:
               else:
                 - script.execute: turn_off_selected_light
 
-# Software quadrature decoder — the stock ESPHome rotary_encoder platform
-# (PCNT-based) only fires once then goes silent on this device.
-# This is a known issue with the Waveshare ESP32-S3 Knob Touch LCD 1.8:
-#   https://community.home-assistant.io/t/display-knob/905249/11
-# KrX3D's custom polling component works around it the same way:
-#   https://github.com/KrX3D/WaveShare-Knob-Esp32S3/tree/main/components/rotary_encoder_custom
-# Polls GPIO7/GPIO8 every 5ms and fires on full-detent completion.
-interval:
-  - interval: 5ms
-    then:
-      - lambda: |-
-          static uint8_t prev_state = 0xFF;   // uninitialized sentinel
-          static int8_t accumulated = 0;
-
-          uint8_t a = gpio_get_level(GPIO_NUM_8);   // pin_a
-          uint8_t b = gpio_get_level(GPIO_NUM_7);   // pin_b
-          uint8_t curr = (a << 1) | b;               // 2-bit gray code
-
-          if (prev_state == 0xFF) { prev_state = curr; return; }  // first run
-          if (curr == prev_state) return;                          // no change
-
-          // Standard quadrature lookup: +1 = CW, -1 = CCW, 0 = invalid/skip
-          static const int8_t lut[4][4] = {
-            /*          to: 00  01  10  11 */
-            /* from 00 */ {  0, -1,  1,  0 },
-            /* from 01 */ {  1,  0,  0, -1 },
-            /* from 10 */ { -1,  0,  0,  1 },
-            /* from 11 */ {  0,  1, -1,  0 }
-          };
-          accumulated += lut[prev_state][curr];
-          prev_state = curr;
-
-          // Fire once the encoder returns to the detent position (both HIGH = state 3)
-          if (curr == 3 && accumulated != 0) {
-            if (accumulated > 0) {
-              ESP_LOGI("encoder", "SW CLOCKWISE  (acc=%d)", accumulated);
-              id(screen_bump_activity).execute();
-              id(increase_light_brightness).execute();
-            } else {
-              ESP_LOGI("encoder", "SW ANTICLOCKWISE  (acc=%d)", accumulated);
-              id(screen_bump_activity).execute();
-              id(decrease_light_brightness).execute();
-            }
-            accumulated = 0;
-          }
+# The software quadrature decoder that was here has been replaced by the
+# on_value handler on the rotary_encoder_custom sensor above, which uses
+# the hardware PCNT counter and reliably captures every step.
 
 sensor:
-  # Keep the PCNT-based sensor for HA visibility but strip its handlers —
-  # actual rotation is handled by the software decoder above.
+  # The rotary_encoder_custom component (PCNT-based) reliably reports every
+  # step.  We track the previous count and derive a delta to adjust brightness.
   - id: !extend rotary_encoder_id
     name: "Rotary Encoder"
     internal: true
+    on_value:
+      then:
+        - lambda: |-
+            static bool initialized = false;
+            static int last_val = 0;
+            int new_val = (int)x;
+            if (!initialized) {
+              last_val = new_val;
+              initialized = true;
+              return;
+            }
+            int delta = new_val - last_val;
+            last_val = new_val;
+            if (delta == 0) return;
+
+            id(user_adjusting) = true;
+            int step = 5;  // 5 % per encoder detent
+            int change = step * abs(delta);
+            if (delta > 0) {
+              id(current_brightness) = std::min(100, id(current_brightness) + change);
+              ESP_LOGI("dial", "Increase brightness -> %d%% (delta=%d)", id(current_brightness), delta);
+            } else {
+              id(current_brightness) = std::max(0, id(current_brightness) - change);
+              ESP_LOGI("dial", "Decrease brightness -> %d%% (delta=%d)", id(current_brightness), delta);
+            }
+            id(screen_bump_activity).execute();
+            id(update_light_display).execute();
+            id(publish_brightness_throttled).execute();
 
   # Home Assistant brightness attribute sensors for each selectable light.
   # Each sensor only triggers a display update when it matches the currently selected light.
