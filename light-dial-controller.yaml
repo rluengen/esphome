@@ -23,6 +23,7 @@ substitutions:
   color_text: "0xFFFFFF"
   color_text_accent: "0xFFDD44"
   color_dots: "0xAAAAAA"
+  color_icon_unavailable: "0x8B0000"
 
 packages:
   remote_packages:
@@ -72,15 +73,7 @@ font:
 
   - file: "fonts/materialdesignicons-webfont.ttf"
     id: mdi_icons_large
-    size: 64
-    bpp: 4
-    glyphs: [
-      "\U000F0335", # mdi-lightbulb-group
-    ]
-
-  - file: "fonts/materialdesignicons-webfont.ttf"
-    id: mdi_icons_xlarge
-    size: 80
+    size: 48
     bpp: 4
     glyphs: [
       "\U000F0335", # mdi-lightbulb-group
@@ -163,7 +156,7 @@ lvgl:
                       id: tile_all_lights_icon
                       align: CENTER
                       x: 0
-                      y: -35
+                      y: -10
                       text: "\U000F0335"
                       text_font: mdi_icons_large
                       text_color: ${color_icon_off}
@@ -171,7 +164,7 @@ lvgl:
                       id: tile_all_lights_name
                       align: CENTER
                       x: 0
-                      y: 10
+                      y: 30
                       text: "All Lights"
                       text_font: segoeui_16
                       text_color: ${color_text}
@@ -179,7 +172,7 @@ lvgl:
                       id: tile_all_lights_pct
                       align: CENTER
                       x: 0
-                      y: 40
+                      y: 55
                       text: "%"
                       text_font: segoeui_16
                       text_color: ${color_text_accent}
@@ -194,7 +187,7 @@ lvgl:
                       id: tile_bed_interior_icon
                       align: CENTER
                       x: 0
-                      y: -35
+                      y: -10
                       text: "\U000F0335"
                       text_font: mdi_icons_large
                       text_color: ${color_icon_off}
@@ -202,15 +195,15 @@ lvgl:
                       id: tile_bed_interior_name
                       align: CENTER
                       x: 0
-                      y: 10
-                      text: "Bed Interior"
+                      y: 30
+                      text: "Interior"
                       text_font: segoeui_16
                       text_color: ${color_text}
                   - label:
                       id: tile_bed_interior_pct
                       align: CENTER
                       x: 0
-                      y: 40
+                      y: 55
                       text: "%"
                       text_font: segoeui_16
                       text_color: ${color_text_accent}
@@ -222,28 +215,28 @@ lvgl:
                 bg_opa: TRANSP
                 widgets:
                   - label:
-                      id: tile_main_can_name
-                      align: CENTER
-                      x: 0
-                      y: -60
-                      text: "Main Can"
-                      text_font: segoeui_16
-                      text_color: ${color_text}
-                  - label:
                       id: tile_main_can_icon
                       align: CENTER
                       x: 0
                       y: -10
                       text: "\U000F0335"
-                      text_font: mdi_icons_xlarge
+                      text_font: mdi_icons_large
                       text_color: ${color_icon_off}
+                  - label:
+                      id: tile_main_can_name
+                      align: CENTER
+                      x: 0
+                      y: 30
+                      text: "Main Can"
+                      text_font: segoeui_16
+                      text_color: ${color_text}
                   - label:
                       id: tile_main_can_pct
                       align: CENTER
                       x: 0
-                      y: 50
+                      y: 55
                       text: "%"
-                      text_font: segoeui_32
+                      text_font: segoeui_16
                       text_color: ${color_text_accent}
 
               - id: tile_bed_can
@@ -256,7 +249,7 @@ lvgl:
                       id: tile_bed_can_icon
                       align: CENTER
                       x: 0
-                      y: -35
+                      y: -10
                       text: "\U000F0335"
                       text_font: mdi_icons_large
                       text_color: ${color_icon_off}
@@ -264,7 +257,7 @@ lvgl:
                       id: tile_bed_can_name
                       align: CENTER
                       x: 0
-                      y: 10
+                      y: 30
                       text: "Bed Can"
                       text_font: segoeui_16
                       text_color: ${color_text}
@@ -272,7 +265,7 @@ lvgl:
                       id: tile_bed_can_pct
                       align: CENTER
                       x: 0
-                      y: 40
+                      y: 55
                       text: "%"
                       text_font: segoeui_16
                       text_color: ${color_text_accent}
@@ -287,7 +280,7 @@ lvgl:
                       id: tile_led_capsule_icon
                       align: CENTER
                       x: 0
-                      y: -35
+                      y: -10
                       text: "\U000F0335"
                       text_font: mdi_icons_large
                       text_color: ${color_icon_off}
@@ -295,15 +288,15 @@ lvgl:
                       id: tile_led_capsule_name
                       align: CENTER
                       x: 0
-                      y: 10
-                      text: "LED Capsule"
+                      y: 30
+                      text: "Bed Capsule"
                       text_font: segoeui_16
                       text_color: ${color_text}
                   - label:
                       id: tile_led_capsule_pct
                       align: CENTER
                       x: 0
-                      y: 40
+                      y: 55
                       text: "%"
                       text_font: segoeui_16
                       text_color: ${color_text_accent}
@@ -318,7 +311,7 @@ lvgl:
                       id: tile_exterior_icon
                       align: CENTER
                       x: 0
-                      y: -35
+                      y: -10
                       text: "\U000F0335"
                       text_font: mdi_icons_large
                       text_color: ${color_icon_off}
@@ -326,7 +319,7 @@ lvgl:
                       id: tile_exterior_name
                       align: CENTER
                       x: 0
-                      y: 10
+                      y: 30
                       text: "Exterior"
                       text_font: segoeui_16
                       text_color: ${color_text}
@@ -334,7 +327,7 @@ lvgl:
                       id: tile_exterior_pct
                       align: CENTER
                       x: 0
-                      y: 40
+                      y: 55
                       text: "%"
                       text_font: segoeui_16
                       text_color: ${color_text_accent}
@@ -349,7 +342,7 @@ lvgl:
                       id: tile_door_icon
                       align: CENTER
                       x: 0
-                      y: -35
+                      y: -10
                       text: "\U000F0335"
                       text_font: mdi_icons_large
                       text_color: ${color_icon_off}
@@ -357,7 +350,7 @@ lvgl:
                       id: tile_door_name
                       align: CENTER
                       x: 0
-                      y: 10
+                      y: 30
                       text: "Door"
                       text_font: segoeui_16
                       text_color: ${color_text}
@@ -365,7 +358,7 @@ lvgl:
                       id: tile_door_pct
                       align: CENTER
                       x: 0
-                      y: 40
+                      y: 55
                       text: "%"
                       text_font: segoeui_16
                       text_color: ${color_text_accent}
@@ -380,7 +373,7 @@ lvgl:
                       id: tile_dog_crate_icon
                       align: CENTER
                       x: 0
-                      y: -35
+                      y: -10
                       text: "\U000F0335"
                       text_font: mdi_icons_large
                       text_color: ${color_icon_off}
@@ -388,7 +381,7 @@ lvgl:
                       id: tile_dog_crate_name
                       align: CENTER
                       x: 0
-                      y: 10
+                      y: 30
                       text: "Dog Crate"
                       text_font: segoeui_16
                       text_color: ${color_text}
@@ -396,7 +389,7 @@ lvgl:
                       id: tile_dog_crate_pct
                       align: CENTER
                       x: 0
-                      y: 40
+                      y: 55
                       text: "%"
                       text_font: segoeui_16
                       text_color: ${color_text_accent}
@@ -434,10 +427,10 @@ select:
     restore_value: false
     options:
       - light.all_lights
-      - light.quinled_van_lightcontroller_bed_interior_lights
+      - light.interior_lights
       - light.quinled_van_lightcontroller_main_can_lights
       - light.quinled_van_lightcontroller_bed_can_lights
-      - light.quinled_van_lightcontroller_cwww_led_capsule_lights
+      - light.quinled_van_lightcontroller_bed_capsule_lights
       - light.quinled_van_lightcontroller_exterior_lights
       - light.quinled_van_lightcontroller_door_light
       - light.quinled_van_lightcontroller_cwww_led_dog_crate_lights
@@ -531,11 +524,22 @@ script:
             };
             int brightness = 0;
             switch (idx) {
-              case 0: brightness = pct_from_attr(id(light_all_lights_brightness).state); break;
-              case 1: brightness = pct_from_attr(id(light_bed_interior_lights_brightness).state); break;
+              case 0: {
+                // Staged: infer master level from the 3 staged lights
+                int cap = pct_from_attr(id(light_bed_capsule_lights_brightness).state);
+                int bed = pct_from_attr(id(light_bed_can_lights_brightness).state);
+                int mc  = pct_from_attr(id(light_main_can_lights_brightness).state);
+                if (cap < 0 && bed < 0 && mc < 0) { brightness = -1; break; }
+                brightness = 0;
+                if (cap > brightness) brightness = cap;
+                if (bed > brightness) brightness = bed;
+                if (mc  > brightness) brightness = mc;
+                break;
+              }
+              case 1: brightness = pct_from_attr(id(light_interior_lights_brightness).state); break;
               case 2: brightness = pct_from_attr(id(light_main_can_lights_brightness).state); break;
               case 3: brightness = pct_from_attr(id(light_bed_can_lights_brightness).state); break;
-              case 4: brightness = pct_from_attr(id(light_cwww_led_capsule_lights_brightness).state); break;
+              case 4: brightness = pct_from_attr(id(light_bed_capsule_lights_brightness).state); break;
               case 5: brightness = pct_from_attr(id(light_exterior_lights_brightness).state); break;
               case 6: brightness = pct_from_attr(id(light_door_light_brightness).state); break;
               case 7: brightness = pct_from_attr(id(light_cwww_led_dog_crate_lights_brightness).state); break;
@@ -550,16 +554,23 @@ script:
             ESP_LOGI("ui", "update_light_display idx=%d -> %d%%", idx, brightness);
           }
           
-          // Update icon color: amber when on, dim gray when off
+          // Update icon color: amber when on, dim gray when off, dark red when unavailable
           lv_obj_t* icons[] = {
             id(tile_all_lights_icon), id(tile_bed_interior_icon), id(tile_main_can_icon),
             id(tile_bed_can_icon), id(tile_led_capsule_icon), id(tile_exterior_icon),
             id(tile_door_icon), id(tile_dog_crate_icon)
           };
-          lv_color_t icon_color = (brightness > 0) ? lv_color_hex(${color_icon_on}) : lv_color_hex(${color_icon_off});
+          lv_color_t icon_color;
+          if (brightness < 0) {
+            icon_color = lv_color_hex(${color_icon_unavailable});
+          } else if (brightness > 0) {
+            icon_color = lv_color_hex(${color_icon_on});
+          } else {
+            icon_color = lv_color_hex(${color_icon_off});
+          }
           lv_obj_set_style_text_color(icons[idx], icon_color, 0);
           
-          // Update arc indicator color
+          // Update arc indicator color (gray when unavailable or off)
           lv_color_t arc_ind_color = (brightness > 0) ? lv_color_hex(${color_arc_active}) : lv_color_hex(${color_arc_bg});
           lv_obj_set_style_arc_color(id(brightness_arc), arc_ind_color, LV_PART_INDICATOR);
       - lvgl.arc.update:
@@ -569,7 +580,7 @@ script:
           // Update visible tab percent label text
           char buf[8];
           if (id(current_brightness) < 0) {
-            snprintf(buf, sizeof(buf), "-%%");
+            snprintf(buf, sizeof(buf), "N/A");
           } else {
             snprintf(buf, sizeof(buf), "%d%%", id(current_brightness));
           }
@@ -620,69 +631,148 @@ script:
     mode: restart
     then:
       - delay: 300ms
+      - script.execute: publish_brightness_now
+
+  - id: publish_brightness_now
+    mode: restart
+    then:
       - lambda: 'id(user_adjusting) = false;'
       - if:
           condition:
-            lambda: 'return id(current_brightness) == 0;'
+            lambda: 'return id(selected_light_index) == 0;'
           then:
-            - lambda: |-
-                ESP_LOGI("ha", "Calling light.turn_off on %s", id(selected_entity).c_str());
-            - homeassistant.service:
-                service: light.turn_off
-                data:
-                  entity_id: !lambda 'return id(selected_entity);'
+            - script.execute: publish_staged_brightness
           else:
-            - lambda: |-
-                ESP_LOGI("ha", "Calling light.turn_on on %s brightness=%d%%", id(selected_entity).c_str(), id(current_brightness));
+            - if:
+                condition:
+                  lambda: 'return id(current_brightness) == 0;'
+                then:
+                  - lambda: |-
+                      ESP_LOGI("ha", "Calling light.turn_off on %s", id(selected_entity).c_str());
+                  - homeassistant.service:
+                      service: light.turn_off
+                      data:
+                        entity_id: !lambda 'return id(selected_entity);'
+                else:
+                  - lambda: |-
+                      ESP_LOGI("ha", "Calling light.turn_on on %s brightness=%d%%", id(selected_entity).c_str(), id(current_brightness));
+                  - homeassistant.service:
+                      service: light.turn_on
+                      data:
+                        entity_id: !lambda 'return id(selected_entity);'
+                        brightness: !lambda |
+                          int val = id(current_brightness);
+                          int b = (int)(val * 255.0f / 100.0f + 0.5f);
+                          if (b < 1) b = 1;
+                          if (b > 255) b = 255;
+                          return b;
+
+  # Staged "All Lights" — sequential by priority, reverse staged off.
+  # Thresholds: Bed Capsule >= 1%, Bed Can >= 30%, Main Can >= 60%
+  - id: publish_staged_brightness
+    then:
+      - lambda: |-
+          int b = id(current_brightness);
+          ESP_LOGI("ha", "Staged publish: master=%d%% capsule=%s bed_can=%s main_can=%s",
+            b, b > 0 ? "ON" : "OFF", b >= 30 ? "ON" : "OFF", b >= 60 ? "ON" : "OFF");
+      # Bed Capsule: on at >= 1%
+      - if:
+          condition:
+            lambda: 'return id(current_brightness) > 0;'
+          then:
             - homeassistant.service:
                 service: light.turn_on
                 data:
-                  entity_id: !lambda 'return id(selected_entity);'
+                  entity_id: light.quinled_van_lightcontroller_bed_capsule_lights
                   brightness: !lambda |
-                    // convert 0..100 -> 1..255 and clamp
-                    int val = id(current_brightness);
-                    int b = (int)(val * 255.0f / 100.0f + 0.5f);
-                    if (b < 1) b = 1;   // avoid sending 0
-                    if (b > 255) b = 255;
-                    return b;
+                    int b = (int)(id(current_brightness) * 255.0f / 100.0f + 0.5f);
+                    return std::clamp(b, 1, 255);
+          else:
+            - homeassistant.service:
+                service: light.turn_off
+                data:
+                  entity_id: light.quinled_van_lightcontroller_bed_capsule_lights
+      # Bed Can: on at >= 30%
+      - if:
+          condition:
+            lambda: 'return id(current_brightness) >= 30;'
+          then:
+            - homeassistant.service:
+                service: light.turn_on
+                data:
+                  entity_id: light.quinled_van_lightcontroller_bed_can_lights
+                  brightness: !lambda |
+                    int b = (int)(id(current_brightness) * 255.0f / 100.0f + 0.5f);
+                    return std::clamp(b, 1, 255);
+          else:
+            - homeassistant.service:
+                service: light.turn_off
+                data:
+                  entity_id: light.quinled_van_lightcontroller_bed_can_lights
+      # Main Can: on at >= 60%
+      - if:
+          condition:
+            lambda: 'return id(current_brightness) >= 60;'
+          then:
+            - homeassistant.service:
+                service: light.turn_on
+                data:
+                  entity_id: light.quinled_van_lightcontroller_main_can_lights
+                  brightness: !lambda |
+                    int b = (int)(id(current_brightness) * 255.0f / 100.0f + 0.5f);
+                    return std::clamp(b, 1, 255);
+          else:
+            - homeassistant.service:
+                service: light.turn_off
+                data:
+                  entity_id: light.quinled_van_lightcontroller_main_can_lights
 
   - id: toggle_selected_light
     then:
-      - lambda: |-
-          ESP_LOGI("touch", "Toggle light: %s", id(selected_entity).c_str());
-          if (id(current_brightness) > 0) {
-            id(previous_brightness) = id(current_brightness);
-            id(current_brightness) = 0;
-          } else {
-            id(current_brightness) = id(previous_brightness);
-          }
-      - script.execute: update_light_display
-      - homeassistant.service:
-          service: light.toggle
-          data:
-            entity_id: !lambda 'return id(selected_entity);'
+      - if:
+          condition:
+            lambda: 'return id(current_brightness) < 0;'
+          then:
+            - lambda: 'ESP_LOGW("touch", "Entity unavailable — ignoring toggle");'
+          else:
+            - lambda: |-
+                ESP_LOGI("touch", "Toggle light: %s", id(selected_entity).c_str());
+                if (id(current_brightness) > 0) {
+                  id(previous_brightness) = id(current_brightness);
+                  id(current_brightness) = 0;
+                } else {
+                  id(current_brightness) = id(previous_brightness);
+                }
+            - script.execute: update_light_display
+            - script.execute: publish_brightness_now
 
   - id: turn_on_selected_light
     then:
-      - lambda: |-
-          ESP_LOGI("touch", "Turn ON light: %s", id(selected_entity).c_str());
-          if (id(current_brightness) == 0) id(current_brightness) = id(previous_brightness);
-      - script.execute: update_light_display
-      - homeassistant.service:
-          service: light.turn_on
-          data:
-            entity_id: !lambda 'return id(selected_entity);'
+      - if:
+          condition:
+            lambda: 'return id(current_brightness) < 0;'
+          then:
+            - lambda: 'ESP_LOGW("touch", "Entity unavailable — ignoring turn on");'
+          else:
+            - lambda: |-
+                ESP_LOGI("touch", "Turn ON light: %s", id(selected_entity).c_str());
+                if (id(current_brightness) == 0) id(current_brightness) = id(previous_brightness);
+            - script.execute: update_light_display
+            - script.execute: publish_brightness_now
 
   - id: turn_off_selected_light
     then:
-      - lambda: |-
-          ESP_LOGI("touch", "Turn OFF light: %s", id(selected_entity).c_str());
-          id(current_brightness) = 0;
-      - script.execute: update_light_display
-      - homeassistant.service:
-          service: light.turn_off
-          data:
-            entity_id: !lambda 'return id(selected_entity);'
+      - if:
+          condition:
+            lambda: 'return id(current_brightness) < 0;'
+          then:
+            - lambda: 'ESP_LOGW("touch", "Entity unavailable — ignoring turn off");'
+          else:
+            - lambda: |-
+                ESP_LOGI("touch", "Turn OFF light: %s", id(selected_entity).c_str());
+                id(current_brightness) = 0;
+            - script.execute: update_light_display
+            - script.execute: publish_brightness_now
 
 binary_sensor:
   - id: !extend touch_input
@@ -761,6 +851,12 @@ sensor:
             last_val = new_val;
             if (delta == 0) return;
 
+            // Block dial adjustment if entity is unavailable
+            if (id(current_brightness) < 0) {
+              ESP_LOGW("dial", "Entity unavailable — ignoring rotation");
+              return;
+            }
+
             id(user_adjusting) = true;
             int step = 5;  // 5 % per encoder detent
             int change = step * abs(delta);
@@ -776,22 +872,13 @@ sensor:
             id(publish_brightness_throttled).execute();
 
   # Home Assistant brightness attribute sensors for each selectable light.
-  # Each sensor only triggers a display update when it matches the currently selected light.
-  - platform: homeassistant
-    id: light_all_lights_brightness
-    entity_id: light.all_lights
-    attribute: brightness
-    internal: true
-    on_value:
-      - if:
-          condition:
-            lambda: 'return id(selected_light_index) == 0;'
-          then:
-            - script.execute: update_light_display
+  # Each sensor only triggers a display update when it matches the currently
+  # selected light.  Staged lights (capsule, bed can, main can) also refresh
+  # the "All Lights" tile (index 0).
 
   - platform: homeassistant
-    id: light_bed_interior_lights_brightness
-    entity_id: light.quinled_van_lightcontroller_bed_interior_lights
+    id: light_interior_lights_brightness
+    entity_id: light.interior_lights
     attribute: brightness
     internal: true
     on_value:
@@ -809,7 +896,7 @@ sensor:
     on_value:
       - if:
           condition:
-            lambda: 'return id(selected_light_index) == 2;'
+            lambda: 'return id(selected_light_index) == 2 || id(selected_light_index) == 0;'
           then:
             - script.execute: update_light_display
 
@@ -821,19 +908,19 @@ sensor:
     on_value:
       - if:
           condition:
-            lambda: 'return id(selected_light_index) == 3;'
+            lambda: 'return id(selected_light_index) == 3 || id(selected_light_index) == 0;'
           then:
             - script.execute: update_light_display
 
   - platform: homeassistant
-    id: light_cwww_led_capsule_lights_brightness
-    entity_id: light.quinled_van_lightcontroller_cwww_led_capsule_lights
+    id: light_bed_capsule_lights_brightness
+    entity_id: light.quinled_van_lightcontroller_bed_capsule_lights
     attribute: brightness
     internal: true
     on_value:
       - if:
           condition:
-            lambda: 'return id(selected_light_index) == 4;'
+            lambda: 'return id(selected_light_index) == 4 || id(selected_light_index) == 0;'
           then:
             - script.execute: update_light_display
 

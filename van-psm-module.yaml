@@ -56,6 +56,7 @@ globals:
 
 canbus:
   - id: !extend canbus0
+    bit_rate: 250kbps  # PSM CAN B = 250kbps. Try 500kbps if on CAN C or Interior bus.
     on_frame:
       # ---- Raw frame logger (all CAN IDs) ----
       - can_id: 0
