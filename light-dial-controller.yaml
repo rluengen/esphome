@@ -23,7 +23,6 @@ substitutions:
   color_text: "0xFFFFFF"
   color_text_accent: "0xFFDD44"
   color_dots: "0xAAAAAA"
-  color_icon_unavailable: "0x8B0000"
 
 packages:
   remote_packages:
@@ -77,6 +76,7 @@ font:
     bpp: 4
     glyphs: [
       "\U000F0335", # mdi-lightbulb-group
+      "\U000F12CD", # mdi-lightbulb-group-off
     ]
 
   - file: "fonts/materialdesignicons-webfont.ttf"
@@ -85,6 +85,7 @@ font:
     bpp: 4
     glyphs: [
       "\U000F0335", # mdi-lightbulb-group
+      "\U000F12CD", # mdi-lightbulb-group-off
     ]
 
 lvgl:
@@ -562,7 +563,7 @@ script:
             ESP_LOGI("ui", "update_light_display idx=%d -> %d%%", idx, brightness);
           }
           
-          // Update icon color: amber when on, dim gray when off, dark red when unavailable
+          // Update icon: amber when on, dim gray when off, gray slashed when unavailable
           lv_obj_t* icons[] = {
             id(tile_all_lights_icon), id(tile_bed_interior_icon), id(tile_main_can_icon),
             id(tile_bed_can_icon), id(tile_led_capsule_icon), id(tile_exterior_icon),
@@ -570,11 +571,17 @@ script:
           };
           lv_color_t icon_color;
           if (brightness < 0) {
-            icon_color = lv_color_hex(${color_icon_unavailable});
-          } else if (brightness > 0) {
-            icon_color = lv_color_hex(${color_icon_on});
-          } else {
             icon_color = lv_color_hex(${color_icon_off});
+            // Swap to slashed-off icon glyph
+            lv_label_set_text(icons[idx], "\U000F12CD");
+          } else {
+            if (brightness > 0) {
+              icon_color = lv_color_hex(${color_icon_on});
+            } else {
+              icon_color = lv_color_hex(${color_icon_off});
+            }
+            // Restore normal icon glyph
+            lv_label_set_text(icons[idx], "\U000F0335");
           }
           lv_obj_set_style_text_color(icons[idx], icon_color, 0);
           
