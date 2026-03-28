@@ -1,0 +1,44 @@
+# =============================================================================
+# Display Keep Awake Automations for Home Assistant
+# =============================================================================
+#
+# Two manual-only automations to turn on or off the "Display Keep Awake"
+# switch on all ESPHome devices that expose one.
+#
+# Installation:
+#   1. Add to configuration.yaml:  automation: !include_dir_merge_list automations/
+#   2. Or append to your existing automations.yaml file
+#   3. Or create via the HA UI and paste the YAML (without the leading "- id:" line)
+# =============================================================================
+
+- id: esphome_display_keep_awake_on
+  alias: "ESPHome - Display Keep Awake ON (All Devices)"
+  description: >-
+    Turn on the "Display Keep Awake" switch on every ESPHome device that has one.
+    Manual trigger only.
+  mode: single
+  trigger: []
+  action:
+    - service: switch.turn_on
+      target:
+        entity_id: >-
+          {{ states.switch
+             | selectattr('entity_id', 'search', '_display_keep_awake$')
+             | map(attribute='entity_id')
+             | list }}
+
+- id: esphome_display_keep_awake_off
+  alias: "ESPHome - Display Keep Awake OFF (All Devices)"
+  description: >-
+    Turn off the "Display Keep Awake" switch on every ESPHome device that has one.
+    Manual trigger only.
+  mode: single
+  trigger: []
+  action:
+    - service: switch.turn_off
+      target:
+        entity_id: >-
+          {{ states.switch
+             | selectattr('entity_id', 'search', '_display_keep_awake$')
+             | map(attribute='entity_id')
+             | list }}
