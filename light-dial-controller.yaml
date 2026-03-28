@@ -82,18 +82,6 @@ font:
       "\U000F0E4F", # mdi-lightbulb-off (individual unavailable)
     ]
 
-  - file: "fonts/materialdesignicons-webfont.ttf"
-    id: mdi_icons_xlarge
-    size: 80
-    bpp: 4
-    glyphs: [
-      "\U000F0335", # mdi-lightbulb (group on)
-      "\U000F12CD", # mdi-lightbulb-group-off (group unavailable)
-      "\U000F06E8", # mdi-lightbulb-on (individual on)
-      "\U000F0336", # mdi-lightbulb-outline (individual off)
-      "\U000F0E4F", # mdi-lightbulb-off (individual unavailable)
-    ]
-
 lvgl:
   on_boot:
     then:
@@ -235,13 +223,13 @@ lvgl:
                       x: 0
                       y: -10
                       text: "\U000F0336"
-                      text_font: mdi_icons_xlarge
+                      text_font: mdi_icons_large
                       text_color: ${color_icon_off}
                   - label:
                       id: tile_main_can_name
                       align: CENTER
                       x: 0
-                      y: 35
+                      y: 30
                       text: "Main Can"
                       text_font: segoeui_16
                       text_color: ${color_text}
@@ -249,9 +237,9 @@ lvgl:
                       id: tile_main_can_pct
                       align: CENTER
                       x: 0
-                      y: 60
+                      y: 55
                       text: "%"
-                      text_font: segoeui_32
+                      text_font: segoeui_16
                       text_color: ${color_text_accent}
 
               - id: tile_bed_can
