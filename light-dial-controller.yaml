@@ -848,6 +848,22 @@ binary_sensor:
               else:
                 - script.execute: turn_off_selected_light
 
+# The sleep.yaml package's !extend on the touchscreen replaces the device's
+# original on_touch/on_release handlers that publish to touch_input.
+# Re-add them here so on_multi_click tap detection works.
+touchscreen:
+  - id: !extend my_touchscreen
+    on_touch:
+      then:
+        - binary_sensor.template.publish:
+            id: touch_input
+            state: ON
+    on_release:
+      then:
+        - binary_sensor.template.publish:
+            id: touch_input
+            state: OFF
+
 # The software quadrature decoder that was here has been replaced by the
 # on_value handler on the rotary_encoder_custom sensor above, which uses
 # the hardware PCNT counter and reliably captures every step.

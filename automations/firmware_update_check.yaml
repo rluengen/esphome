@@ -9,9 +9,9 @@
 # so new devices are included automatically — no need to maintain a list.
 #
 # Installation:
-#   1. Paste into configuration.yaml under the 'automation:' key, OR
-#   2. Place this file in your automations directory and include it, OR
-#   3. Import via the HA UI (Settings > Automations > ⋮ > Import from YAML)
+#   1. Add to configuration.yaml:  automation: !include_dir_merge_list automations/
+#   2. Or append to your existing automations.yaml file
+#   3. Or create via the HA UI and paste the YAML (without the leading "- id:" line)
 # =============================================================================
 
 - id: esphome_daily_firmware_update_check
