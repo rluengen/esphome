@@ -12,7 +12,7 @@ substitutions:
   friendly_name: Light Dial Controller
   project_name: light-dial-controller
   project_version: "1.0.17"
-  log_level: DEBUG
+  log_level: INFO
 
   # Theme colors
   color_bg: "0x000000"
@@ -644,7 +644,7 @@ script:
       - script.execute: publish_brightness_now
 
   - id: publish_brightness_now
-    mode: restart
+    mode: single
     then:
       - lambda: 'id(user_adjusting) = false;'
       - if:
