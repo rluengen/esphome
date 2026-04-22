@@ -1,0 +1,107 @@
+# Waveshare ESP32-P4 with ESP32-C6 WiFi co-processor (SDIO)
+# Covers: ESP32-P4 board, PSRAM, LDO, logger, C6 hosted WiFi + firmware update
+#
+# Used by: waveshare-esp32-p4-8.8-dsi-touch-a.yaml, driver-controller.yaml
+
+esp32:
+  board: esp32-p4-evboard
+  variant: esp32p4
+  flash_size: 16MB
+  framework:
+    type: esp-idf
+
+psram:
+  mode: hex
+  speed: 200MHZ
+
+# LDO for MIPI-DSI PHY - required for display to initialize
+esp_ldo:
+  - voltage: 2.5V
+    channel: 3
+
+logger:
+  level: ${log_level}
+  hardware_uart: UART0
+
+# ESP32-C6 co-processor for WiFi via SDIO
+esp32_hosted:
+  active_high: true
+  variant: ESP32C6
+  reset_pin: GPIO54
+  cmd_pin: GPIO19
+  clk_pin: GPIO18
+  d0_pin: GPIO14
+  d1_pin: GPIO15
+  d2_pin: GPIO16
+  d3_pin: GPIO17
+
+# Embedded co-processor firmware update
+update:
+  - platform: esp32_hosted
+    name: "ESP32-C6 Firmware"
+    type: embedded
+    path: network_adapter_esp32c6.bin
+    sha256: 2aa46dbcd18f5b2046f58b82cdc62bdf21af137930e67c4b3b114f6e3e0daf15
+    update_interval: never
+
+# I2C bus (GT911 touchscreen, backlight MCU, ES8311 codec)
+i2c:
+  sda: GPIO7
+  scl: GPIO8
+  frequency: 400kHz
+  scan: false
+
+# ---- Audio: ES8311 Codec + NS4150B Power Amplifier ----
+# ES8311 codec at I2C address 0x18
+audio_dac:
+  - platform: es8311
+    id: es8311_dac
+    bits_per_sample: 24bit
+    sample_rate: 16000
+    use_mclk: true
+    address: 0x18
+
+i2s_audio:
+  - id: i2s_out
+    i2s_lrclk_pin: GPIO10    # WS / LRCK
+    i2s_bclk_pin: GPIO12     # BCLK / SCLK
+    i2s_mclk_pin: GPIO13     # MCLK
+
+speaker:
+  - platform: i2s_audio
+    id: i2s_speaker
+    i2s_audio_id: i2s_out
+    i2s_dout_pin: GPIO9      # ES8311 DSDIN (data TO codec)
+    dac_type: external
+    audio_dac: es8311_dac
+    sample_rate: 16000
+    bits_per_sample: 24bit
+    channel: left
+    use_apll: true
+    mclk_multiple: 384
+    timeout: never
+    buffer_duration: 500ms
+    i2s_mode: primary
+    num_channels: 1
+
+media_player:
+  - platform: speaker
+    name: "Speaker"
+    id: speaker_media_player
+    announcement_pipeline:
+      speaker: i2s_speaker
+      num_channels: 1
+    on_announcement:
+      - delay: 250ms
+      - switch.turn_on: pa_enable
+    on_idle:
+      - switch.turn_off: pa_enable
+
+# NS4150B power amplifier enable (GPIO53, active high)
+# Kept OFF by default; enabled 250ms after DAC starts to avoid pop
+switch:
+  - platform: gpio
+    name: "Speaker Enable"
+    id: pa_enable
+    pin: GPIO53
+    restore_mode: RESTORE_DEFAULT_OFF

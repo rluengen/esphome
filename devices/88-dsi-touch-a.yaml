@@ -1,0 +1,84 @@
+# Waveshare 8.8" DSI Touch Display (480x1920, OTA7290B bridge, GT911 touch)
+# Covers: external_components, on_boot bridge init, i2c_device, backlight,
+#         MIPI-DSI display, and GT911 touchscreen
+#
+# Used by: waveshare-esp32-p4-8.8-dsi-touch-a.yaml, driver-controller.yaml
+
+# Local external component for DSI display init with BSP-correct order
+# Required because built-in mipi_dsi sends DCS after panel_init (blank screen).
+# OTA7290B bridge needs DCS SLPOUT/DISPON BEFORE DPI video starts.
+external_components:
+  - source:
+      type: local
+      path: components
+    components: [waveshare_dsi]
+
+esphome:
+  on_boot:
+    - priority: 600
+      then:
+        - lambda: |-
+            // === Waveshare OTA7290B Bridge Init (BSP-matched order) ===
+            // BSP: HW Reset -> MCU Init -> delay -> DSI bus -> DCS -> DPI
+
+            // Step 1: Hardware reset via GPIO27 (BSP_LCD_DSI_RST)
+            gpio_set_direction(GPIO_NUM_27, GPIO_MODE_OUTPUT);
+            gpio_set_level(GPIO_NUM_27, 1);
+            delay(10);
+            gpio_set_level(GPIO_NUM_27, 0);
+            delay(10);
+            gpio_set_level(GPIO_NUM_27, 1);
+            delay(50);
+
+            // Step 2: MCU init (register 0x95) per Waveshare OTA7290B driver
+            id(display_backlight_i2c).write_byte(0x95, 0x11);
+            delay(10);
+            id(display_backlight_i2c).write_byte(0x95, 0x17);
+
+            // Step 3: Backlight on (direct I2C)
+            id(display_backlight_i2c).write_byte(0x96, 0xFF);
+
+            // Step 4: Wait for bridge to stabilize (BLOCKING)
+            delay(200);
+            ESP_LOGI("waveshare", "OTA7290B bridge init complete");
+    - priority: 200
+      then:
+        - light.turn_on:
+            id: display_backlight
+
+# I2C device for panel/backlight control (address 0x45)
+i2c_device:
+  - address: 0x45
+    id: display_backlight_i2c
+
+# Backlight brightness control as a light
+output:
+  - platform: template
+    id: backlight_output
+    type: float
+    write_action:
+      - lambda: |-
+          uint8_t brightness = (uint8_t)(state * 255);
+          id(display_backlight_i2c).write_byte(0x96, brightness);
+
+light:
+  - platform: monochromatic
+    name: "Display Backlight"
+    id: display_backlight
+    output: backlight_output
+    default_transition_length: 350ms
+    restore_mode: RESTORE_DEFAULT_ON
+
+# MIPI-DSI Display - Waveshare 8.8" (480x1920 portrait, landscape via rotation)
+waveshare_dsi:
+  id: dsi_display
+  rotation: 270
+
+# GT911 Touchscreen
+touchscreen:
+  - platform: gt911
+    id: dsi_touchscreen
+    update_interval: 16ms
+    transform:
+      swap_xy: true
+      mirror_x: true
