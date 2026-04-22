@@ -41,6 +41,11 @@ packages:
       - path: devices/reterminal-e1001.yaml
       - path: packages/ota/http_update.yaml
 
+# Deep-sleep dashboard - power save is fine, but fast_connect (from shared wifi.yaml)
+# saves 3-5s on each wake cycle
+wifi:
+  power_save_mode: LIGHT
+
 
 esphome:
   name: ${device_name}

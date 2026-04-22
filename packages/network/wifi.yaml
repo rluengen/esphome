@@ -2,11 +2,15 @@
 # Include this in your device configs with: <<: !include templates/base/wifi.yaml
 
 wifi:
+  # power_save_mode: Disables ESP-IDF modem sleep so the radio stays fully active.
+  # Prevents silent API disconnects and delayed service calls on interactive devices.
+  # Override to LIGHT in battery/deep-sleep devices (gps, pwmdehumidifier, terminal).
+  power_save_mode: NONE
+
   # fast_connect: Skips WiFi channel scanning, connects directly to last known BSSID/channel
   # Benefits: Faster boot time (~3-5s savings), lower power consumption during connection
   # Drawbacks: Won't roam between APs in mesh networks, breaks if router changes channel
-  # Recommendation: Enable for stationary devices with single AP, disable for mobile/multi-AP setups
-  fast_connect: false
+  fast_connect: true
   ssid: ${wifi_ssid}
   password: ${wifi_password}
   reboot_timeout: 0s  # Don't reboot if WiFi is unavailable; keep retrying

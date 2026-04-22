@@ -640,7 +640,7 @@ script:
   - id: publish_brightness_throttled
     mode: restart
     then:
-      - delay: 300ms
+      - delay: 100ms
       - script.execute: publish_brightness_now
 
   - id: publish_brightness_now

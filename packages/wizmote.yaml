@@ -48,10 +48,6 @@ wizmote:
         id(wizmote_up).publish_state(false);
         id(wizmote_down).publish_state(false);
 
-wifi:
-  power_save_mode: none
-  fast_connect: true
-
 binary_sensor:
     # Wizmote Pin 1
   - platform: template
