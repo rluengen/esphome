@@ -136,6 +136,10 @@ globals:
     restore_value: no
     initial_value: '0'
 
+# --- Logger override: free GPIO44 (UART0 RX) for MCP2515 CS ---
+logger:
+  hardware_uart: USB_CDC
+
 # --- SPI Bus (XIAO ESP32-S3 default SPI pins) ---
 spi:
   clk_pin: GPIO7    # D8
@@ -147,6 +151,7 @@ canbus:
   - platform: mcp2515
     id: espar_can
     cs_pin: GPIO44       # D7 - CS pin on the CAN Bus Breakout Board
+    interrupt_pin: GPIO4  # D3 - INT pin on the CAN Bus Breakout Board
     clock: ${mcp_clock}
     can_id: 0
     bit_rate: ${can_bit_rate}
