@@ -88,7 +88,8 @@ lvgl:
       - script.execute: restore_roller_position
       - lvgl.resume:
 
-  disp_bg_color: ${color_bg}
+  bottom_layer:
+    bg_color: ${color_bg}
 
   top_layer:
     widgets:
