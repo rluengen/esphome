@@ -1,81 +1,78 @@
-# Espar (Eberspacher) Airtronic AS3 D2L Diesel Heater - CAN Bus Controller
-# Hardware: Seeed Studio XIAO ESP32-S3 + CAN Bus Breakout Board (MCP2515 + SN65HVD230)
-# https://wiki.seeedstudio.com/xiao-can-bus-expansion/
+# =============================================================================
+#  Espar (Eberspacher) Airtronic AS3 D2L Diesel Heater - CAN Bus Controller
+#  Hardware: Seeed Studio XIAO ESP32-S3 + CAN Bus Breakout Board (MCP2515)
 #
-# Wiring:
-#   XIAO CAN Bus Breakout Board plugs directly onto the XIAO ESP32-S3.
-#   Connect CAN-H and CAN-L terminals to the Espar heater's CAN bus lines.
-#   If CAN communication fails, short the P1 pad on the back of the breakout
-#   board to enable the 120 ohm termination resistor.
+#  Approach: Heater-regulated - we send the user's desired temperature to the
+#  heater via CAN and let the heater's internal PID controller modulate fan
+#  speed and fuel pump rate.  The ESPHome thermostat acts only as a safety
+#  supervisor (cuts off if cabin overshoots by 3 deg C).
 #
-# EasyStart Pro Connector Wire Colors (AS3 D2L):
-#   RD   (red)        - +12V Power
-#   BN   (brown)      - Ground
-#   BURD (blue/red)   - CAN-H
-#   BUBK (blue/black) - CAN-L
+#  Wiring:
+#    XIAO CAN Bus Breakout Board plugs directly onto the XIAO ESP32-S3.
+#    Connect CAN-H and CAN-L terminals to the Espar heater CAN bus lines.
+#    If CAN communication fails, short the P1 pad on the back of the breakout
+#    board to enable the 120 ohm termination resistor.
 #
-# IMPORTANT - Before using commands:
-#   1. Start with sniff_mode: "true" to discover CAN IDs on your heater
-#   2. Monitor logs to identify the status broadcast and command IDs
-#   3. Update the can_id substitutions below with your discovered values
-#   4. Set sniff_mode: "false" to switch to normal operation
+#  EasyStart Pro Connector Wire Colors (AS3 D2L):
+#    RD   (red)        - +12V Power
+#    BN   (brown)      - Ground
+#    BURD (blue/red)   - CAN-H
+#    BUBK (blue/black) - CAN-L
 #
-# The Espar AS3 D2L CAN bus protocol is proprietary. The CAN IDs and data byte
-# assignments below are typical starting points based on community findings.
-# Your specific heater firmware version may differ - always verify by sniffing first.
+#  CAN Protocol (from TrooperDuper/espar-airtronic-esphome reverse engineering):
+#    HEATER -> CONTROLLER:
+#      0x625  ~100ms  Heater heartbeat
+#      0x2C4  ~220ms  Status: D0=state, D1 bit5=flame, D4/D5=counter LE
+#      0x2C5  ~220ms  Secondary status (observed all-zero)
+#      0x2C6  ~220ms  Data (static observed)
 #
-# Known CAN Message IDs (from community reverse engineering):
-#   Source: https://www.fordtransitusaforum.com/threads/101989/
+#    CONTROLLER -> HEATER (we transmit):
+#      0x54   200ms  Command frame
+#                    IDLE: [00][00][FE][FF][ctr_lo][ctr_hi][00][00]
+#                    FAN:  [01][02][FE][FF][ctr_lo][ctr_hi][00][00]
+#                    HEAT: [01][05][tmp_lo][tmp_hi][ctr_lo][ctr_hi][00][00]
+#                    temp = round(celsius * 10)   (CAN word = degrees C x 10)
+#      0x55   200ms  Config A: 10 27 00 00 00 00 00 00
+#      0x56   200ms  Config B: 10 27 00 00 00 00 00 00
+#      0x57   200ms  Config C: 00 00 FE FF FE FF 00 00
+#      0x60D  100ms  Controller heartbeat: 0D 10 82 B6 09 20 70 00
+#      0x65   ~10s   Status burst (4 frames, D2 cycles 01->02->03)
+#      0x5C-0x10A    Init burst (sent at startup until 0x625 received)
 #
-#   0x625       - EasyStart Pro heartbeat/keep-alive (frequent, consistent data)
-#                 Example: 25 10 6F 3D 7C D3 E4 01
-#   0x2C4       - Heater status / temperature data
-#                 Bytes 5-6 appear to be temperature (e.g. 7E 04, 7B 04, 79 04)
-#   0x2C5       - Heater status update (additional parameters)
-#   0x2C6       - Heater operational state
-#                 Example: F4 01 84 03 (consistent during operation)
-#   0x7A0       - Diagnostic request (ISO-TP multi-frame protocol)
-#   0x73C       - Diagnostic response (ISO-TP multi-frame protocol)
-
-# https://romheat.romcomm.com/images/uploaded/Espar_CANBUS_Instructions.pdf
-
-# From the Eberspächer troubleshooting manual (Krueger.co.uk), the external air inlet temperature sensor connects to:
-# Grey/Red (GYRD) wire
-# Brown/White (BNWH) wire
-# This is an NTC thermistor sensor — the heater auto-detects it during startup. You can buy the Eberspächer 
-# OEM sensor or use a matching NTC component (the same part that works on the D2/D4/D5 also works on the 
-# S2/S3/M3 series per community testing). The sensor is not polarity dependent.
+#  Cabin temperature sensor (optional):
+#    Create a Home Assistant template sensor that averages your cabin sensors.
+#    Update cabin_temp_entity below to match.  If not configured, the heater
+#    runs continuously when mode=HEAT (heater thermocouple limits it safely).
+#
+#  External NTC temperature sensor (optional hardware):
+#    Grey/Red (GYRD) + Brown/White (BNWH) wires on the heater connector.
+#    If connected, the heater uses it for internal regulation.
+# =============================================================================
 
 substitutions:
   device_name: esparheater
   friendly_name: Espar Heater
   project_name: Van Espar Heater Controller
-  project_version: "1.0.3"
+  project_version: "2.0.0"
   log_level: DEBUG
 
-  # --- CAN Bus Configuration ---
-  # Set to "true" to log ALL CAN frames (discovery mode)
-  # Set to "false" for normal operation with parsed sensors
-  sniff_mode: "true"
-
-  # CAN bus bit rate - Espar AS3 typically uses 25kbps
-  # If no frames appear, try: 10kbps, 20kbps, 50kbps, 100kbps
-  can_bit_rate: 25kbps
+  # CAN bus bit rate - Espar uses 500 kbps
+  can_bit_rate: 500kbps
 
   # MCP2515 crystal frequency (16MHz on the Seeed CAN Bus Expansion Board)
   mcp_clock: 16MHZ
 
-  # --- Espar CAN IDs (update after sniffing your heater) ---
-  # Based on community findings - verify by sniffing your specific unit
-  # TODO: Uncomment and update these after sniffing your heater's CAN bus
-  # heater_status_id: "0x2C4"       # Heater -> Controller: status/temperature data
-  # heater_temp_id: "0x2C5"         # Heater -> Controller: additional status
-  # heater_error_id: "0x2C6"        # Heater -> Controller: operational state
-  # heater_command_id: "0x625"      # Controller -> Heater: heartbeat/commands
-  # heater_diag_req_id: "0x7A0"     # Diagnostic request (ISO-TP)
-  # heater_diag_resp_id: "0x73C"    # Diagnostic response (ISO-TP)
+  # Cabin temperature sensor unit: "F" (Fahrenheit) or "C" (Celsius).
+  # This controls whether the sensor value is converted to Celsius internally.
+  # ESPHome climate entities always work in Celsius; Home Assistant displays
+  # in whatever unit your HA instance is configured for.
+  cabin_temp_unit: "F"
 
-# --- Packages (remote with variable overrides) ---
+  # Home Assistant entity ID for averaged cabin temperature sensor.
+  # Set to "" if you do not have one yet - heater will still work.
+  cabin_temp_entity: sensor.cabin_average_temperature
+
+# --- Packages (remote) ---
 packages:
   remote_packages:
     url: https://github.com/rluengen/esphome
@@ -101,376 +98,535 @@ esphome:
     name: smartvan.${project_name}
     version: ${project_version}
   on_boot:
-    priority: 600
+    priority: 200
     then:
+      - script.execute: send_init_burst
       - lambda: |-
-          ESP_LOGI("espar", "Espar Heater CAN Bus Controller booted");
-          ESP_LOGI("espar", "Sniff mode: ${sniff_mode}");
-          ESP_LOGI("espar", "CAN bit rate: ${can_bit_rate}");
-          ESP_LOGI("espar", "MCP2515 clock: ${mcp_clock}");
-          ESP_LOGI("espar", "SPI pins - CLK: GPIO7, MISO: GPIO8, MOSI: GPIO9");
-          ESP_LOGI("espar", "MCP2515 CS pin: GPIO44");
+          ESP_LOGI("espar", "Espar CAN controller booted - sending init burst");
 
-interval:
-  - interval: 10s
-    then:
-      - lambda: |-
-          static uint32_t can_check_count = 0;
-          can_check_count++;
+# Free GPIO44 (UART0 RX) for MCP2515 CS
+logger:
+  hardware_uart: USB_CDC
 
-          ESP_LOGI("espar_diag", "--- CAN Bus Health Check #%d ---", can_check_count);
+# --- SPI Bus (XIAO ESP32-S3 default pins) ---
+spi:
+  clk_pin: GPIO7
+  miso_pin: GPIO8
+  mosi_pin: GPIO9
 
-          // Check if any frames have been received
-          static uint32_t last_frame_count = 0;
-          uint32_t current = id(can_frame_counter);
-          if (current == last_frame_count) {
-            ESP_LOGW("espar_diag", "No new CAN frames received since last check (total: %d)", current);
-          } else {
-            ESP_LOGI("espar_diag", "CAN frames received: %d (delta: +%d)", current, current - last_frame_count);
-          }
-          last_frame_count = current;
-
+# =============================================================================
+# GLOBALS - CAN state tracking
+# =============================================================================
 globals:
-  - id: can_frame_counter
+  # Heater status from 0x2C4
+  - id: heater_ctr
+    type: uint16_t
+    restore_value: no
+    initial_value: '0xFFFE'
+  - id: heater_d1_state
+    type: uint8_t
+    restore_value: no
+    initial_value: '0'
+
+  # Command state (set by thermostat actions, read by 200ms TX interval)
+  - id: cmd_heating
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+  - id: cmd_fan
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+
+  # Error tracking
+  - id: startup_enter_ms
+    type: uint32_t
+    restore_value: no
+    initial_value: '0'
+  - id: failed_start_count
+    type: uint8_t
+    restore_value: no
+    initial_value: '0'
+  - id: locked_out
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+  - id: waiting_heat_confirm
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+  - id: heat_cmd_ms
     type: uint32_t
     restore_value: no
     initial_value: '0'
 
-# --- Logger override: free GPIO44 (UART0 RX) for MCP2515 CS ---
-logger:
-  hardware_uart: USB_CDC
+  # Heartbeat loss detection (two-stage: timeout + grace period)
+  - id: heater_last_seen
+    type: uint32_t
+    restore_value: no
+    initial_value: '0'
+  - id: disconnect_pending
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+  - id: disconnect_pending_ms
+    type: uint32_t
+    restore_value: no
+    initial_value: '0'
 
-# --- SPI Bus (XIAO ESP32-S3 default SPI pins) ---
-spi:
-  clk_pin: GPIO7    # D8
-  miso_pin: GPIO8   # D9
-  mosi_pin: GPIO9   # D10
+  # Init burst retry
+  - id: last_init_ms
+    type: uint32_t
+    restore_value: no
+    initial_value: '0'
 
-# --- CAN Bus (MCP2515 on Seeed CAN Bus Breakout Board) ---
+  # 0x65 status burst sequencing
+  - id: burst_in_progress
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+  - id: status_burst_idx
+    type: uint8_t
+    restore_value: no
+    initial_value: '0'
+  - id: status_seq
+    type: uint8_t
+    restore_value: no
+    initial_value: '0'
+  - id: t_burst_frame_last
+    type: uint32_t
+    restore_value: no
+    initial_value: '0'
+
+  # Cabin temp availability flag
+  - id: temp_available
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+
+# =============================================================================
+# CAN BUS - MCP2515 on Seeed CAN Bus Breakout Board
+# =============================================================================
 canbus:
   - platform: mcp2515
     id: espar_can
-    cs_pin: GPIO44       # D7 - CS pin on the CAN Bus Breakout Board
-    interrupt_pin: GPIO4  # D3 - INT pin on the CAN Bus Breakout Board
+    cs_pin: GPIO44
+    interrupt_pin: GPIO4
     clock: ${mcp_clock}
     can_id: 0
     bit_rate: ${can_bit_rate}
     on_frame:
-      # ---------------------------------------------------------------
-      # SNIFF MODE: Log all CAN frames for protocol discovery
-      # ---------------------------------------------------------------
-      - can_id: 0
-        can_id_mask: 0          # Match ALL CAN IDs
+      # --- Heater heartbeat (0x625) ---
+      - can_id: 0x625
         then:
           - lambda: |-
-              // Always log in sniff mode, skip in normal mode
-              if (std::string("${sniff_mode}") != "true") return;
+              id(heater_last_seen) = millis();
+              id(disconnect_pending) = false;
+              if (!id(heater_connected)->state) {
+                id(failed_start_count) = 0;
+                id(locked_out) = false;
+                id(heater_connected)->publish_state(true);
+                id(heater_fault)->publish_state("OK");
+                ESP_LOGI("espar", "Heater heartbeat received - connected");
+              }
 
-              // Increment frame counter for diagnostics
-              id(can_frame_counter) += 1;
+      # --- Heater status (0x2C4) ---
+      - can_id: 0x2C4
+        then:
+          - lambda: |-
+              if (x.size() < 6) return;
 
-              // Format data bytes as hex string
-              std::string data_hex = "";
+              uint8_t new_state = x[0];
+              bool new_flame = (x[1] & 0x20) != 0;
+              uint16_t new_ctr = (uint16_t)x[4] | ((uint16_t)x[5] << 8);
+              id(heater_ctr) = new_ctr;
+
+              bool state_changed = (new_state != id(heater_d1_state))
+                                || (new_flame != id(flame_active)->state);
+
+              // Track startup state transitions for error detection
+              if (new_state == 0x02 && id(heater_d1_state) != 0x02) {
+                id(startup_enter_ms) = millis();
+                ESP_LOGD("espar", "Heater entering STARTUP state");
+              }
+              if (id(heater_d1_state) == 0x02 && new_state != 0x02) {
+                id(startup_enter_ms) = 0;
+                if (new_state == 0x03 && id(cmd_heating)) {
+                  id(failed_start_count) = id(failed_start_count) + 1;
+                  ESP_LOGW("espar", "STARTUP->IDLE without HEATING - failed start #%u",
+                           id(failed_start_count));
+                  if (id(failed_start_count) >= 10) {
+                    id(locked_out) = true;
+                    id(cmd_heating) = false;
+                    id(cmd_fan) = false;
+                    id(heater_fault)->publish_state("LOCKOUT: power-cycle heater");
+                  } else {
+                    char buf[32];
+                    snprintf(buf, sizeof(buf), "Failed start #%u", id(failed_start_count));
+                    id(heater_fault)->publish_state(buf);
+                  }
+                }
+              }
+
+              // Confirm heating started
+              if (new_state == 0x09 && id(waiting_heat_confirm)) {
+                id(waiting_heat_confirm) = false;
+                id(failed_start_count) = 0;
+                ESP_LOGI("espar", "Heating confirmed - flame: %s",
+                         new_flame ? "active" : "off");
+              }
+
+              id(heater_d1_state) = new_state;
+
+              if (state_changed) {
+                const char *state_str =
+                  (new_state == 0x09) ? "HEATING" :
+                  (new_state == 0x21) ? "FAN" :
+                  (new_state == 0x03) ? "IDLE" :
+                  (new_state == 0x02) ? "STARTUP" : "UNKNOWN";
+                id(heater_state)->publish_state(state_str);
+                id(flame_active)->publish_state(new_flame);
+                ESP_LOGI("espar", "State: %s | Flame: %s | Ctr: 0x%04X",
+                         state_str, new_flame ? "ON" : "off", new_ctr);
+              }
+
+      # --- Catch-all: log unknown CAN IDs for future RE ---
+      - can_id: 0
+        can_id_mask: 0
+        then:
+          - lambda: |-
+              // Skip known IDs
+              if (can_id == 0x625 || can_id == 0x2C4 ||
+                  can_id == 0x2C5 || can_id == 0x2C6) return;
+
+              std::string hex;
               for (size_t i = 0; i < x.size(); i++) {
                 char buf[4];
                 snprintf(buf, sizeof(buf), "%02X ", x[i]);
-                data_hex += buf;
+                hex += buf;
               }
-              ESP_LOGI("espar_sniff", "CAN ID: 0x%03X  Len: %d  Data: %s",
-                can_id, x.size(), data_hex.c_str());
+              ESP_LOGD("espar", "Unknown CAN 0x%03X [%d]: %s",
+                       can_id, x.size(), hex.c_str());
 
-      # ---------------------------------------------------------------
-      # HEATER STATUS: Parse status broadcast frame
-      # TODO: Uncomment after sniffing - update can_id and byte assignments
-      # ---------------------------------------------------------------
-      # - can_id: ${heater_status_id}
-      #   then:
-      #     - lambda: |-
-      #         if (std::string("${sniff_mode}") == "true") return;
-      #         if (x.size() < 8) return;
-      #
-      #         // --- Typical status frame byte assignments ---
-      #         // NOTE: These are EXAMPLES - verify against your sniffed data!
-      #         // Byte 0: Heater operating state
-      #         //   0x00 = Off
-      #         //   0x01 = Starting (glow plug preheat)
-      #         //   0x02 = Starting (fuel priming)
-      #         //   0x03 = Ignition
-      #         //   0x04 = Running / Heating
-      #         //   0x05 = Cooldown / Shutdown
-      #         //   0x06 = Error / Lockout
-      #         uint8_t state = x[0];
-      #
-      #         const char* state_str;
-      #         switch (state) {
-      #           case 0x00: state_str = "Off"; break;
-      #           case 0x01: state_str = "Glow Plug Preheat"; break;
-      #           case 0x02: state_str = "Fuel Priming"; break;
-      #           case 0x03: state_str = "Ignition"; break;
-      #           case 0x04: state_str = "Running"; break;
-      #           case 0x05: state_str = "Cooldown"; break;
-      #           case 0x06: state_str = "Error"; break;
-      #           default: state_str = "Unknown"; break;
-      #         }
-      #
-      #         ESP_LOGI("espar", "Heater state: %s (0x%02X)", state_str, state);
-      #         id(heater_state).publish_state(state_str);
-      #         id(heater_running).publish_state(state == 0x04);
-      #
-      #         // Byte 1: Heat output level / power percentage
-      #         if (x.size() > 1) {
-      #           float power_pct = (float)x[1] / 255.0 * 100.0;
-      #           id(heater_power).publish_state(power_pct);
-      #         }
-      #
-      #         // Byte 2-3: Fan speed (RPM, big-endian)
-      #         if (x.size() > 3) {
-      #           uint16_t fan_rpm = (x[2] << 8) | x[3];
-      #           id(heater_fan_speed).publish_state(fan_rpm);
-      #         }
+# =============================================================================
+# SCRIPT - 17-frame CAN init burst (sent until heater responds with 0x625)
+# =============================================================================
+script:
+  - id: send_init_burst
+    then:
+      - lambda: |-
+          auto *can = id(espar_can);
+          std::vector<uint8_t> d;
+          d = {0x1E,0x00,0x1E,0x00,0x00,0x00,0x00,0x00}; can->send_data(0x5C,  false, d);
+          can->send_data(0x5F,  false, d);
+          d = {0x12,0x00,0x00,0x00,0x00,0x00,0x00,0xF1}; can->send_data(0x62,  false, d);
+          d = {0x32,0x01,0x01,0x00,0x00,0x00,0x00,0x00}; can->send_data(0x63,  false, d);
+          d = {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00}; can->send_data(0x66,  false, d);
+          d = {0x12,0x00,0x00,0x00,0x00,0x00,0x00,0xF0}; can->send_data(0x6D,  false, d);
+          d = {0x10,0x00,0x01,0x20,0x10,0x01};            can->send_data(0x10A, false, d);
+          d = {0x00,0x00,0x00,0x00,0x00,0x00,0xFE,0xFF}; can->send_data(0x5D,  false, d);
+          d = {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00}; can->send_data(0x5E,  false, d);
+          d = {0x00,0x00,0x00,0x00,0x00,0x00,0xFE,0xFF}; can->send_data(0x60,  false, d);
+          d = {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00}; can->send_data(0x61,  false, d);
+          d = {0x3C,0x00,0x05,0x00,0xC8,0x00,0xFF,0x03}; can->send_data(0x64,  false, d);
+          d = {0xBE,0x3E,0x27,0x00,0x01,0x1E,0x00,0x00}; can->send_data(0x67,  false, d);
+          can->send_data(0x68, false, d);
+          can->send_data(0x69, false, d);
+          can->send_data(0x6A, false, d);
+          can->send_data(0x6B, false, d);
+          can->send_data(0x6C, false, d);
+          ESP_LOGD("espar", "Init burst sent (17 frames)");
 
-      # ---------------------------------------------------------------
-      # HEATER TEMPERATURE: Parse temperature data frame
-      # TODO: Uncomment after sniffing - update can_id and byte assignments
-      # ---------------------------------------------------------------
-      # - can_id: ${heater_temp_id}
-      #   then:
-      #     - lambda: |-
-      #         if (std::string("${sniff_mode}") == "true") return;
-      #         if (x.size() < 4) return;
-      #
-      #         // Byte 0-1: Exhaust temperature (°C * 10, big-endian)
-      #         int16_t exhaust_raw = (x[0] << 8) | x[1];
-      #         float exhaust_temp = exhaust_raw / 10.0;
-      #         id(heater_exhaust_temp).publish_state(exhaust_temp);
-      #
-      #         // Byte 2-3: Supply voltage (mV, big-endian)
-      #         if (x.size() > 3) {
-      #           uint16_t voltage_mv = (x[2] << 8) | x[3];
-      #           float voltage = voltage_mv / 1000.0;
-      #           id(heater_voltage).publish_state(voltage);
-      #         }
-      #
-      #         ESP_LOGD("espar", "Exhaust: %.1f°C  Supply: %.1fV",
-      #           exhaust_temp, (x.size() > 3) ? ((x[2] << 8) | x[3]) / 1000.0 : 0.0);
+# =============================================================================
+# INTERVALS - Periodic CAN TX and safety checks
+# =============================================================================
+interval:
+  # --- 100ms: Controller heartbeat + init retry + status burst frames ---
+  - interval: 100ms
+    then:
+      - lambda: |-
+          if (id(espar_standby)->state) return;
+          auto *can = id(espar_can);
+          uint32_t now = millis();
 
-      # ---------------------------------------------------------------
-      # HEATER ERRORS: Parse diagnostic/error frame
-      # TODO: Uncomment after sniffing - update can_id and byte assignments
-      # ---------------------------------------------------------------
-      # - can_id: ${heater_error_id}
-      #   then:
-      #     - lambda: |-
-      #         if (std::string("${sniff_mode}") == "true") return;
-      #         if (x.size() < 2) return;
-      #
-      #         uint16_t error_code = (x[0] << 8) | x[1];
-      #         if (error_code != 0) {
-      #           ESP_LOGW("espar", "Heater error code: %d (0x%04X)", error_code, error_code);
-      #         }
-      #         id(heater_error_code).publish_state(error_code);
+          // Controller heartbeat 0x60D
+          std::vector<uint8_t> hb = {0x0D,0x10,0x82,0xB6,0x09,0x20,0x70,0x00};
+          can->send_data(0x60D, false, hb);
 
-# ==============================================================================
-# TODO: Uncomment the sections below after sniffing your heater's CAN bus
-# and discovering the actual CAN IDs, data byte assignments, and commands.
-# ==============================================================================
+          // Init burst retry if heater not connected (every 150ms)
+          if (!id(heater_connected)->state && (now - id(last_init_ms)) >= 150) {
+            id(send_init_burst).execute();
+            id(last_init_ms) = now;
+          }
 
-# --- Sensors ---
-# sensor:
-#   - platform: template
-#     name: "Exhaust Temperature"
-#     id: heater_exhaust_temp
-#     unit_of_measurement: "°C"
-#     device_class: temperature
-#     state_class: measurement
-#     accuracy_decimals: 1
-#     icon: mdi:thermometer-high
+          // Status burst frame TX (4 frames spaced ~150ms within each burst)
+          if (id(burst_in_progress)) {
+            if ((now - id(t_burst_frame_last)) >= 150 || id(status_burst_idx) == 0) {
+              uint8_t seq_vals[] = {0x01, 0x02, 0x03};
+              uint8_t ctr_lo = id(heater_ctr) & 0xFF;
+              uint8_t ctr_hi = (id(heater_ctr) >> 8) & 0xFF;
+              std::vector<uint8_t> d65 = {ctr_lo, ctr_hi, seq_vals[id(status_seq)],
+                                          0x00, 0x00, 0x00, 0x00, 0x00};
+              can->send_data(0x65, false, d65);
+              id(t_burst_frame_last) = now;
+              id(status_burst_idx) = id(status_burst_idx) + 1;
+              if (id(status_burst_idx) >= 4) {
+                id(status_seq) = (id(status_seq) + 1) % 3;
+                id(burst_in_progress) = false;
+              }
+            }
+          }
+
+  # --- 200ms: Command group (0x54/55/56/57) ---
+  - interval: 200ms
+    then:
+      - lambda: |-
+          if (id(espar_standby)->state) return;
+          auto *can = id(espar_can);
+
+          // NaN fallback: if HEAT mode but no cabin sensor data yet, force heating.
+          // The heater's internal thermocouple provides safety limiting.
+          if (id(heater_climate)->mode == climate::CLIMATE_MODE_HEAT &&
+              !id(temp_available) && !id(cmd_heating) && !id(locked_out)) {
+            id(cmd_heating) = true;
+            id(cmd_fan) = false;
+            ESP_LOGI("espar", "No cabin temp - defaulting to HEAT");
+          }
+
+          // Build 0x54 command frame
+          uint8_t ctr_lo = id(heater_ctr) & 0xFF;
+          uint8_t ctr_hi = (id(heater_ctr) >> 8) & 0xFF;
+          std::vector<uint8_t> d54(8, 0);
+
+          if (id(cmd_heating) && !id(locked_out)) {
+            d54[0] = 0x01;
+            d54[1] = 0x05;
+            // Encode target temperature: CAN word = celsius * 10
+            float target_c = id(heater_climate)->target_temperature;
+            if (std::isnan(target_c)) target_c = 21.0f;
+            target_c = std::max(10.0f, std::min(30.0f, target_c));
+            uint16_t temp_word = (uint16_t)(target_c * 10.0f + 0.5f);
+            d54[2] = temp_word & 0xFF;
+            d54[3] = (temp_word >> 8) & 0xFF;
+          } else if (id(cmd_fan) && !id(locked_out)) {
+            d54[0] = 0x01;
+            d54[1] = 0x02;
+            d54[2] = 0xFE;
+            d54[3] = 0xFF;
+          } else {
+            d54[0] = 0x00;
+            d54[1] = 0x00;
+            d54[2] = 0xFE;
+            d54[3] = 0xFF;
+          }
+          d54[4] = ctr_lo;
+          d54[5] = ctr_hi;
+          can->send_data(0x54, false, d54);
+
+          // Static config frames
+          std::vector<uint8_t> d55 = {0x10,0x27,0x00,0x00,0x00,0x00,0x00,0x00};
+          can->send_data(0x55, false, d55);
+          can->send_data(0x56, false, d55);
+          std::vector<uint8_t> d57 = {0x00,0x00,0xFE,0xFF,0xFE,0xFF,0x00,0x00};
+          can->send_data(0x57, false, d57);
+
+  # --- 1s: Safety checks ---
+  - interval: 1s
+    then:
+      - lambda: |-
+          uint32_t now = millis();
+
+          // Two-stage heartbeat loss: 10s timeout + 5s grace before disconnect
+          if (id(heater_connected)->state && (now - id(heater_last_seen)) > 10000) {
+            if (!id(disconnect_pending)) {
+              id(disconnect_pending) = true;
+              id(disconnect_pending_ms) = now;
+              ESP_LOGD("espar", "Heartbeat late - grace period started");
+            } else if ((now - id(disconnect_pending_ms)) >= 5000) {
+              id(disconnect_pending) = false;
+              id(heater_ctr) = 0xFFFE;
+              id(last_init_ms) = 0;
+              id(heater_connected)->publish_state(false);
+              id(heater_fault)->publish_state("Heartbeat lost");
+              ESP_LOGW("espar", "Heater heartbeat lost");
+            }
+          }
+
+          // Startup timeout: stuck in STARTUP > 90s
+          if (id(heater_d1_state) == 0x02 && id(startup_enter_ms) != 0) {
+            if ((now - id(startup_enter_ms)) > 90000) {
+              id(startup_enter_ms) = 0;
+              id(failed_start_count) = id(failed_start_count) + 1;
+              ESP_LOGW("espar", "Startup timeout - failed start #%u",
+                       id(failed_start_count));
+              if (id(failed_start_count) >= 10) {
+                id(locked_out) = true;
+                id(cmd_heating) = false;
+                id(cmd_fan) = false;
+                id(heater_fault)->publish_state("LOCKOUT: power-cycle heater");
+              } else {
+                char buf[32];
+                snprintf(buf, sizeof(buf), "Failed start #%u", id(failed_start_count));
+                id(heater_fault)->publish_state(buf);
+              }
+            }
+          }
+
+          // Heat confirm timeout: HEAT sent but not HEATING after 30s
+          if (id(waiting_heat_confirm) && id(cmd_heating)) {
+            if ((now - id(heat_cmd_ms)) > 30000 && id(heater_d1_state) != 0x09) {
+              id(waiting_heat_confirm) = false;
+              ESP_LOGW("espar", "Heat confirm timeout");
+              id(heater_fault)->publish_state("Heat confirm timeout");
+            }
+          }
+
+  # --- 10s: Start status burst ---
+  - interval: 10s
+    then:
+      - lambda: |-
+          if (!id(burst_in_progress) && !id(espar_standby)->state) {
+            id(burst_in_progress) = true;
+            id(status_burst_idx) = 0;
+            id(t_burst_frame_last) = millis();
+          }
+
+# =============================================================================
+# SENSOR - Cabin temperature from Home Assistant
+# =============================================================================
+sensor:
+  - platform: homeassistant
+    id: cabin_temp
+    entity_id: ${cabin_temp_entity}
+    filters:
+      - filter_out: nan
+      - lambda: |-
+          // Convert to Celsius if cabin_temp_unit is F; pass through if C
+          if (std::string("${cabin_temp_unit}") == "F")
+            return (x - 32.0f) * 5.0f / 9.0f;
+          return x;
+    on_value:
+      then:
+        - lambda: 'id(temp_available) = true;'
+
+# =============================================================================
+# CLIMATE - Thermostat (safety supervisor; heater does primary regulation)
+# =============================================================================
 #
-#   - platform: template
-#     name: "Supply Voltage"
-#     id: heater_voltage
-#     unit_of_measurement: "V"
-#     device_class: voltage
-#     state_class: measurement
-#     accuracy_decimals: 1
-#     icon: mdi:car-battery
+# The heater's internal PID controller modulates fan/fuel to maintain the
+# setpoint we send via CAN.  The ESPHome thermostat only intervenes as a
+# safety cutoff if the cabin overshoots by heat_overrun degrees.
 #
-#   - platform: template
-#     name: "Fan Speed"
-#     id: heater_fan_speed
-#     unit_of_measurement: "RPM"
-#     state_class: measurement
-#     accuracy_decimals: 0
-#     icon: mdi:fan
-#
-#   - platform: template
-#     name: "Power Level"
-#     id: heater_power
-#     unit_of_measurement: "%"
-#     state_class: measurement
-#     accuracy_decimals: 0
-#     icon: mdi:fire
-#
-#   - platform: template
-#     name: "Error Code"
-#     id: heater_error_code
-#     accuracy_decimals: 0
-#     icon: mdi:alert-circle
+climate:
+  - platform: thermostat
+    name: "Climate"
+    id: heater_climate
+    sensor: cabin_temp
+    visual:
+      min_temperature: 10
+      max_temperature: 30
+      temperature_step: 0.5
+    min_idle_time: 10s
+    min_heating_off_time: 60s
+    min_heating_run_time: 60s
+    heat_deadband: 0.5
+    heat_overrun: 3.0
+    startup_delay: true
+    heat_action:
+      - lambda: |-
+          if (id(locked_out)) return;
+          id(cmd_heating) = true;
+          id(cmd_fan) = false;
+          id(waiting_heat_confirm) = true;
+          id(heat_cmd_ms) = millis();
+          float t = id(heater_climate)->target_temperature;
+          ESP_LOGI("espar", "Thermostat: HEAT at %.1f C (%.0f F)",
+                   t, t * 9.0f / 5.0f + 32.0f);
+    idle_action:
+      - lambda: |-
+          id(cmd_heating) = false;
+          id(cmd_fan) = false;
+          id(waiting_heat_confirm) = false;
+          ESP_LOGI("espar", "Thermostat: IDLE (safety cutoff or mode change)");
+    fan_only_action:
+      - lambda: |-
+          id(cmd_heating) = false;
+          id(cmd_fan) = true;
+          id(waiting_heat_confirm) = false;
+          ESP_LOGI("espar", "Thermostat: FAN ONLY");
+    off_mode:
+      - lambda: |-
+          id(cmd_heating) = false;
+          id(cmd_fan) = false;
+          id(waiting_heat_confirm) = false;
+          ESP_LOGI("espar", "Thermostat: OFF");
+    heat_mode:
+      - lambda: 'ESP_LOGI("espar", "Climate mode -> HEAT");'
+    fan_only_mode:
+      - lambda: 'ESP_LOGI("espar", "Climate mode -> FAN_ONLY");'
+    min_fanning_off_time: 30s
+    min_fanning_run_time: 30s
+    default_preset: Home
+    preset:
+      - name: Home
+        default_target_temperature_low: 21
 
-# --- Text Sensors ---
-# text_sensor:
-#   - platform: template
-#     name: "State"
-#     id: heater_state
-#     icon: mdi:radiator
+# =============================================================================
+# STATUS SENSORS
+# =============================================================================
+text_sensor:
+  - platform: template
+    name: "State"
+    id: heater_state
+    icon: mdi:radiator
 
-# --- Binary Sensors ---
-# binary_sensor:
-#   - platform: template
-#     name: "Running"
-#     id: heater_running
-#     device_class: running
-#     icon: mdi:fire-circle
+  - platform: template
+    name: "Fault"
+    id: heater_fault
+    icon: mdi:alert-circle
 
-# --- Controls ---
-# switch:
-#   - platform: template
-#     name: "Power"
-#     id: heater_switch
-#     icon: mdi:radiator
-#     optimistic: true
-#     turn_on_action:
-#       - logger.log: "Sending heater START command"
-#       - canbus.send:
-#           canbus_id: espar_can
-#           can_id: ${heater_command_id}
-#           data: [0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
-#     turn_off_action:
-#       - logger.log: "Sending heater STOP command"
-#       - canbus.send:
-#           canbus_id: espar_can
-#           can_id: ${heater_command_id}
-#           data: [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
+binary_sensor:
+  - platform: template
+    name: "Flame Active"
+    id: flame_active
+    device_class: heat
+    icon: mdi:fire
 
-# --- Buttons ---
-# button:
-#   - platform: template
-#     name: "Start"
-#     icon: mdi:play
-#     on_press:
-#       - logger.log: "Sending heater START command"
-#       - canbus.send:
-#           canbus_id: espar_can
-#           can_id: ${heater_command_id}
-#           data: [0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
-#
-#   - platform: template
-#     name: "Stop"
-#     icon: mdi:stop
-#     on_press:
-#       - logger.log: "Sending heater STOP command"
-#       - canbus.send:
-#           canbus_id: espar_can
-#           can_id: ${heater_command_id}
-#           data: [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
+  - platform: template
+    name: "Connected"
+    id: heater_connected
+    device_class: connectivity
 
-# --- Number: Heat level adjustment ---
-# number:
-#   - platform: template
-#     name: "Heat Level"
-#     id: heater_heat_level
-#     icon: mdi:thermometer-lines
-#     min_value: 0
-#     max_value: 100
-#     step: 10
-#     initial_value: 0
-#     optimistic: true
-#     unit_of_measurement: "%"
-#     set_action:
-#       - logger.log:
-#           format: "Setting heater level to %.0f%%"
-#           args: ['x']
-#       - canbus.send:
-#           canbus_id: espar_can
-#           can_id: ${heater_command_id}
-#           data: !lambda |-
-#             uint8_t level = (uint8_t)(x * 255.0 / 100.0);
-#             return {0x02, level, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+  - platform: status
+    name: "Node Status"
+    device_class: connectivity
 
-# --- Climate: Thin wrapper that forwards mode/setpoint to the CAN bus ---
-# The heater has its own thermostat - this just sends commands when you
-# change mode or target temperature from the HA UI.
-# climate:
-#   - platform: thermostat
-#     name: "Climate"
-#     id: heater_climate
-#     icon: mdi:radiator
-#     sensor: heater_exhaust_temp  # Display-only; the heater controls its own loop
-#     visual:
-#       min_temperature: 10
-#       max_temperature: 35
-#       temperature_step: 1.0
-#     min_idle_time: 10s
-#     min_heating_off_time: 60s     # Prevent rapid cycling - heater needs cooldown
-#     min_heating_run_time: 120s    # Let heater run at least 2 min per cycle
-#     heat_deadband: 0.5
-#     heat_overrun: 0.5
-#     heat_action:
-#       - lambda: |-
-#           if (std::string("${sniff_mode}") == "true") {
-#             ESP_LOGW("espar", "Sniff mode active - not sending heat command");
-#             return;
-#           }
-#           float setpoint = id(heater_climate).target_temperature;
-#           uint8_t temp_byte = (uint8_t)clamp((int)setpoint, 0, 255);
-#           ESP_LOGI("espar", "Climate HEAT: sending start + setpoint %.0f°C", setpoint);
-#       - if:
-#           condition:
-#             lambda: 'return std::string("${sniff_mode}") != "true";'
-#           then:
-#             - canbus.send:
-#                 canbus_id: espar_can
-#                 can_id: ${heater_command_id}
-#                 data: !lambda |-
-#                   float setpoint = id(heater_climate).target_temperature;
-#                   uint8_t temp_byte = (uint8_t)clamp((int)setpoint, 0, 255);
-#                   return {0x01, temp_byte, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-#     idle_action:
-#       - lambda: |-
-#           if (std::string("${sniff_mode}") == "true") {
-#             ESP_LOGW("espar", "Sniff mode active - not sending idle/off command");
-#             return;
-#           }
-#           ESP_LOGI("espar", "Climate IDLE: sending stop command");
-#       - if:
-#           condition:
-#             lambda: 'return std::string("${sniff_mode}") != "true";'
-#           then:
-#             - canbus.send:
-#                 canbus_id: espar_can
-#                 can_id: ${heater_command_id}
-#                 data: [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
-#     off_mode:
-#       - lambda: 'ESP_LOGI("espar", "Climate mode set to OFF");'
-#     heat_mode:
-#       - lambda: 'ESP_LOGI("espar", "Climate mode set to HEAT");'
-#     target_temperature_change_action:
-#       - lambda: |-
-#           if (std::string("${sniff_mode}") == "true") return;
-#           float setpoint = id(heater_climate).target_temperature;
-#           ESP_LOGI("espar", "Target temperature changed to %.0f°C", setpoint);
-#       - if:
-#           condition:
-#             lambda: 'return std::string("${sniff_mode}") != "true";'
-#           then:
-#             - canbus.send:
-#                 canbus_id: espar_can
-#                 can_id: ${heater_command_id}
-#                 data: !lambda |-
-#                   float setpoint = id(heater_climate).target_temperature;
-#                   uint8_t temp_byte = (uint8_t)clamp((int)setpoint, 0, 255);
-#                   return {0x02, temp_byte, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-#     default_preset: Home
-#     preset:
-#       - name: Home
-#         default_target_temperature_low: 20
+# =============================================================================
+# CONTROLS
+# =============================================================================
+
+# CAN standby: suspends all outbound CAN frames.
+# Use before connecting EasyStart Pro or OEM diagnostic tools.
+switch:
+  - platform: template
+    name: "CAN Standby"
+    id: espar_standby
+    icon: mdi:pause-circle-outline
+    restore_mode: ALWAYS_OFF
+    optimistic: true
+    turn_on_action:
+      - lambda: |-
+          ESP_LOGI("espar", "TX standby ON - outbound frames suspended");
+          id(heater_fault)->publish_state("TX standby: safe for OEM tool");
+    turn_off_action:
+      - lambda: |-
+          ESP_LOGI("espar", "TX standby OFF - resuming, re-running handshake");
+          id(heater_connected)->publish_state(false);
+          id(disconnect_pending) = false;
+          id(last_init_ms) = 0;
+          id(heater_fault)->publish_state("OK");
+
+button:
+  - platform: restart
+    name: "Restart Controller"
+    icon: mdi:restart
