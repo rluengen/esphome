@@ -37,17 +37,6 @@ packages:
           touchscreen_id: dsi_touchscreen
           backlight_id: display_backlight
 
-# Ethernet - DISABLED (Waveshare 8.8" DSI may not have IP101 PHY)
-# ethernet:
-#   type: IP101
-#   mdc_pin: GPIO31
-#   mdio_pin: GPIO52
-#   power_pin: GPIO51
-#   clk:
-#     mode: CLK_EXT_IN
-#     pin: GPIO50
-#   phy_addr: 1
-
 # Touch debug logging
 touchscreen:
   - id: !extend dsi_touchscreen
