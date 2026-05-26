@@ -597,10 +597,6 @@ binary_sensor:
     id: heater_connected
     device_class: connectivity
 
-  - platform: status
-    name: "Node Status"
-    device_class: connectivity
-
 # =============================================================================
 # CONTROLS
 # =============================================================================
@@ -626,7 +622,3 @@ switch:
           id(last_init_ms) = 0;
           id(heater_fault)->publish_state("OK");
 
-button:
-  - platform: restart
-    name: "Restart Controller"
-    icon: mdi:restart
