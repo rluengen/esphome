@@ -38,7 +38,7 @@
 substitutions:
   device_name: awning-controller
   friendly_name: Awning Controller
-  project_name: Van Awning Controller
+  project_name: Awning Controller
   project_version: "1.0.0"
   log_level: DEBUG
 
