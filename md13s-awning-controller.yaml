@@ -11,12 +11,14 @@
 #    MD13S GND -- INA228 GND -- XIAO GND
 #    MD13S 5V OUT -- XIAO 5V pin  (powers the ESP32)
 #
-#    INA228 SDA -- XIAO D4 (GPIO5)
-#    INA228 SCL -- XIAO D5 (GPIO6)
+#    Grove Base I2C port -- INA228 STEMMA QT (via STEMMA QT to Grove adapter)
+#      XIAO D4 (GPIO5) -- INA228 SDA  (Grove pin 2)
+#      XIAO D5 (GPIO6) -- INA228 SCL  (Grove pin 1)
 #    INA228 VBUS -- 12V battery positive (for bus voltage measurement)
 #
-#    XIAO D1 (GPIO2) -- MD13S DIR   (direction: HIGH=extend, LOW=retract)
-#    XIAO D2 (GPIO3) -- MD13S PWM   (enable: HIGH=on, LOW=off)
+#    Grove port D2/D3 -- MD13S Grove connector
+#      XIAO D2 (GPIO3) -- MD13S PWM   (enable: HIGH=on, LOW=off)  [Grove pin 1]
+#      XIAO D3 (GPIO4) -- MD13S DIR   (direction: HIGH=extend, LOW=retract)  [Grove pin 2]
 #
 #    MD13S OUT A -- Motor terminal 1
 #    MD13S OUT B -- Motor terminal 2
@@ -50,8 +52,9 @@ substitutions:
   log_level: DEBUG
 
   # --- Cytron MD13S GPIO pins ---
-  dir_pin: GPIO2     # D1 - direction control
-  pwm_pin: GPIO3     # D2 - motor enable
+  # MD13S Grove connector plugs into Grove Base port D2/D3
+  pwm_pin: GPIO3     # D2 - motor enable  (Grove pin 1)
+  dir_pin: GPIO4     # D3 - direction control  (Grove pin 2)
 
   # --- INA228 I2C ---
   i2c_sda_pin: GPIO5   # D4
