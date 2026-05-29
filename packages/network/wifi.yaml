@@ -8,9 +8,9 @@ wifi:
   power_save_mode: NONE
 
   # fast_connect: Skips WiFi channel scanning, connects directly to last known BSSID/channel
-  # Benefits: Faster boot time (~3-5s savings), lower power consumption during connection
-  # Drawbacks: Won't roam between APs in mesh networks, breaks if router changes channel
-  fast_connect: true
+  # Disabled here because it can cause connection reliability issues in some environments.
+  # If needed for a specific device, override this value locally.
+  fast_connect: false
   ssid: ${wifi_ssid}
   password: ${wifi_password}
   reboot_timeout: 0s  # Don't reboot if WiFi is unavailable; keep retrying
