@@ -1852,6 +1852,17 @@ sensor:
 # ---- Water Control State Sensors ----
 # Track hot water heater and water pump state from the water tank controller
 binary_sensor:
+  - platform: status
+    id: device_online
+    internal: true
+    on_state:
+      then:
+        - lvgl.label.update:
+            id: lbl_tab_home_icon
+            text: !lambda |-
+              // Show alert icon when disconnected from Wi-Fi/HA API.
+              return std::string(x ? "\U000F02DC" : "\U000F15D0");
+
   - platform: homeassistant
     id: ha_hot_water_heater_state
     entity_id: switch.water_tank_display_hot_water_heater
@@ -1972,6 +1983,7 @@ font:
     bpp: 4
     glyphs: [
       "\U000F02DC", # home
+      "\U000F15D0", # home-alert-outline
       "\U000F0590", # cloudy (weather)
       "\U000F0335", # lightbulb
       "\U000F0336", # lightbulb-on
@@ -2173,6 +2185,7 @@ lvgl:
                       - script.execute: highlight_tab_home
                   widgets:
                     - label:
+                        id: lbl_tab_home_icon
                         text_font: mdi_tab
                         text_color: 0xFFFFFF
                         text: "\U000F02DC"
@@ -2199,7 +2212,7 @@ lvgl:
                         id: lbl_tab_weather_icon
                         text_font: mdi_tab
                         text_color: 0xB0B0B0
-                        text: "\U000F0590"
+                        text: "\U000F0599"
                         align: CENTER
                         y: -6
                     - label:
