@@ -38,10 +38,6 @@ packages:
           touchscreen_id: dsi_touchscreen
           backlight_id: display_backlight
 
-wifi:
-  min_auth_mode: WPA2
-  output_power: 20dB
-
 waveshare_dsi:
   id: dsi_display
   rotation: 0
@@ -311,13 +307,12 @@ script:
             - homeassistant.service:
                 service: light.turn_off
                 data:
-                  entity_id: light.light_controller_main_can_lights
+                  entity_id: light.quinled_van_lightcontroller_main_can_lights
           else:
             - homeassistant.service:
                 service: light.turn_on
                 data:
-                  entity_id: light.light_controller_main_can_lights
-                data_template:
+                  entity_id: light.quinled_van_lightcontroller_main_can_lights
                   brightness: !lambda 'return id(pending_bright_main_cans);'
 
   - id: debounce_bed_cans
@@ -331,13 +326,12 @@ script:
             - homeassistant.service:
                 service: light.turn_off
                 data:
-                  entity_id: light.light_controller_bed_can_lights
+                  entity_id: light.quinled_van_lightcontroller_bed_can_lights
           else:
             - homeassistant.service:
                 service: light.turn_on
                 data:
-                  entity_id: light.light_controller_bed_can_lights
-                data_template:
+                  entity_id: light.quinled_van_lightcontroller_bed_can_lights
                   brightness: !lambda 'return id(pending_bright_bed_cans);'
 
   - id: debounce_door
@@ -351,13 +345,12 @@ script:
             - homeassistant.service:
                 service: light.turn_off
                 data:
-                  entity_id: light.light_controller_door_light
+                  entity_id: light.quinled_van_lightcontroller_door_light
           else:
             - homeassistant.service:
                 service: light.turn_on
                 data:
-                  entity_id: light.light_controller_door_light
-                data_template:
+                  entity_id: light.quinled_van_lightcontroller_door_light
                   brightness: !lambda 'return id(pending_bright_door);'
 
   - id: debounce_dog_crate
@@ -371,13 +364,12 @@ script:
             - homeassistant.service:
                 service: light.turn_off
                 data:
-                  entity_id: light.light_controller_dog_crate_lights
+                  entity_id: light.quinled_van_lightcontroller_cwww_led_dog_crate_lights
           else:
             - homeassistant.service:
                 service: light.turn_on
                 data:
-                  entity_id: light.light_controller_dog_crate_lights
-                data_template:
+                  entity_id: light.quinled_van_lightcontroller_cwww_led_dog_crate_lights
                   brightness: !lambda 'return id(pending_bright_dog_crate);'
 
   - id: debounce_bed_capsule
@@ -391,13 +383,12 @@ script:
             - homeassistant.service:
                 service: light.turn_off
                 data:
-                  entity_id: light.light_controller_bed_capsule_lights
+                  entity_id: light.quinled_van_lightcontroller_bed_capsule_lights
           else:
             - homeassistant.service:
                 service: light.turn_on
                 data:
-                  entity_id: light.light_controller_bed_capsule_lights
-                data_template:
+                  entity_id: light.quinled_van_lightcontroller_bed_capsule_lights
                   brightness: !lambda 'return id(pending_bright_bed_capsule);'
 
   - id: debounce_awning_out
@@ -417,7 +408,6 @@ script:
                 service: light.turn_on
                 data:
                   entity_id: light.light_controller_awning_outside_light_strip
-                data_template:
                   brightness: !lambda 'return id(pending_bright_awning_out);'
 
   - id: debounce_awning_in
@@ -437,7 +427,6 @@ script:
                 service: light.turn_on
                 data:
                   entity_id: light.light_controller_awning_inside_light_strip
-                data_template:
                   brightness: !lambda 'return id(pending_bright_awning_in);'
 
   - id: debounce_exterior
@@ -451,53 +440,48 @@ script:
             - homeassistant.service:
                 service: light.turn_off
                 data:
-                  entity_id: light.light_controller_exterior_capsule_passenger_flood_light
+                  entity_id: light.quinled_van_lightcontroller_exterior_lights
             - homeassistant.service:
                 service: light.turn_off
                 data:
-                  entity_id: light.light_controller_exterior_capsule_driver_flood_light
+                  entity_id: light.quinled_van_lightcontroller_exterior_lights
             - homeassistant.service:
                 service: light.turn_off
                 data:
-                  entity_id: light.light_controller_exterior_roof_passenger_flood_light
+                  entity_id: light.quinled_van_lightcontroller_exterior_lights
             - homeassistant.service:
                 service: light.turn_off
                 data:
-                  entity_id: light.light_controller_exterior_roof_driver_flood_light
+                  entity_id: light.quinled_van_lightcontroller_exterior_lights
             - homeassistant.service:
                 service: light.turn_off
                 data:
-                  entity_id: light.light_controller_exterior_roof_rear_flood_light
+                  entity_id: light.quinled_van_lightcontroller_exterior_lights
           else:
             - homeassistant.service:
                 service: light.turn_on
                 data:
-                  entity_id: light.light_controller_exterior_capsule_passenger_flood_light
-                data_template:
+                  entity_id: light.quinled_van_lightcontroller_exterior_lights
                   brightness: !lambda 'return id(pending_bright_exterior);'
             - homeassistant.service:
                 service: light.turn_on
                 data:
-                  entity_id: light.light_controller_exterior_capsule_driver_flood_light
-                data_template:
+                  entity_id: light.quinled_van_lightcontroller_exterior_lights
                   brightness: !lambda 'return id(pending_bright_exterior);'
             - homeassistant.service:
                 service: light.turn_on
                 data:
-                  entity_id: light.light_controller_exterior_roof_passenger_flood_light
-                data_template:
+                  entity_id: light.quinled_van_lightcontroller_exterior_lights
                   brightness: !lambda 'return id(pending_bright_exterior);'
             - homeassistant.service:
                 service: light.turn_on
                 data:
-                  entity_id: light.light_controller_exterior_roof_driver_flood_light
-                data_template:
+                  entity_id: light.quinled_van_lightcontroller_exterior_lights
                   brightness: !lambda 'return id(pending_bright_exterior);'
             - homeassistant.service:
                 service: light.turn_on
                 data:
-                  entity_id: light.light_controller_exterior_roof_rear_flood_light
-                data_template:
+                  entity_id: light.quinled_van_lightcontroller_exterior_lights
                   brightness: !lambda 'return id(pending_bright_exterior);'
 
   # ── Awning Toggle Scripts ──
@@ -1131,7 +1115,7 @@ text_sensor:
   # Light entity state sensors (detect unavailable to disable sliders)
   - platform: homeassistant
     id: ha_state_main_cans
-    entity_id: light.light_controller_main_can_lights
+    entity_id: light.quinled_van_lightcontroller_main_can_lights
     internal: true
     on_value:
       then:
@@ -1153,7 +1137,7 @@ text_sensor:
 
   - platform: homeassistant
     id: ha_state_bed_cans
-    entity_id: light.light_controller_bed_can_lights
+    entity_id: light.quinled_van_lightcontroller_bed_can_lights
     internal: true
     on_value:
       then:
@@ -1175,7 +1159,7 @@ text_sensor:
 
   - platform: homeassistant
     id: ha_state_door
-    entity_id: light.light_controller_door_light
+    entity_id: light.quinled_van_lightcontroller_door_light
     internal: true
     on_value:
       then:
@@ -1197,7 +1181,7 @@ text_sensor:
 
   - platform: homeassistant
     id: ha_state_dog_crate
-    entity_id: light.light_controller_dog_crate_lights
+    entity_id: light.quinled_van_lightcontroller_cwww_led_dog_crate_lights
     internal: true
     on_value:
       then:
@@ -1219,7 +1203,7 @@ text_sensor:
 
   - platform: homeassistant
     id: ha_state_bed_capsule
-    entity_id: light.light_controller_bed_capsule_lights
+    entity_id: light.quinled_van_lightcontroller_bed_capsule_lights
     internal: true
     on_value:
       then:
@@ -1285,7 +1269,7 @@ text_sensor:
 
   - platform: homeassistant
     id: ha_state_exterior
-    entity_id: light.light_controller_exterior_capsule_passenger_flood_light
+    entity_id: light.quinled_van_lightcontroller_exterior_lights
     internal: true
     on_value:
       then:
@@ -1598,7 +1582,7 @@ sensor:
   # Light brightness sensors (HA brightness is 0-255)
   - platform: homeassistant
     id: ha_bright_main_cans
-    entity_id: light.light_controller_main_can_lights
+    entity_id: light.quinled_van_lightcontroller_main_can_lights
     attribute: brightness
     internal: true
     on_value:
@@ -1615,7 +1599,7 @@ sensor:
 
   - platform: homeassistant
     id: ha_bright_bed_cans
-    entity_id: light.light_controller_bed_can_lights
+    entity_id: light.quinled_van_lightcontroller_bed_can_lights
     attribute: brightness
     internal: true
     on_value:
@@ -1632,7 +1616,7 @@ sensor:
 
   - platform: homeassistant
     id: ha_bright_door
-    entity_id: light.light_controller_door_light
+    entity_id: light.quinled_van_lightcontroller_door_light
     attribute: brightness
     internal: true
     on_value:
@@ -1649,7 +1633,7 @@ sensor:
 
   - platform: homeassistant
     id: ha_bright_dog_crate
-    entity_id: light.light_controller_dog_crate_lights
+    entity_id: light.quinled_van_lightcontroller_cwww_led_dog_crate_lights
     attribute: brightness
     internal: true
     on_value:
@@ -1666,7 +1650,7 @@ sensor:
 
   - platform: homeassistant
     id: ha_bright_bed_capsule
-    entity_id: light.light_controller_bed_capsule_lights
+    entity_id: light.quinled_van_lightcontroller_bed_capsule_lights
     attribute: brightness
     internal: true
     on_value:
@@ -1717,7 +1701,7 @@ sensor:
 
   - platform: homeassistant
     id: ha_bright_exterior
-    entity_id: light.light_controller_exterior_capsule_passenger_flood_light
+    entity_id: light.quinled_van_lightcontroller_exterior_lights
     attribute: brightness
     internal: true
     on_value:
@@ -2622,20 +2606,20 @@ lvgl:
                                   - homeassistant.service:
                                       service: light.turn_off
                                       data:
-                                        entity_id: light.main_cans
+                                        entity_id: light.quinled_van_lightcontroller_main_can_lights
                                   - homeassistant.service:
                                       service: light.turn_off
                                       data:
-                                        entity_id: light.bed_cans
+                                        entity_id: light.quinled_van_lightcontroller_bed_can_lights
                                 else:
                                   - homeassistant.service:
                                       service: light.turn_on
                                       data:
-                                        entity_id: light.main_cans
+                                        entity_id: light.quinled_van_lightcontroller_main_can_lights
                                   - homeassistant.service:
                                       service: light.turn_on
                                       data:
-                                        entity_id: light.bed_cans
+                                        entity_id: light.quinled_van_lightcontroller_bed_can_lights
                         widgets:
                           - label:
                               id: lbl_scene_cans
@@ -2670,20 +2654,20 @@ lvgl:
                                   - homeassistant.service:
                                       service: light.turn_off
                                       data:
-                                        entity_id: light.awning_out
+                                        entity_id: light.light_controller_awning_outside_light_strip
                                   - homeassistant.service:
                                       service: light.turn_off
                                       data:
-                                        entity_id: light.awning_in
+                                        entity_id: light.light_controller_awning_inside_light_strip
                                 else:
                                   - homeassistant.service:
                                       service: light.turn_on
                                       data:
-                                        entity_id: light.awning_out
+                                        entity_id: light.light_controller_awning_outside_light_strip
                                   - homeassistant.service:
                                       service: light.turn_on
                                       data:
-                                        entity_id: light.awning_in
+                                        entity_id: light.light_controller_awning_inside_light_strip
                         widgets:
                           - label:
                               id: lbl_scene_awning
@@ -2725,42 +2709,41 @@ lvgl:
                                   - homeassistant.service:
                                       service: light.turn_off
                                       data:
-                                        entity_id: light.bed_capsule
+                                        entity_id: light.quinled_van_lightcontroller_bed_capsule_lights
                                 else:
                                   - homeassistant.service:
                                       service: light.turn_on
                                       data:
-                                        entity_id: light.bed_capsule
-                                      data_template:
+                                        entity_id: light.quinled_van_lightcontroller_bed_capsule_lights
                                         brightness: "64"
                                   - homeassistant.service:
                                       service: light.turn_off
                                       data:
-                                        entity_id: light.main_cans
+                                        entity_id: light.quinled_van_lightcontroller_main_can_lights
                                   - homeassistant.service:
                                       service: light.turn_off
                                       data:
-                                        entity_id: light.bed_cans
+                                        entity_id: light.quinled_van_lightcontroller_bed_can_lights
                                   - homeassistant.service:
                                       service: light.turn_off
                                       data:
-                                        entity_id: light.door
+                                        entity_id: light.quinled_van_lightcontroller_door_light
                                   - homeassistant.service:
                                       service: light.turn_off
                                       data:
-                                        entity_id: light.dog_crate
+                                        entity_id: light.quinled_van_lightcontroller_cwww_led_dog_crate_lights
                                   - homeassistant.service:
                                       service: light.turn_off
                                       data:
-                                        entity_id: light.awning_out
+                                        entity_id: light.light_controller_awning_outside_light_strip
                                   - homeassistant.service:
                                       service: light.turn_off
                                       data:
-                                        entity_id: light.awning_in
+                                        entity_id: light.light_controller_awning_inside_light_strip
                                   - homeassistant.service:
                                       service: light.turn_off
                                       data:
-                                        entity_id: light.exterior_floods
+                                        entity_id: light.quinled_van_lightcontroller_exterior_lights
                         widgets:
                           - label:
                               id: lbl_scene_bedtime
@@ -3257,7 +3240,7 @@ lvgl:
                             - homeassistant.service:
                                 service: light.toggle
                                 data:
-                                  entity_id: light.main_cans
+                                  entity_id: light.quinled_van_lightcontroller_main_can_lights
                         widgets:
                           - label:
                               id: lbl_icon_main_cans
@@ -3316,7 +3299,7 @@ lvgl:
                             - homeassistant.service:
                                 service: light.toggle
                                 data:
-                                  entity_id: light.bed_cans
+                                  entity_id: light.quinled_van_lightcontroller_bed_can_lights
                         widgets:
                           - label:
                               id: lbl_icon_bed_cans
@@ -3375,7 +3358,7 @@ lvgl:
                             - homeassistant.service:
                                 service: light.toggle
                                 data:
-                                  entity_id: light.door
+                                  entity_id: light.quinled_van_lightcontroller_door_light
                         widgets:
                           - label:
                               id: lbl_icon_door
@@ -3434,7 +3417,7 @@ lvgl:
                             - homeassistant.service:
                                 service: light.toggle
                                 data:
-                                  entity_id: light.dog_crate
+                                  entity_id: light.quinled_van_lightcontroller_cwww_led_dog_crate_lights
                         widgets:
                           - label:
                               id: lbl_icon_dog_crate
@@ -3493,7 +3476,7 @@ lvgl:
                             - homeassistant.service:
                                 service: light.toggle
                                 data:
-                                  entity_id: light.bed_capsule
+                                  entity_id: light.quinled_van_lightcontroller_bed_capsule_lights
                         widgets:
                           - label:
                               id: lbl_icon_bed_capsule
@@ -3552,7 +3535,7 @@ lvgl:
                             - homeassistant.service:
                                 service: light.toggle
                                 data:
-                                  entity_id: light.awning_out
+                                  entity_id: light.light_controller_awning_outside_light_strip
                         widgets:
                           - label:
                               id: lbl_icon_awning_out
@@ -3611,7 +3594,7 @@ lvgl:
                             - homeassistant.service:
                                 service: light.toggle
                                 data:
-                                  entity_id: light.awning_in
+                                  entity_id: light.light_controller_awning_inside_light_strip
                         widgets:
                           - label:
                               id: lbl_icon_awning_in
@@ -3670,7 +3653,7 @@ lvgl:
                             - homeassistant.service:
                                 service: light.toggle
                                 data:
-                                  entity_id: light.exterior_floods
+                                  entity_id: light.quinled_van_lightcontroller_exterior_lights
                         widgets:
                           - label:
                               id: lbl_icon_exterior
