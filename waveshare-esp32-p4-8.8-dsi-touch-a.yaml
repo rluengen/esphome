@@ -2105,20 +2105,20 @@ font:
   # UI text font
   - file: "fonts/Roboto-Regular.ttf"
     id: roboto_small
-    size: 28
+    size: 34
     bpp: 4
     glyphs: " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~°"
 
   # Large value font
   - file: "fonts/Roboto-Regular.ttf"
     id: roboto_large
-    size: 44
+    size: 48
     bpp: 4
     glyphs: " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~°"
 
   - file: "fonts/Roboto-Regular.ttf"
     id: roboto_xlarge
-    size: 56
+    size: 60
     bpp: 4
     glyphs: " -0123456789:AMP"
 
