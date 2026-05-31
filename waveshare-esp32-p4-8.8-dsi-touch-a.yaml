@@ -125,6 +125,56 @@ script:
       - lvgl.widget.hide: content_water
       - script.execute: highlight_tab_home
 
+  # Update home scene bulb icons for at-a-glance scene status
+  - id: update_home_scene_icons
+    then:
+      - lvgl.label.update:
+          id: lbl_scene_cans
+          text: !lambda |-
+            bool main_on = !isnan(id(ha_bright_main_cans).state) && id(ha_bright_main_cans).state > 0;
+            bool bed_on = !isnan(id(ha_bright_bed_cans).state) && id(ha_bright_bed_cans).state > 0;
+            return std::string((main_on && bed_on) ? "\U000F0336" : "\U000F0335");
+          text_color: !lambda |-
+            bool main_on = !isnan(id(ha_bright_main_cans).state) && id(ha_bright_main_cans).state > 0;
+            bool bed_on = !isnan(id(ha_bright_bed_cans).state) && id(ha_bright_bed_cans).state > 0;
+            return (main_on && bed_on) ? lv_color_hex(0xFFD700) : lv_color_hex(0x808080);
+
+      - lvgl.label.update:
+          id: lbl_scene_awning
+          text: !lambda |-
+            bool out_on = !isnan(id(ha_bright_awning_out).state) && id(ha_bright_awning_out).state > 0;
+            bool in_on = !isnan(id(ha_bright_awning_in).state) && id(ha_bright_awning_in).state > 0;
+            return std::string((out_on && in_on) ? "\U000F0336" : "\U000F0335");
+          text_color: !lambda |-
+            bool out_on = !isnan(id(ha_bright_awning_out).state) && id(ha_bright_awning_out).state > 0;
+            bool in_on = !isnan(id(ha_bright_awning_in).state) && id(ha_bright_awning_in).state > 0;
+            return (out_on && in_on) ? lv_color_hex(0xFFD700) : lv_color_hex(0x808080);
+
+      - lvgl.label.update:
+          id: lbl_scene_bedtime
+          text: !lambda |-
+            bool capsule_on = !isnan(id(ha_bright_bed_capsule).state) && id(ha_bright_bed_capsule).state > 0;
+            bool others_off =
+              (!isnan(id(ha_bright_main_cans).state) && id(ha_bright_main_cans).state <= 0) &&
+              (!isnan(id(ha_bright_bed_cans).state) && id(ha_bright_bed_cans).state <= 0) &&
+              (!isnan(id(ha_bright_door).state) && id(ha_bright_door).state <= 0) &&
+              (!isnan(id(ha_bright_dog_crate).state) && id(ha_bright_dog_crate).state <= 0) &&
+              (!isnan(id(ha_bright_awning_out).state) && id(ha_bright_awning_out).state <= 0) &&
+              (!isnan(id(ha_bright_awning_in).state) && id(ha_bright_awning_in).state <= 0) &&
+              (!isnan(id(ha_bright_exterior).state) && id(ha_bright_exterior).state <= 0);
+            return std::string((capsule_on && others_off) ? "\U000F0336" : "\U000F0335");
+          text_color: !lambda |-
+            bool capsule_on = !isnan(id(ha_bright_bed_capsule).state) && id(ha_bright_bed_capsule).state > 0;
+            bool others_off =
+              (!isnan(id(ha_bright_main_cans).state) && id(ha_bright_main_cans).state <= 0) &&
+              (!isnan(id(ha_bright_bed_cans).state) && id(ha_bright_bed_cans).state <= 0) &&
+              (!isnan(id(ha_bright_door).state) && id(ha_bright_door).state <= 0) &&
+              (!isnan(id(ha_bright_dog_crate).state) && id(ha_bright_dog_crate).state <= 0) &&
+              (!isnan(id(ha_bright_awning_out).state) && id(ha_bright_awning_out).state <= 0) &&
+              (!isnan(id(ha_bright_awning_in).state) && id(ha_bright_awning_in).state <= 0) &&
+              (!isnan(id(ha_bright_exterior).state) && id(ha_bright_exterior).state <= 0);
+            return (capsule_on && others_off) ? lv_color_hex(0xFFD700) : lv_color_hex(0x808080);
+
   # Update lights tab icon and count badge
   - id: update_lights_tab
     then:
@@ -1561,6 +1611,7 @@ sensor:
             text: !lambda 'return std::string((!isnan(x) && x > 0) ? "\U000F0336" : "\U000F0335");'
             text_color: !lambda 'return (!isnan(x) && x > 0) ? lv_color_hex(0xFFD700) : lv_color_hex(0x808080);'
         - script.execute: update_lights_tab
+        - script.execute: update_home_scene_icons
 
   - platform: homeassistant
     id: ha_bright_bed_cans
@@ -1577,6 +1628,7 @@ sensor:
             text: !lambda 'return std::string((!isnan(x) && x > 0) ? "\U000F0336" : "\U000F0335");'
             text_color: !lambda 'return (!isnan(x) && x > 0) ? lv_color_hex(0xFFD700) : lv_color_hex(0x808080);'
         - script.execute: update_lights_tab
+        - script.execute: update_home_scene_icons
 
   - platform: homeassistant
     id: ha_bright_door
@@ -1593,6 +1645,7 @@ sensor:
             text: !lambda 'return std::string((!isnan(x) && x > 0) ? "\U000F0336" : "\U000F0335");'
             text_color: !lambda 'return (!isnan(x) && x > 0) ? lv_color_hex(0xFFD700) : lv_color_hex(0x808080);'
         - script.execute: update_lights_tab
+        - script.execute: update_home_scene_icons
 
   - platform: homeassistant
     id: ha_bright_dog_crate
@@ -1609,6 +1662,7 @@ sensor:
             text: !lambda 'return std::string((!isnan(x) && x > 0) ? "\U000F0336" : "\U000F0335");'
             text_color: !lambda 'return (!isnan(x) && x > 0) ? lv_color_hex(0xFFD700) : lv_color_hex(0x808080);'
         - script.execute: update_lights_tab
+        - script.execute: update_home_scene_icons
 
   - platform: homeassistant
     id: ha_bright_bed_capsule
@@ -1625,6 +1679,7 @@ sensor:
             text: !lambda 'return std::string((!isnan(x) && x > 0) ? "\U000F0336" : "\U000F0335");'
             text_color: !lambda 'return (!isnan(x) && x > 0) ? lv_color_hex(0xFFD700) : lv_color_hex(0x808080);'
         - script.execute: update_lights_tab
+        - script.execute: update_home_scene_icons
 
   - platform: homeassistant
     id: ha_bright_awning_out
@@ -1641,6 +1696,7 @@ sensor:
             text: !lambda 'return std::string((!isnan(x) && x > 0) ? "\U000F0336" : "\U000F0335");'
             text_color: !lambda 'return (!isnan(x) && x > 0) ? lv_color_hex(0xFFD700) : lv_color_hex(0x808080);'
         - script.execute: update_lights_tab
+        - script.execute: update_home_scene_icons
 
   - platform: homeassistant
     id: ha_bright_awning_in
@@ -1657,6 +1713,7 @@ sensor:
             text: !lambda 'return std::string((!isnan(x) && x > 0) ? "\U000F0336" : "\U000F0335");'
             text_color: !lambda 'return (!isnan(x) && x > 0) ? lv_color_hex(0xFFD700) : lv_color_hex(0x808080);'
         - script.execute: update_lights_tab
+        - script.execute: update_home_scene_icons
 
   - platform: homeassistant
     id: ha_bright_exterior
@@ -1673,6 +1730,7 @@ sensor:
             text: !lambda 'return std::string((!isnan(x) && x > 0) ? "\U000F0336" : "\U000F0335");'
             text_color: !lambda 'return (!isnan(x) && x > 0) ? lv_color_hex(0xFFD700) : lv_color_hex(0x808080);'
         - script.execute: update_lights_tab
+        - script.execute: update_home_scene_icons
 
   # ---- Weather Forecast Temperature Sensors ----
   # Day 1 (today)
@@ -2544,164 +2602,178 @@ lvgl:
                         x: 20
                         y: 20
 
-                    # ── Cans On/Off ──
+                    # ── Cans Scene ──
+                    - button:
+                        width: 70
+                        height: 70
+                        x: 20
+                        y: 80
+                        bg_color: 0x2D2D44
+                        radius: 35
+                        on_press:
+                          then:
+                            - if:
+                                condition:
+                                  lambda: |-
+                                    bool main_on = !isnan(id(ha_bright_main_cans).state) && id(ha_bright_main_cans).state > 0;
+                                    bool bed_on = !isnan(id(ha_bright_bed_cans).state) && id(ha_bright_bed_cans).state > 0;
+                                    return main_on && bed_on;
+                                then:
+                                  - homeassistant.service:
+                                      service: light.turn_off
+                                      data:
+                                        entity_id: light.main_cans
+                                  - homeassistant.service:
+                                      service: light.turn_off
+                                      data:
+                                        entity_id: light.bed_cans
+                                else:
+                                  - homeassistant.service:
+                                      service: light.turn_on
+                                      data:
+                                        entity_id: light.main_cans
+                                  - homeassistant.service:
+                                      service: light.turn_on
+                                      data:
+                                        entity_id: light.bed_cans
+                        widgets:
+                          - label:
+                              id: lbl_scene_cans
+                              text_font: mdi_small
+                              text_color: 0x808080
+                              text: "\U000F0335"
+                              align: CENTER
                     - label:
                         text: "Cans"
                         text_font: roboto_small
                         text_color: 0xB0B0B0
-                        x: 20
-                        y: 65
-                    - button:
-                        width: 120
-                        height: 55
-                        x: 15
+                        x: 105
                         y: 100
-                        bg_color: 0x2E7D32
-                        radius: 10
-                        on_press:
-                          then:
-                            - homeassistant.service:
-                                service: light.turn_on
-                                data:
-                                  entity_id: light.main_cans
-                            - homeassistant.service:
-                                service: light.turn_on
-                                data:
-                                  entity_id: light.bed_cans
-                        widgets:
-                          - label:
-                              text: "On"
-                              text_font: roboto_small
-                              text_color: 0xFFFFFF
-                              align: CENTER
-                    - button:
-                        width: 120
-                        height: 55
-                        x: 155
-                        y: 100
-                        bg_color: 0xC62828
-                        radius: 10
-                        on_press:
-                          then:
-                            - homeassistant.service:
-                                service: light.turn_off
-                                data:
-                                  entity_id: light.main_cans
-                            - homeassistant.service:
-                                service: light.turn_off
-                                data:
-                                  entity_id: light.bed_cans
-                        widgets:
-                          - label:
-                              text: "Off"
-                              text_font: roboto_small
-                              text_color: 0xFFFFFF
-                              align: CENTER
 
-                    # ── Awning Lights On/Off ──
-                    - label:
-                        text: "Awning Lights"
-                        text_font: roboto_small
-                        text_color: 0xB0B0B0
+                    # ── Awning Scene ──
+                    - button:
+                        width: 70
+                        height: 70
                         x: 20
                         y: 185
-                    - button:
-                        width: 120
-                        height: 55
-                        x: 15
-                        y: 220
-                        bg_color: 0x2E7D32
-                        radius: 10
+                        bg_color: 0x2D2D44
+                        radius: 35
                         on_press:
                           then:
-                            - homeassistant.service:
-                                service: light.turn_on
-                                data:
-                                  entity_id: light.awning_out
-                            - homeassistant.service:
-                                service: light.turn_on
-                                data:
-                                  entity_id: light.awning_in
+                            - if:
+                                condition:
+                                  lambda: |-
+                                    bool out_on = !isnan(id(ha_bright_awning_out).state) && id(ha_bright_awning_out).state > 0;
+                                    bool in_on = !isnan(id(ha_bright_awning_in).state) && id(ha_bright_awning_in).state > 0;
+                                    return out_on && in_on;
+                                then:
+                                  - homeassistant.service:
+                                      service: light.turn_off
+                                      data:
+                                        entity_id: light.awning_out
+                                  - homeassistant.service:
+                                      service: light.turn_off
+                                      data:
+                                        entity_id: light.awning_in
+                                else:
+                                  - homeassistant.service:
+                                      service: light.turn_on
+                                      data:
+                                        entity_id: light.awning_out
+                                  - homeassistant.service:
+                                      service: light.turn_on
+                                      data:
+                                        entity_id: light.awning_in
                         widgets:
                           - label:
-                              text: "On"
-                              text_font: roboto_small
-                              text_color: 0xFFFFFF
+                              id: lbl_scene_awning
+                              text_font: mdi_small
+                              text_color: 0x808080
+                              text: "\U000F0335"
                               align: CENTER
-                    - button:
-                        width: 120
-                        height: 55
-                        x: 155
-                        y: 220
-                        bg_color: 0xC62828
-                        radius: 10
-                        on_press:
-                          then:
-                            - homeassistant.service:
-                                service: light.turn_off
-                                data:
-                                  entity_id: light.awning_out
-                            - homeassistant.service:
-                                service: light.turn_off
-                                data:
-                                  entity_id: light.awning_in
-                        widgets:
-                          - label:
-                              text: "Off"
-                              text_font: roboto_small
-                              text_color: 0xFFFFFF
-                              align: CENTER
+                    - label:
+                        text: "Awning"
+                        text_font: roboto_small
+                        text_color: 0xB0B0B0
+                        x: 105
+                        y: 205
 
-                    # ── Bedtime ──
+                    # ── Bedtime Scene ──
                     - button:
-                        width: 260
-                        height: 60
-                        x: 15
-                        y: 320
-                        bg_color: 0x1565C0
-                        radius: 10
+                        width: 70
+                        height: 70
+                        x: 20
+                        y: 290
+                        bg_color: 0x2D2D44
+                        radius: 35
                         on_press:
                           then:
-                            - homeassistant.service:
-                                service: light.turn_on
-                                data:
-                                  entity_id: light.bed_capsule
-                                data_template:
-                                  brightness: "64"
-                            - homeassistant.service:
-                                service: light.turn_off
-                                data:
-                                  entity_id: light.main_cans
-                            - homeassistant.service:
-                                service: light.turn_off
-                                data:
-                                  entity_id: light.bed_cans
-                            - homeassistant.service:
-                                service: light.turn_off
-                                data:
-                                  entity_id: light.door
-                            - homeassistant.service:
-                                service: light.turn_off
-                                data:
-                                  entity_id: light.dog_crate
-                            - homeassistant.service:
-                                service: light.turn_off
-                                data:
-                                  entity_id: light.awning_out
-                            - homeassistant.service:
-                                service: light.turn_off
-                                data:
-                                  entity_id: light.awning_in
-                            - homeassistant.service:
-                                service: light.turn_off
-                                data:
-                                  entity_id: light.exterior_floods
+                            - if:
+                                condition:
+                                  lambda: |-
+                                    bool capsule_on = !isnan(id(ha_bright_bed_capsule).state) && id(ha_bright_bed_capsule).state > 0;
+                                    bool others_off =
+                                      (!isnan(id(ha_bright_main_cans).state) && id(ha_bright_main_cans).state <= 0) &&
+                                      (!isnan(id(ha_bright_bed_cans).state) && id(ha_bright_bed_cans).state <= 0) &&
+                                      (!isnan(id(ha_bright_door).state) && id(ha_bright_door).state <= 0) &&
+                                      (!isnan(id(ha_bright_dog_crate).state) && id(ha_bright_dog_crate).state <= 0) &&
+                                      (!isnan(id(ha_bright_awning_out).state) && id(ha_bright_awning_out).state <= 0) &&
+                                      (!isnan(id(ha_bright_awning_in).state) && id(ha_bright_awning_in).state <= 0) &&
+                                      (!isnan(id(ha_bright_exterior).state) && id(ha_bright_exterior).state <= 0);
+                                    return capsule_on && others_off;
+                                then:
+                                  - homeassistant.service:
+                                      service: light.turn_off
+                                      data:
+                                        entity_id: light.bed_capsule
+                                else:
+                                  - homeassistant.service:
+                                      service: light.turn_on
+                                      data:
+                                        entity_id: light.bed_capsule
+                                      data_template:
+                                        brightness: "64"
+                                  - homeassistant.service:
+                                      service: light.turn_off
+                                      data:
+                                        entity_id: light.main_cans
+                                  - homeassistant.service:
+                                      service: light.turn_off
+                                      data:
+                                        entity_id: light.bed_cans
+                                  - homeassistant.service:
+                                      service: light.turn_off
+                                      data:
+                                        entity_id: light.door
+                                  - homeassistant.service:
+                                      service: light.turn_off
+                                      data:
+                                        entity_id: light.dog_crate
+                                  - homeassistant.service:
+                                      service: light.turn_off
+                                      data:
+                                        entity_id: light.awning_out
+                                  - homeassistant.service:
+                                      service: light.turn_off
+                                      data:
+                                        entity_id: light.awning_in
+                                  - homeassistant.service:
+                                      service: light.turn_off
+                                      data:
+                                        entity_id: light.exterior_floods
                         widgets:
                           - label:
-                              text: "Bedtime"
-                              text_font: roboto_small
-                              text_color: 0xFFFFFF
+                              id: lbl_scene_bedtime
+                              text_font: mdi_small
+                              text_color: 0x808080
+                              text: "\U000F0335"
                               align: CENTER
+                    - label:
+                        text: "Bedtime"
+                        text_font: roboto_small
+                        text_color: 0xB0B0B0
+                        x: 105
+                        y: 310
 
               # ── Awning Controls Section (right) ──
               - obj:
