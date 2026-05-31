@@ -92,7 +92,7 @@ sensor:
 
 switch:
   - platform: gpio
-    name: "PA CTRL"
+    name: "Amplifier"
     pin: 48
     restore_mode: RESTORE_DEFAULT_ON
 
