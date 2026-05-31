@@ -1987,7 +1987,7 @@ font:
   # Small icons for sunrise/sunset, water, battery, lightbulb
   - file: "fonts/materialdesignicons-webfont.ttf"
     id: mdi_small
-    size: 40
+    size: 48
     bpp: 4
     glyphs: [
       "\U000F059C", # weather-sunset-up (sunrise)
