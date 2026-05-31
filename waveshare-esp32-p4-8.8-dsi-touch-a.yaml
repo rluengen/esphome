@@ -1242,6 +1242,67 @@ text_sensor:
                     disabled: false
                   opa: 100%
 
+  # Detect unavailable water control devices
+  - platform: homeassistant
+    id: ha_heater_state_raw
+    entity_id: switch.water_tank_display_hot_water_heater
+    internal: true
+    on_value:
+      then:
+        - if:
+            condition:
+              lambda: 'return x == "unavailable";'
+            then:
+              - lvgl.label.update:
+                  id: lbl_heater_status
+                  text: "N/A"
+                  text_color: 0x555555
+              - lvgl.label.update:
+                  id: lbl_heater_icon
+                  text: "\U000F0F91"
+                  text_color: 0x555555
+              - lvgl.widget.update:
+                  id: btn_hot_water
+                  state:
+                    disabled: true
+                  opa: 40%
+            else:
+              - lvgl.widget.update:
+                  id: btn_hot_water
+                  state:
+                    disabled: false
+                  opa: 100%
+
+  - platform: homeassistant
+    id: ha_pump_state_raw
+    entity_id: switch.water_tank_display_water_pump
+    internal: true
+    on_value:
+      then:
+        - if:
+            condition:
+              lambda: 'return x == "unavailable";'
+            then:
+              - lvgl.label.update:
+                  id: lbl_pump_status
+                  text: "N/A"
+                  text_color: 0x555555
+              - lvgl.label.update:
+                  id: lbl_pump_icon
+                  text: "\U000F0F93"
+                  text_color: 0x555555
+              - lvgl.widget.update:
+                  id: btn_water_pump
+                  state:
+                    disabled: true
+                  opa: 40%
+            else:
+              - lvgl.widget.update:
+                  id: btn_water_pump
+                  state:
+                    disabled: false
+                  opa: 100%
+
 sensor:
   - platform: homeassistant
     id: water_level
@@ -1809,68 +1870,6 @@ binary_sensor:
             text: !lambda 'return std::string(x ? "\U000F058E" : "\U000F0F93");'
             text_color: !lambda 'return x ? lv_color_hex(0x00BFFF) : lv_color_hex(0x808080);'
         - script.execute: update_water_tab
-
-  # Detect unavailable water control devices via text_sensor
-text_sensor:
-  - platform: homeassistant
-    id: ha_heater_state_raw
-    entity_id: switch.water_tank_display_hot_water_heater
-    internal: true
-    on_value:
-      then:
-        - if:
-            condition:
-              lambda: 'return x == "unavailable";'
-            then:
-              - lvgl.label.update:
-                  id: lbl_heater_status
-                  text: "N/A"
-                  text_color: 0x555555
-              - lvgl.label.update:
-                  id: lbl_heater_icon
-                  text: "\U000F0F91"
-                  text_color: 0x555555
-              - lvgl.widget.update:
-                  id: btn_hot_water
-                  state:
-                    disabled: true
-                  opa: 40%
-            else:
-              - lvgl.widget.update:
-                  id: btn_hot_water
-                  state:
-                    disabled: false
-                  opa: 100%
-
-  - platform: homeassistant
-    id: ha_pump_state_raw
-    entity_id: switch.water_tank_display_water_pump
-    internal: true
-    on_value:
-      then:
-        - if:
-            condition:
-              lambda: 'return x == "unavailable";'
-            then:
-              - lvgl.label.update:
-                  id: lbl_pump_status
-                  text: "N/A"
-                  text_color: 0x555555
-              - lvgl.label.update:
-                  id: lbl_pump_icon
-                  text: "\U000F0F93"
-                  text_color: 0x555555
-              - lvgl.widget.update:
-                  id: btn_water_pump
-                  state:
-                    disabled: true
-                  opa: 40%
-            else:
-              - lvgl.widget.update:
-                  id: btn_water_pump
-                  state:
-                    disabled: false
-                  opa: 100%
 
 # ---- Weather Forecast ----
 # Forecast sensors are defined above (text_sensor + sensor sections).
