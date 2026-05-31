@@ -1290,6 +1290,120 @@ text_sensor:
                     disabled: false
                   opa: 100%
 
+  # Light brightness attributes are absent when lights are off, so ingest them as
+  # text and normalize missing values to 0 before publishing to numeric sensors.
+  - platform: homeassistant
+    id: ha_bright_main_cans_raw
+    entity_id: light.quinled_van_lightcontroller_main_can_lights
+    attribute: brightness
+    internal: true
+    on_value:
+      then:
+        - lambda: |-
+            float brightness = 0.0f;
+            if (!x.empty() && x != "None" && x != "unknown" && x != "unavailable") {
+              brightness = strtof(x.c_str(), nullptr);
+            }
+            id(ha_bright_main_cans).publish_state(brightness);
+
+  - platform: homeassistant
+    id: ha_bright_bed_cans_raw
+    entity_id: light.quinled_van_lightcontroller_bed_can_lights
+    attribute: brightness
+    internal: true
+    on_value:
+      then:
+        - lambda: |-
+            float brightness = 0.0f;
+            if (!x.empty() && x != "None" && x != "unknown" && x != "unavailable") {
+              brightness = strtof(x.c_str(), nullptr);
+            }
+            id(ha_bright_bed_cans).publish_state(brightness);
+
+  - platform: homeassistant
+    id: ha_bright_door_raw
+    entity_id: light.quinled_van_lightcontroller_door_light
+    attribute: brightness
+    internal: true
+    on_value:
+      then:
+        - lambda: |-
+            float brightness = 0.0f;
+            if (!x.empty() && x != "None" && x != "unknown" && x != "unavailable") {
+              brightness = strtof(x.c_str(), nullptr);
+            }
+            id(ha_bright_door).publish_state(brightness);
+
+  - platform: homeassistant
+    id: ha_bright_dog_crate_raw
+    entity_id: light.quinled_van_lightcontroller_dog_crate_lights
+    attribute: brightness
+    internal: true
+    on_value:
+      then:
+        - lambda: |-
+            float brightness = 0.0f;
+            if (!x.empty() && x != "None" && x != "unknown" && x != "unavailable") {
+              brightness = strtof(x.c_str(), nullptr);
+            }
+            id(ha_bright_dog_crate).publish_state(brightness);
+
+  - platform: homeassistant
+    id: ha_bright_bed_capsule_raw
+    entity_id: light.quinled_van_lightcontroller_bed_capsule_lights
+    attribute: brightness
+    internal: true
+    on_value:
+      then:
+        - lambda: |-
+            float brightness = 0.0f;
+            if (!x.empty() && x != "None" && x != "unknown" && x != "unavailable") {
+              brightness = strtof(x.c_str(), nullptr);
+            }
+            id(ha_bright_bed_capsule).publish_state(brightness);
+
+  - platform: homeassistant
+    id: ha_bright_awning_out_raw
+    entity_id: light.light_controller_awning_outside_light_strip
+    attribute: brightness
+    internal: true
+    on_value:
+      then:
+        - lambda: |-
+            float brightness = 0.0f;
+            if (!x.empty() && x != "None" && x != "unknown" && x != "unavailable") {
+              brightness = strtof(x.c_str(), nullptr);
+            }
+            id(ha_bright_awning_out).publish_state(brightness);
+
+  - platform: homeassistant
+    id: ha_bright_awning_in_raw
+    entity_id: light.light_controller_awning_inside_light_strip
+    attribute: brightness
+    internal: true
+    on_value:
+      then:
+        - lambda: |-
+            float brightness = 0.0f;
+            if (!x.empty() && x != "None" && x != "unknown" && x != "unavailable") {
+              brightness = strtof(x.c_str(), nullptr);
+            }
+            id(ha_bright_awning_in).publish_state(brightness);
+
+  - platform: homeassistant
+    id: ha_bright_exterior_raw
+    entity_id: light.quinled_van_lightcontroller_exterior_lights
+    attribute: brightness
+    internal: true
+    on_value:
+      then:
+        - lambda: |-
+            float brightness = 0.0f;
+            if (!x.empty() && x != "None" && x != "unknown" && x != "unavailable") {
+              brightness = strtof(x.c_str(), nullptr);
+            }
+            id(ha_bright_exterior).publish_state(brightness);
+
   # Detect unavailable water control devices
   - platform: homeassistant
     id: ha_heater_state_raw
@@ -1599,10 +1713,8 @@ sensor:
             text_color: !lambda 'return isnan(x) ? lv_color_hex(0x555555) : lv_color_hex(0xFFFFFF);'
 
   # Light brightness sensors (HA brightness is 0-255)
-  - platform: homeassistant
+  - platform: template
     id: ha_bright_main_cans
-    entity_id: light.quinled_van_lightcontroller_main_can_lights
-    attribute: brightness
     internal: true
     on_value:
       then:
@@ -1616,10 +1728,8 @@ sensor:
         - script.execute: update_lights_tab
         - script.execute: update_home_scene_icons
 
-  - platform: homeassistant
+  - platform: template
     id: ha_bright_bed_cans
-    entity_id: light.quinled_van_lightcontroller_bed_can_lights
-    attribute: brightness
     internal: true
     on_value:
       then:
@@ -1633,10 +1743,8 @@ sensor:
         - script.execute: update_lights_tab
         - script.execute: update_home_scene_icons
 
-  - platform: homeassistant
+  - platform: template
     id: ha_bright_door
-    entity_id: light.quinled_van_lightcontroller_door_light
-    attribute: brightness
     internal: true
     on_value:
       then:
@@ -1650,10 +1758,8 @@ sensor:
         - script.execute: update_lights_tab
         - script.execute: update_home_scene_icons
 
-  - platform: homeassistant
+  - platform: template
     id: ha_bright_dog_crate
-    entity_id: light.quinled_van_lightcontroller_dog_crate_lights
-    attribute: brightness
     internal: true
     on_value:
       then:
@@ -1667,10 +1773,8 @@ sensor:
         - script.execute: update_lights_tab
         - script.execute: update_home_scene_icons
 
-  - platform: homeassistant
+  - platform: template
     id: ha_bright_bed_capsule
-    entity_id: light.quinled_van_lightcontroller_bed_capsule_lights
-    attribute: brightness
     internal: true
     on_value:
       then:
@@ -1684,10 +1788,8 @@ sensor:
         - script.execute: update_lights_tab
         - script.execute: update_home_scene_icons
 
-  - platform: homeassistant
+  - platform: template
     id: ha_bright_awning_out
-    entity_id: light.light_controller_awning_outside_light_strip
-    attribute: brightness
     internal: true
     on_value:
       then:
@@ -1701,10 +1803,8 @@ sensor:
         - script.execute: update_lights_tab
         - script.execute: update_home_scene_icons
 
-  - platform: homeassistant
+  - platform: template
     id: ha_bright_awning_in
-    entity_id: light.light_controller_awning_inside_light_strip
-    attribute: brightness
     internal: true
     on_value:
       then:
@@ -1718,10 +1818,8 @@ sensor:
         - script.execute: update_lights_tab
         - script.execute: update_home_scene_icons
 
-  - platform: homeassistant
+  - platform: template
     id: ha_bright_exterior
-    entity_id: light.quinled_van_lightcontroller_exterior_lights
-    attribute: brightness
     internal: true
     on_value:
       then:
