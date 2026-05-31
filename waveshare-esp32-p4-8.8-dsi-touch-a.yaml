@@ -27,6 +27,7 @@ packages:
       - path: packages/common.yaml
         vars:
           api_encryption_key: !secret encryption_key
+          ota_password: !secret ota_password
       - path: packages/network/wifi.yaml
         vars:
           wifi_ssid: !secret wifi_ssid
@@ -36,6 +37,13 @@ packages:
         vars:
           touchscreen_id: dsi_touchscreen
           backlight_id: display_backlight
+
+esp32:
+  cpu_frequency: 360MHz
+
+waveshare_dsi:
+  id: dsi_display
+  rotation: 0
 
 # Touch debug logging
 touchscreen:
@@ -2069,8 +2077,8 @@ interval:
           static const int NUM_PTS = 60;
           static const int CHART_W = 904;   // 920 - 16 padding
           static const int CHART_H = 144;   // 160 - 16 padding
-          static lv_point_t solar_pts[NUM_PTS];
-          static lv_point_t batt_pts[NUM_PTS];
+          static lv_point_precise_t solar_pts[NUM_PTS];
+          static lv_point_precise_t batt_pts[NUM_PTS];
           static bool initialized = false;
 
           if (!initialized) {
@@ -2109,6 +2117,7 @@ interval:
 lvgl:
   displays:
     - dsi_display
+  rotation: 270
   touchscreens:
     - dsi_touchscreen
   color_depth: 16

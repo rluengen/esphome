@@ -1,8 +1,8 @@
 # Common Device Configuration
 substitutions:
   log_level: INFO
-  api_encryption_key:
-  ota_password:
+  api_encryption_key: ""
+  ota_password: ""
 
 # Enable logging
 logger:
