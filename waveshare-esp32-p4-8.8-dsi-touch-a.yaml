@@ -236,9 +236,10 @@ script:
             lv_label_set_text(id(lbl_tab_water_icon), "\U000F1507");  // water-minus-outline
             return;
           }
-          // Check pump and heater state
-          bool pump_on = id(ha_water_pump_state).state;
-          bool heater_on = id(ha_hot_water_heater_state).state;
+          // Check pump and heater state from raw HA text values to avoid
+          // binary conversion warnings when HA reports "unavailable".
+          bool pump_on = id(ha_pump_state_raw).state == "on";
+          bool heater_on = id(ha_heater_state_raw).state == "on";
           if (pump_on && heater_on) {
             lv_label_set_text(id(lbl_tab_water_icon), "\U000F1A85");  // water-thermometer
           } else if (pump_on) {
@@ -364,12 +365,12 @@ script:
             - homeassistant.service:
                 service: light.turn_off
                 data:
-                  entity_id: light.quinled_van_lightcontroller_cwww_led_dog_crate_lights
+                  entity_id: light.quinled_van_lightcontroller_dog_crate_lights
           else:
             - homeassistant.service:
                 service: light.turn_on
                 data:
-                  entity_id: light.quinled_van_lightcontroller_cwww_led_dog_crate_lights
+                  entity_id: light.quinled_van_lightcontroller_dog_crate_lights
                   brightness: !lambda 'return id(pending_bright_dog_crate);'
 
   - id: debounce_bed_capsule
@@ -1181,7 +1182,7 @@ text_sensor:
 
   - platform: homeassistant
     id: ha_state_dog_crate
-    entity_id: light.quinled_van_lightcontroller_cwww_led_dog_crate_lights
+    entity_id: light.quinled_van_lightcontroller_dog_crate_lights
     internal: true
     on_value:
       then:
@@ -1314,11 +1315,20 @@ text_sensor:
                     disabled: true
                   opa: 40%
             else:
+              - lvgl.label.update:
+                  id: lbl_heater_status
+                  text: !lambda 'return std::string(x == "on" ? "ON" : "OFF");'
+                  text_color: !lambda 'return x == "on" ? lv_color_hex(0xFF6600) : lv_color_hex(0x888888);'
+              - lvgl.label.update:
+                  id: lbl_heater_icon
+                  text: !lambda 'return std::string(x == "on" ? "\U000F0F92" : "\U000F0F91");'
+                  text_color: !lambda 'return x == "on" ? lv_color_hex(0xFF6600) : lv_color_hex(0x808080);'
               - lvgl.widget.update:
                   id: btn_hot_water
                   state:
                     disabled: false
                   opa: 100%
+        - script.execute: update_water_tab
 
   - platform: homeassistant
     id: ha_pump_state_raw
@@ -1344,11 +1354,20 @@ text_sensor:
                     disabled: true
                   opa: 40%
             else:
+              - lvgl.label.update:
+                  id: lbl_pump_status
+                  text: !lambda 'return std::string(x == "on" ? "ON" : "OFF");'
+                  text_color: !lambda 'return x == "on" ? lv_color_hex(0x00BFFF) : lv_color_hex(0x888888);'
+              - lvgl.label.update:
+                  id: lbl_pump_icon
+                  text: !lambda 'return std::string(x == "on" ? "\U000F058E" : "\U000F0F93");'
+                  text_color: !lambda 'return x == "on" ? lv_color_hex(0x00BFFF) : lv_color_hex(0x808080);'
               - lvgl.widget.update:
                   id: btn_water_pump
                   state:
                     disabled: false
                   opa: 100%
+        - script.execute: update_water_tab
 
 sensor:
   - platform: homeassistant
@@ -1633,7 +1652,7 @@ sensor:
 
   - platform: homeassistant
     id: ha_bright_dog_crate
-    entity_id: light.quinled_van_lightcontroller_cwww_led_dog_crate_lights
+    entity_id: light.quinled_van_lightcontroller_dog_crate_lights
     attribute: brightness
     internal: true
     on_value:
@@ -1904,38 +1923,6 @@ binary_sensor:
             text: !lambda |-
               // Show alert icon when disconnected from Wi-Fi/HA API.
               return std::string(x ? "\U000F02DC" : "\U000F15D0");
-
-  - platform: homeassistant
-    id: ha_hot_water_heater_state
-    entity_id: switch.water_tank_display_hot_water_heater
-    internal: true
-    on_state:
-      then:
-        - lvgl.label.update:
-            id: lbl_heater_status
-            text: !lambda 'return std::string(x ? "ON" : "OFF");'
-            text_color: !lambda 'return x ? lv_color_hex(0xFF6600) : lv_color_hex(0x888888);'
-        - lvgl.label.update:
-            id: lbl_heater_icon
-            text: !lambda 'return std::string(x ? "\U000F0F92" : "\U000F0F91");'
-            text_color: !lambda 'return x ? lv_color_hex(0xFF6600) : lv_color_hex(0x808080);'
-        - script.execute: update_water_tab
-
-  - platform: homeassistant
-    id: ha_water_pump_state
-    entity_id: switch.water_tank_display_water_pump
-    internal: true
-    on_state:
-      then:
-        - lvgl.label.update:
-            id: lbl_pump_status
-            text: !lambda 'return std::string(x ? "ON" : "OFF");'
-            text_color: !lambda 'return x ? lv_color_hex(0x00BFFF) : lv_color_hex(0x888888);'
-        - lvgl.label.update:
-            id: lbl_pump_icon
-            text: !lambda 'return std::string(x ? "\U000F058E" : "\U000F0F93");'
-            text_color: !lambda 'return x ? lv_color_hex(0x00BFFF) : lv_color_hex(0x808080);'
-        - script.execute: update_water_tab
 
 # ---- Weather Forecast ----
 # Forecast sensors are defined above (text_sensor + sensor sections).
@@ -2731,7 +2718,7 @@ lvgl:
                                   - homeassistant.service:
                                       service: light.turn_off
                                       data:
-                                        entity_id: light.quinled_van_lightcontroller_cwww_led_dog_crate_lights
+                                        entity_id: light.quinled_van_lightcontroller_dog_crate_lights
                                   - homeassistant.service:
                                       service: light.turn_off
                                       data:
@@ -3417,7 +3404,7 @@ lvgl:
                             - homeassistant.service:
                                 service: light.toggle
                                 data:
-                                  entity_id: light.quinled_van_lightcontroller_cwww_led_dog_crate_lights
+                                  entity_id: light.quinled_van_lightcontroller_dog_crate_lights
                         widgets:
                           - label:
                               id: lbl_icon_dog_crate
