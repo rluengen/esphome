@@ -38,8 +38,9 @@ packages:
           touchscreen_id: dsi_touchscreen
           backlight_id: display_backlight
 
-esp32:
-  cpu_frequency: 360MHz
+wifi:
+  min_auth_mode: WPA2
+  output_power: 20dB
 
 waveshare_dsi:
   id: dsi_display
@@ -48,6 +49,10 @@ waveshare_dsi:
 # Touch debug logging
 touchscreen:
   - id: !extend dsi_touchscreen
+    transform:
+      swap_xy: false
+      mirror_x: false
+      mirror_y: false
     on_touch:
       - lambda: |-
           for (auto &tp : touches) {
