@@ -11,7 +11,7 @@ substitutions:
   device_name: light-dial-controller
   friendly_name: Light Dial Controller
   project_name: light-dial-controller
-  project_version: "1.0.22"
+  project_version: "1.0.23"
   log_level: INFO
 
   # Theme colors
@@ -418,8 +418,14 @@ lvgl:
                     id(dial_selected_light).publish_state(std::string(opts[idx]));
                     ESP_LOGI("tileview", "Selected idx=%d entity=%s", idx, opts[idx]);
                     
-                    // Mark swipe so tap handler can ignore it
-                    id(just_swiped) = true;
+                    // Only mark as swipe when the tile change was a user gesture.
+                    // Programmatic selects (restore, remote HA select) set programmatic_select
+                    // first so we don't block the next tap.
+                    if (id(programmatic_select)) {
+                      id(programmatic_select) = false;
+                    } else {
+                      id(just_swiped) = true;
+                    }
                 - script.execute: clear_swipe_flag
                 - script.execute: update_light_display
 
@@ -452,12 +458,13 @@ select:
               break;
             }
           }
+      - lambda: 'id(programmatic_select) = true;'
       - lvgl.tileview.select:
           id: light_tiles
           row: 0
           column: !lambda 'return id(selected_light_index);'
           animated: true
-      - lambda: 'id(just_swiped) = false;'
+      - lambda: 'id(just_swiped) = false; id(programmatic_select) = false;'
       - script.execute: update_light_display
 
     on_value:
@@ -489,6 +496,10 @@ globals:
     type: bool
     initial_value: "false"
 
+  - id: programmatic_select
+    type: bool
+    initial_value: "false"
+
   - id: user_adjusting
     type: bool
     initial_value: "false"
@@ -506,12 +517,13 @@ script:
 
   - id: restore_roller_position
     then:
+      - lambda: 'id(programmatic_select) = true;'
       - lvgl.tileview.select:
           id: light_tiles
           row: 0
           column: !lambda 'return id(selected_light_index);'
           animated: false
-      - lambda: 'id(just_swiped) = false;'
+      - lambda: 'id(just_swiped) = false; id(programmatic_select) = false;'
       - script.execute: update_light_display
 
   - id: update_light_display

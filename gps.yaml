@@ -116,10 +116,23 @@ gps:
   satellites:
     id: gps_satellites
     on_value:
-      - lambda: 'id(satellite_count) = (int)x;'
+      - lambda: |-
+          id(satellite_count) = (int)x;
+          ESP_LOGI("gps_diag", "Satellites: %d | HDOP: %.2f | Speed: %.2f km/h | Fix: %s",
+            (int)x,
+            id(gps_hdop).state,
+            id(gps_speed).state,
+            (int)x >= 4 ? "YES" : "NO");
   speed:
     id: gps_speed
     name: "Speed"
+  hdop:
+    id: gps_hdop
+    on_value:
+      - lambda: |-
+          if (x > 5.0f) {
+            ESP_LOGW("gps_diag", "Poor HDOP: %.2f (>5 means bad geometry — check sky view)", x);
+          }
   longitude:
     id: gps_longitude
     internal: true
@@ -215,6 +228,27 @@ text_sensor:
       if (sats >= 4) return {"Fair"};
       return {"Poor/No Fix"};
 
+interval:
+  - interval: 30s
+    then:
+      - lambda: |-
+          int sats = id(satellite_count);
+          float hdop = id(gps_hdop).state;
+          float speed = id(gps_speed).state;
+          float lat = id(gps_latitude).state;
+          float lon = id(raw_longitude);
+          ESP_LOGI("gps_status", "--- GPS heartbeat ---");
+          ESP_LOGI("gps_status", "  Satellites : %d  (need >=4 for fix)", sats);
+          ESP_LOGI("gps_status", "  HDOP       : %.2f  (need <=5.0 for usable fix)", hdop);
+          ESP_LOGI("gps_status", "  Speed      : %.2f km/h", speed);
+          ESP_LOGI("gps_status", "  Lat/Lon    : %.6f, %.6f%s", lat, lon,
+            (lat == 0.0f && lon == 0.0f) ? "  <-- still 0,0: no NMEA position data received" : "");
+          if (sats == 0) {
+            ESP_LOGW("gps_status", "  !! 0 satellites: GPS module may not be responding (check baud rate / wiring)");
+          } else if (sats < 4) {
+            ESP_LOGW("gps_status", "  !! Partial view: only %d sats, move to open sky", sats);
+          }
+
 esphome:
   name: ${device_name}
   friendly_name: ${friendly_name}
@@ -226,18 +260,23 @@ esphome:
     then:
       - delay: 500ms  # Let GPS stabilize
       - lambda: |-
+          ESP_LOGI("gps_boot", "=== GPS boot sequence start ===");
+          ESP_LOGI("gps_boot", "Step 1: Sending $PCAS01,7 baud-rate change command at 9600");
           // GPS module defaults to 9600 baud (matching our UART).
           // Send baud rate change command while both sides agree on 9600.
           id(gps_uart).write_str("\x24PCAS01,7*1B\r\n");
       - delay: 200ms  # Wait for GPS to switch baud rate
       - lambda: |-
+          ESP_LOGI("gps_boot", "Step 2: Switching ESP UART to 115200");
           // Switch the ESP UART to match the GPS module's new baud rate
           id(gps_uart).set_baud_rate(115200);
           id(gps_uart).load_settings();
+          ESP_LOGI("gps_boot", "Step 2 done: UART now at 115200 — if GPS is silent after this, baud change failed");
       - delay: 100ms
       - lambda: |-
           // Set the speed according to selected rate
           std::string rate = id(gps_rate_select).current_option();
+          ESP_LOGI("gps_boot", "Step 3: Applying update rate '%s'", rate.c_str());
           if (rate == "1Hz (Low Power)") {
             id(gps_uart).write_str("\x24PCAS04,3*1A\r\n");  // GPS+GLONASS+Galileo
             id(gps_uart).write_str("\x24PCAS02,1000*2E\r\n");
@@ -248,11 +287,17 @@ esphome:
             id(gps_uart).write_str("\x24PCAS04,1*18\r\n");  // GPS only (faster)
             id(gps_uart).write_str("\x24PCAS02,100*1E\r\n");
           }
-          ESP_LOGI("gps", "Applied GPS rate: %s", rate.c_str());
+          ESP_LOGI("gps_boot", "Step 3 done: rate applied");
       - lambda: |-
+          ESP_LOGI("gps_boot", "Step 4: Enabling SBAS ($PCAS06,1)");
           id(gps_uart).write_str("\x24PCAS06,1*1A\r\n");  // Enable SBAS
+          ESP_LOGI("gps_boot", "=== GPS boot sequence complete — watching for NMEA data ===");
 
 logger:
   level: ${log_level}
   hardware_uart: USB_CDC
+  logs:
+    gps: DEBUG        # logs every parsed NMEA sentence and fix state
+    uart: DEBUG       # logs raw UART bytes — confirms GPS is actually talking
+    sensor: INFO
 
