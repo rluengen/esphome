@@ -1,0 +1,36 @@
+- id: geolocator_set_home_from_gps
+  alias: GeoLocator - Set Home Location From GPS Sensors
+  description: Update zone.home latitude/longitude from ESPHome GPS sensors
+  mode: restart
+  trigger:
+    - platform: state
+      entity_id:
+        - sensor.global_positioning_system_latitude
+        - sensor.global_positioning_system_longitude
+  condition:
+    - condition: template
+      value_template: >
+        {{ states('sensor.global_positioning_system_latitude') not in ['unknown', 'unavailable', 'none', ''] }}
+    - condition: template
+      value_template: >
+        {{ states('sensor.global_positioning_system_longitude') not in ['unknown', 'unavailable', 'none', ''] }}
+  action:
+    - service: homeassistant.set_location
+      data:
+        latitude: "{{ states('sensor.global_positioning_system_latitude') | float }}"
+        longitude: "{{ states('sensor.global_positioning_system_longitude') | float }}"
+
+- id: geolocator_update_when_home_changes
+  alias: GeoLocator - Update When Home Location Changes
+  description: Run GeoLocator refresh whenever zone.home updates
+  mode: single
+  trigger:
+    - platform: state
+      entity_id: zone.home
+  condition:
+    - condition: template
+      value_template: >
+        {{ state_attr('zone.home', 'latitude') is not none and state_attr('zone.home', 'longitude') is not none }}
+  action:
+    - service: geolocator.update_location
+      data: {}
