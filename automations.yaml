@@ -22,7 +22,7 @@
 
 - id: geolocator_update_when_home_changes
   alias: GeoLocator - Update When Home Location Changes
-  description: Run GeoLocator refresh whenever zone.home updates
+  description: Run GeoLocator and Public Lands refresh whenever zone.home updates
   mode: single
   trigger:
     - platform: state
@@ -34,3 +34,6 @@
   action:
     - service: geolocator.update_location
       data: {}
+    - service: button.press
+      target:
+        entity_id: button.public_lands_refresh
