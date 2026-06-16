@@ -207,10 +207,10 @@ canbus:
                 ESP_LOGW("CAN", "0x3A5 Sliding Door: frame too short (%d bytes, need 2)", x.size());
                 return;
               }
-              // SlidingDoorState: start_bit=12, length=1
+              // SlidingDoorState: start_bit=12, length=1. VAL: 1=Closed, 0=Open
               bool closed = (x[1] >> 4) & 0x01;
               ESP_LOGI("CAN", "0x3A5 Sliding Door (CAN): %s", closed ? "CLOSED" : "OPEN");
-              id(can_sliding_door_closed).publish_state(closed);
+              id(sliding_door_open).publish_state(!closed);
 
       # ---- Decoded: Driver Door State (CAN ID 0x397 / 919) ----
       - can_id: 0x397
@@ -221,7 +221,7 @@ canbus:
               uint8_t state = (x[1] >> 4) & 0x03;
               bool open = (state == 2);
               ESP_LOGI("CAN", "0x397 Driver Door (CAN): %s (raw=%d)", open ? "OPEN" : "CLOSED", state);
-              id(can_driver_door_open).publish_state(open);
+              id(driver_door_open).publish_state(open);
 
       # ---- Decoded: Passenger Door State (CAN ID 0x39B / 923) ----
       - can_id: 0x39B
@@ -232,7 +232,7 @@ canbus:
               uint8_t state = (x[1] >> 4) & 0x03;
               bool open = (state == 2);
               ESP_LOGI("CAN", "0x39B Passenger Door (CAN): %s (raw=%d)", open ? "OPEN" : "CLOSED", state);
-              id(can_passenger_door_open).publish_state(open);
+              id(passenger_door_open).publish_state(open);
 
       # ---- Decoded: Rear Door State (CAN ID 0x351 / 849) ----
       - can_id: 0x351
@@ -243,7 +243,7 @@ canbus:
               uint8_t state = x[0] & 0x03;
               bool open = (state == 2);
               ESP_LOGI("CAN", "0x351 Rear Door (CAN): %s (raw=%d)", open ? "OPEN" : "CLOSED", state);
-              id(can_rear_door_open).publish_state(open);
+              id(rear_door_open).publish_state(open);
 
       # ---- Decoded: Driver Window (CAN ID 0x31A / 794) ----
       - can_id: 0x31A
@@ -253,7 +253,7 @@ canbus:
               // DriverWindowClosed: start_bit=13, length=1
               bool closed = (x[1] >> 5) & 0x01;
               ESP_LOGI("CAN", "0x31A Driver Window (CAN): %s", closed ? "CLOSED" : "OPEN");
-              id(can_driver_window_closed).publish_state(closed);
+              id(can_driver_window).publish_state(closed);
 
       # ---- Decoded: Passenger Window (CAN ID 0x320 / 800) ----
       - can_id: 0x320
@@ -263,7 +263,7 @@ canbus:
               // PassengerWindowClosed: start_bit=13, length=1
               bool closed = (x[1] >> 5) & 0x01;
               ESP_LOGI("CAN", "0x320 Passenger Window (CAN): %s", closed ? "CLOSED" : "OPEN");
-              id(can_passenger_window_closed).publish_state(closed);
+              id(can_passenger_window).publish_state(closed);
 
       # ---- Decoded: Odometer (CAN ID 0x375 / 885) ----
       - can_id: 0x375
@@ -372,12 +372,12 @@ text_sensor:
   - platform: template
     id: can_rear_wheel_dir_right
     name: "Rear Wheel Direction (Right)"
-    icon: "mdi:arrow-left-right"
+    icon: "mdi:arrow-up-down"
 
   - platform: template
     id: can_rear_wheel_dir_left
     name: "Rear Wheel Direction (Left)"
-    icon: "mdi:arrow-left-right"
+    icon: "mdi:arrow-up-down"
 
   - platform: template
     id: can_central_locking_event
@@ -385,46 +385,46 @@ text_sensor:
     icon: "mdi:car-key"
 
 binary_sensor:
+  # --- Unified door sensors (updated by both CAN and digital inputs) ---
   - platform: template
-    id: can_sliding_door_closed
-    name: "Sliding Door Closed (CAN)"
+    id: driver_door_open
+    name: "Driver Door Open"
     icon: "mdi:car-door"
     device_class: door
+    on_state:
+      - lambda: |-
+          bool any = id(driver_door_open).state || id(passenger_door_open).state || id(sliding_door_open).state || id(rear_door_open).state;
+          id(any_door_open).publish_state(any);
 
   - platform: template
-    id: can_driver_door_open
-    name: "Driver Door Open (CAN)"
+    id: passenger_door_open
+    name: "Passenger Door Open"
     icon: "mdi:car-door"
     device_class: door
+    on_state:
+      - lambda: |-
+          bool any = id(driver_door_open).state || id(passenger_door_open).state || id(sliding_door_open).state || id(rear_door_open).state;
+          id(any_door_open).publish_state(any);
 
   - platform: template
-    id: can_passenger_door_open
-    name: "Passenger Door Open (CAN)"
+    id: sliding_door_open
+    name: "Sliding Door Open"
     icon: "mdi:car-door"
     device_class: door
+    on_state:
+      - lambda: |-
+          bool any = id(driver_door_open).state || id(passenger_door_open).state || id(sliding_door_open).state || id(rear_door_open).state;
+          id(any_door_open).publish_state(any);
 
   - platform: template
-    id: can_rear_door_open
-    name: "Rear Door Open (CAN)"
+    id: rear_door_open
+    name: "Rear Door Open"
     icon: "mdi:car-door"
     device_class: door
-
-  - platform: template
-    id: can_driver_window_closed
-    name: "Driver Window Closed (CAN)"
-    icon: "mdi:car-door"
-    device_class: window
-
-  - platform: template
-    id: can_passenger_window_closed
-    name: "Passenger Window Closed (CAN)"
-    icon: "mdi:car-door"
-    device_class: window
-
-  - platform: template
-    id: can_handbrake_on
-    name: "Handbrake Engaged (CAN)"
-    icon: "mdi:car-brake-parking"
+    on_state:
+      - lambda: |-
+          bool any = id(driver_door_open).state || id(passenger_door_open).state || id(sliding_door_open).state || id(rear_door_open).state;
+          id(any_door_open).publish_state(any);
 
   - platform: template
     id: any_door_open
@@ -432,53 +432,67 @@ binary_sensor:
     icon: "mdi:car-door"
     device_class: door
 
+  # --- CAN-only sensors (windows, handbrake) ---
+  - platform: template
+    id: can_driver_window
+    name: "Driver Window"
+    icon: "mdi:window-closed-variant"
+    device_class: window
+
+  - platform: template
+    id: can_passenger_window
+    name: "Passenger Window"
+    icon: "mdi:window-closed-variant"
+    device_class: window
+
+  - platform: template
+    id: can_handbrake_on
+    name: "Handbrake Engaged"
+    icon: "mdi:car-brake-parking"
+
   # Connector 2, Pin 7, High
   - id: !extend di1
-    name: "Passenger Door Open"
+    name: "Passenger Door (Input)"
+    internal: true
     icon: "mdi:car-door"
     device_class: door
     on_state:
       - lambda: |-
-          ESP_LOGI("DOOR", "Passenger door: %s", x ? "OPEN" : "CLOSED");
-          bool any = id(di1).state || id(di2).state || id(di3).state || id(di4).state;
-          ESP_LOGI("DOOR", "Any door open: %s", any ? "YES" : "NO");
-          id(any_door_open).publish_state(any);
+          ESP_LOGI("DOOR", "Passenger door (Input): %s", x ? "OPEN" : "CLOSED");
+          id(passenger_door_open).publish_state(x);
 
   # Connector 2, Pin 1, High
   - id: !extend di2
-    name: "Driver Door Open"
+    name: "Driver Door (Input)"
+    internal: true
     icon: "mdi:car-door"
     device_class: door
     on_state:
       - lambda: |-
-          ESP_LOGI("DOOR", "Driver door: %s", x ? "OPEN" : "CLOSED");
-          bool any = id(di1).state || id(di2).state || id(di3).state || id(di4).state;
-          ESP_LOGI("DOOR", "Any door open: %s", any ? "YES" : "NO");
-          id(any_door_open).publish_state(any);
+          ESP_LOGI("DOOR", "Driver door (Input): %s", x ? "OPEN" : "CLOSED");
+          id(driver_door_open).publish_state(x);
 
   # Connector 3, Pin 3, Low
   - id: !extend di3
-    name: "Sliding Door Open"
+    name: "Sliding Door (Input)"
+    internal: true
     icon: "mdi:car-door"
     device_class: door
     on_state:
       - lambda: |-
-          ESP_LOGI("DOOR", "Sliding door: %s", x ? "OPEN" : "CLOSED");
-          bool any = id(di1).state || id(di2).state || id(di3).state || id(di4).state;
-          ESP_LOGI("DOOR", "Any door open: %s", any ? "YES" : "NO");
-          id(any_door_open).publish_state(any);
+          ESP_LOGI("DOOR", "Sliding door (Input): %s", x ? "OPEN" : "CLOSED");
+          id(sliding_door_open).publish_state(x);
 
   # Connector 3, Pin 13, Low
   - id: !extend di4
-    name: "Rear Door Open"
+    name: "Rear Door (Input)"
+    internal: true
     icon: "mdi:car-door"
     device_class: door
     on_state:
       - lambda: |-
-          ESP_LOGI("DOOR", "Rear door: %s", x ? "OPEN" : "CLOSED");
-          bool any = id(di1).state || id(di2).state || id(di3).state || id(di4).state;
-          ESP_LOGI("DOOR", "Any door open: %s", any ? "YES" : "NO");
-          id(any_door_open).publish_state(any);
+          ESP_LOGI("DOOR", "Rear door (Input): %s", x ? "OPEN" : "CLOSED");
+          id(rear_door_open).publish_state(x);
 
   # Connector 3, Pin 31, High
   - id: !extend di5
@@ -542,10 +556,10 @@ switch:
           then:
             - lambda: |-
                 ESP_LOGW("LOCK", "Cannot lock - doors open: Passenger=%s Driver=%s Sliding=%s Rear=%s",
-                  id(di1).state ? "OPEN" : "closed",
-                  id(di2).state ? "OPEN" : "closed",
-                  id(di3).state ? "OPEN" : "closed",
-                  id(di4).state ? "OPEN" : "closed");
+                  id(passenger_door_open).state ? "OPEN" : "CLOSED",
+                  id(driver_door_open).state ? "OPEN" : "CLOSED",
+                  id(sliding_door_open).state ? "OPEN" : "CLOSED",
+                  id(rear_door_open).state ? "OPEN" : "CLOSED");
           else:
             - lambda: 'ESP_LOGI("LOCK", "Sending lock pulse via relay (do1) for 500ms");'
             - switch.turn_on: do1
