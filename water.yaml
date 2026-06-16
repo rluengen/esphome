@@ -22,23 +22,11 @@
 #   VBUS (+5V)
 #   GND
 
-# TODO: ADS1115 via I2C to read water tank level sensor, connected from a stemma QT port to the ADS1115 to the i2c relay.
-# https://www.adafruit.com/product/1085
-# https://www.adafruit.com/product/4424
-# Then I just need the voltage divider circuit from the water tank sensor to the ADS1115 input.
-
 # xl9535 Device
 # Relay 1: relay_hot_water_heater
 # Relay 2: relay_supply_valve
 # Relay 3: relay_fill_valve
 # Relay 4: relay_water_pump
-
-# and now I have the hot water heater on a 30 amp relay, the water pump switch on an input, and an LED on the 
-# switch to show if the water pump is currently on. I can hook the 12V LED straight to the water pump power.
-# The 30 amp relay for hot water and the switch I can connect with the PCF8574 I2C expander if needed, or possibly
-# use GPIO 43/44?
-# https://www.adafruit.com/product/5545
-
 
 # F1502 water-alert
 # F150A water-plus
@@ -973,7 +961,7 @@ lvgl:
 
         - label:
             id: lbl_valve_supply
-            text: "\U000F1066"
+            text: "\U000F1067"  # valve-closed
             align: BOTTOM_LEFT
             x: 180
             y: -60
@@ -984,7 +972,7 @@ lvgl:
 
         - label:
             id: lbl_valve_fill
-            text: "\U000F1066"
+            text: "\U000F1067"  # valve-closed
             align: BOTTOM_LEFT
             x: 240
             y: -60
