@@ -442,43 +442,7 @@ script:
                 service: light.turn_off
                 data:
                   entity_id: light.quinled_van_lightcontroller_exterior_lights
-            - homeassistant.service:
-                service: light.turn_off
-                data:
-                  entity_id: light.quinled_van_lightcontroller_exterior_lights
-            - homeassistant.service:
-                service: light.turn_off
-                data:
-                  entity_id: light.quinled_van_lightcontroller_exterior_lights
-            - homeassistant.service:
-                service: light.turn_off
-                data:
-                  entity_id: light.quinled_van_lightcontroller_exterior_lights
-            - homeassistant.service:
-                service: light.turn_off
-                data:
-                  entity_id: light.quinled_van_lightcontroller_exterior_lights
           else:
-            - homeassistant.service:
-                service: light.turn_on
-                data:
-                  entity_id: light.quinled_van_lightcontroller_exterior_lights
-                  brightness: !lambda 'return id(pending_bright_exterior);'
-            - homeassistant.service:
-                service: light.turn_on
-                data:
-                  entity_id: light.quinled_van_lightcontroller_exterior_lights
-                  brightness: !lambda 'return id(pending_bright_exterior);'
-            - homeassistant.service:
-                service: light.turn_on
-                data:
-                  entity_id: light.quinled_van_lightcontroller_exterior_lights
-                  brightness: !lambda 'return id(pending_bright_exterior);'
-            - homeassistant.service:
-                service: light.turn_on
-                data:
-                  entity_id: light.quinled_van_lightcontroller_exterior_lights
-                  brightness: !lambda 'return id(pending_bright_exterior);'
             - homeassistant.service:
                 service: light.turn_on
                 data:

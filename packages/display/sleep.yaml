@@ -2,21 +2,30 @@
 # Combines configurable timeout, LVGL pause/resume, keep-awake toggle,
 # wake-touch guard, and a remote wake button.
 #
+# Sleep phases:
+#   Active → Dim (low backlight, LVGL still running) → Off (backlight off, LVGL paused)
+#   Any touch during dim phase returns to active.
+#   The dim phase reduces burn-in by lowering backlight before fully sleeping.
+#
 # Required substitutions:
 #   backlight_id: light id for the display backlight (default: display_backlight_id)
 #   touchscreen_id: touchscreen component id for touch input (default: my_touchscreen)
 #
 # Optional substitutions:
 #   default_timeout_seconds: default sleep timeout in seconds (default: 60)
+#   default_dim_seconds: how long to stay in dim mode before full off (default: 30)
+#   dim_brightness: backlight brightness during dim phase 0.0-1.0 (default: 0.05)
 #
 # Provides these IDs for consumers to reference:
 #   screen_bump_activity (script): call from encoder/other handlers to reset the timeout
 #   enter_screen_off (script): force display to sleep immediately
 #   exit_screen_off (script): force display to wake immediately
-#   screen_is_off (global bool): true when display is sleeping
+#   screen_is_off (global bool): true when display is sleeping (dim or off)
+#   screen_is_dim (global bool): true when display is in dim phase
 #   wake_touch (global bool): true on the first touch after waking, consume to ignore wake input
 #   keep_display_awake (global bool): true when keep-awake switch is on
 #   display_timeout (number): configurable timeout in seconds (10-720)
+#   display_dim_duration (number): configurable dim duration in seconds (5-300)
 #   display_keep_awake_switch (switch): toggle to keep display always on
 #   wake_display_button (button): press to wake display remotely
 #
@@ -35,6 +44,8 @@ substitutions:
   backlight_id: display_backlight_id
   touchscreen_id: my_touchscreen
   default_timeout_seconds: "60"
+  default_dim_seconds: "30"
+  dim_brightness: "0.05"
 
 number:
   - platform: template
@@ -50,8 +61,25 @@ number:
     step: 5
     mode: box
 
+  - platform: template
+    name: Screen Dim Duration
+    optimistic: true
+    entity_category: config
+    id: display_dim_duration
+    unit_of_measurement: "s"
+    initial_value: ${default_dim_seconds}
+    restore_value: true
+    min_value: 5
+    max_value: 300
+    step: 5
+    mode: box
+
 globals:
   - id: screen_is_off
+    type: bool
+    initial_value: "false"
+
+  - id: screen_is_dim
     type: bool
     initial_value: "false"
 
@@ -72,7 +100,7 @@ script:
     then:
       - if:
           condition:
-            lambda: 'return id(screen_is_off);'
+            lambda: 'return id(screen_is_off) || id(screen_is_dim);'
           then:
             - script.execute: exit_screen_off
       - if:
@@ -80,9 +108,24 @@ script:
             lambda: 'return !id(keep_display_awake);'
           then:
             - delay: !lambda 'return (uint32_t)(id(display_timeout).state * 1000);'
+            - script.execute: enter_screen_dim
+
+  # Phase 1: Dim backlight (LVGL still running for glanceability)
+  - id: enter_screen_dim
+    then:
+      - if:
+          condition:
+            lambda: 'return !id(screen_is_dim) && !id(screen_is_off);'
+          then:
+            - logger.log: "Display entering dim mode"
+            - lambda: 'id(screen_is_dim) = true;'
+            - light.turn_on:
+                id: ${backlight_id}
+                brightness: ${dim_brightness}
+            - delay: !lambda 'return (uint32_t)(id(display_dim_duration).state * 1000);'
             - script.execute: enter_screen_off
 
-  # Put display to sleep: backlight off + LVGL paused
+  # Phase 2: Fully off - backlight off + LVGL paused
   - id: enter_screen_off
     then:
       - if:
@@ -90,20 +133,23 @@ script:
             lambda: 'return !id(screen_is_off);'
           then:
             - logger.log: "Putting display to sleep"
-            - lambda: 'id(screen_is_off) = true;'
+            - lambda: |-
+                id(screen_is_off) = true;
+                id(screen_is_dim) = false;
             - light.turn_off: ${backlight_id}
             - lvgl.pause:
 
-  # Wake display: backlight on + LVGL resumed
+  # Wake display from any sleep phase: backlight on + LVGL resumed
   - id: exit_screen_off
     then:
       - logger.log: "Waking display"
       - lambda: |-
           id(screen_is_off) = false;
+          id(screen_is_dim) = false;
           id(wake_touch) = true;
+      - lvgl.resume:
       - light.turn_on: ${backlight_id}
       - delay: 60ms   # give panel rails time to rise
-      - lvgl.resume:
 
 touchscreen:
   - id: !extend ${touchscreen_id}
