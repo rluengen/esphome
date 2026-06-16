@@ -1,0 +1,22 @@
+{
+  "name": "light-dial-controller",
+  "version": "1.0.24",
+  "build_metadata": {
+    "build_time": "2026-06-15 19:22:56 -0700",
+    "esphome_version": "2026.5.3",
+    "git_sha": "de7e8a8",
+    "config_hash": "949046977",
+    "platform_version": null,
+    "esp_idf_version": "5.5.4"
+  },
+  "builds": [
+    {
+      "ota": {
+        "summary": "Firmware update 1.0.24",
+        "path": "firmware.ota.bin",
+        "md5": "a3c1b122fe6e2eaa31651b4ea3c7fe36"
+      },
+      "chipFamily": "ESP32-S3"
+    }
+  ]
+}
