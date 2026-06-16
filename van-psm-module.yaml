@@ -1,9 +1,87 @@
 # Recreational Vehicle Programmable Special Module (PSM) Configuration for ESPHome
 # using the waveshare esp32 s3 8di 8do board.
-
+#
 # Programmable Special Module Standard Programs
 # https://www.mbvans.com/en/upfitter/resources/psm-programs
 # https://www.mbvans.com/content/dam/mb-vans/us/upfitter/psm-programs/MY25_RV_Software_Specification_V4.pdf
+#
+# ==========================================================================
+# Wiring: Mercedes Sprinter PSM Connectors → Waveshare ESP32-S3-8DI-8DO
+# ==========================================================================
+#
+#   PSM Connector 2 (Inputs - Active High):
+#     Pin 7  (Passenger Door Open) ──► DI1 (GPIO4)
+#     Pin 1  (Driver Door Open)    ──► DI2 (GPIO5)
+#
+#   PSM Connector 3 (Inputs - Active Low):
+#     Pin 3  (Sliding Door Open)   ──► DI3 (GPIO6)
+#     Pin 13 (Rear Door Open)      ──► DI4 (GPIO7)
+#
+#   PSM Connector 3 (Inputs - Active High):
+#     Pin 31 (Vehicle Locked)      ──► DI5 (GPIO8)
+#     Pin 32 (Vehicle Unlocked)    ──► DI6 (GPIO9)
+#     Pin 21 (Speed > 0 mph)       ──► DI7 (GPIO10)
+#
+#   PSM Connector 3 (Outputs - Relay):
+#     Pin 30 (Lock Relay)          ◄── DO1 (PCA9554 pin 0)
+#     Pin 23 (Hazard Lights)       ◄── DO2 (PCA9554 pin 1)
+#
+#   CAN Bus (PSM CAN B, 250kbps):
+#     CAN H ──► ESP32 CAN TX (GPIO2)
+#     CAN L ──► ESP32 CAN RX (GPIO3)
+#
+# Board Pinout:
+#
+#   Waveshare ESP32-S3-POE-ETH-8DI-8DO:
+#     ┌─────────────────────────────────────────────────────┐
+#     │         Waveshare ESP32-S3 8DI-8DO                  │
+#     │                                                     │
+#     │  Digital Inputs (active-low, pull-up, 10ms debounce)│
+#     │  ┌──────────────────────────────────────────────┐   │
+#     │  │ DI1 (GPIO4)  ── Passenger Door Open          │   │
+#     │  │ DI2 (GPIO5)  ── Driver Door Open             │   │
+#     │  │ DI3 (GPIO6)  ── Sliding Door Open            │   │
+#     │  │ DI4 (GPIO7)  ── Rear Door Open               │   │
+#     │  │ DI5 (GPIO8)  ── Vehicle Locked Signal        │   │
+#     │  │ DI6 (GPIO9)  ── Vehicle Unlocked Signal      │   │
+#     │  │ DI7 (GPIO10) ── Speed > 0 mph               │   │
+#     │  │ DI8 (GPIO11) ── (unused)                     │   │
+#     │  └──────────────────────────────────────────────┘   │
+#     │                                                     │
+#     │  Digital Outputs (PCA9554 I2C expander, relay)      │
+#     │  ┌──────────────────────────────────────────────┐   │
+#     │  │ DO1 (PCA0) ── Vehicle Lock Relay (500ms pulse)│  │
+#     │  │ DO2 (PCA1) ── Hazard Warning Lights          │   │
+#     │  │ DO3-DO8    ── (unused)                       │   │
+#     │  └──────────────────────────────────────────────┘   │
+#     │                                                     │
+#     │  CAN Bus (ESP32 TWAI, 250kbps)                      │
+#     │  ┌──────────────────────────────────────────────┐   │
+#     │  │ TX (GPIO2) ── CAN H                          │   │
+#     │  │ RX (GPIO3) ── CAN L                          │   │
+#     │  └──────────────────────────────────────────────┘   │
+#     │                                                     │
+#     │  I2C (PCA9554 + PCF85063 RTC)                       │
+#     │  │ SDA (GPIO42), SCL (GPIO41), 100kHz           │   │
+#     │                                                     │
+#     │  Accessories                                        │
+#     │  │ Buzzer (GPIO46), RGB LED (GPIO38/WS2812)     │   │
+#     │                                                     │
+#     └─────────────────────────────────────────────────────┘
+#
+#   CAN Bus Decoded Signals (from vs30_canb_psm.dbc):
+#     0x0A1 (161) ── Rear wheel speed (L/R) + direction
+#     0x0A3 (163) ── Front wheel speed (L/R)
+#     0x225 (549) ── Handbrake state (on/off)
+#     0x307 (775) ── Central locking events (keyfob/interior)
+#     0x31A (794) ── Driver window (open/closed)
+#     0x320 (800) ── Passenger window (open/closed)
+#     0x351 (849) ── Rear door state (open/closed)
+#     0x375 (885) ── Odometer (km)
+#     0x397 (919) ── Driver door state (open/closed)
+#     0x39B (923) ── Passenger door state (open/closed)
+#     0x3A5 (933) ── Sliding door state (open/closed)
+#
 
 substitutions:
   device_name: van-psm-module
@@ -34,8 +112,9 @@ packages:
       - path: devices/waveshare-esp32-s3-8di-8do.yaml
 
 # https://www.mbvans.com/content/dam/mb-vans/us/upfitter/psm-programs/MY25_RV_Software_Specification_V4.pdf
-# CAN B DBC reference: https://github.com/bistromath/vs30-dbc
-# PSM CAN B interface is 250kbps
+# CAN B DBC reference (check for updates):
+#   https://github.com/bistromath/vs30-dbc/blob/main/vs30_canb_psm.dbc
+# PSM CAN B interface is 250kbps (firewalled subset of full CAN B)
 # outputs:
 # hazard warning lights
 # vehicle lock
@@ -133,6 +212,100 @@ canbus:
               ESP_LOGI("CAN", "0x3A5 Sliding Door (CAN): %s", closed ? "CLOSED" : "OPEN");
               id(can_sliding_door_closed).publish_state(closed);
 
+      # ---- Decoded: Driver Door State (CAN ID 0x397 / 919) ----
+      - can_id: 0x397
+        then:
+          - lambda: |-
+              if (x.size() < 2) return;
+              // DriverDoorState: start_bit=12, length=2. VAL: 2=Open, 1=Closed
+              uint8_t state = (x[1] >> 4) & 0x03;
+              bool open = (state == 2);
+              ESP_LOGI("CAN", "0x397 Driver Door (CAN): %s (raw=%d)", open ? "OPEN" : "CLOSED", state);
+              id(can_driver_door_open).publish_state(open);
+
+      # ---- Decoded: Passenger Door State (CAN ID 0x39B / 923) ----
+      - can_id: 0x39B
+        then:
+          - lambda: |-
+              if (x.size() < 2) return;
+              // PassengerDoorState: start_bit=12, length=2. VAL: 2=Open, 1=Closed
+              uint8_t state = (x[1] >> 4) & 0x03;
+              bool open = (state == 2);
+              ESP_LOGI("CAN", "0x39B Passenger Door (CAN): %s (raw=%d)", open ? "OPEN" : "CLOSED", state);
+              id(can_passenger_door_open).publish_state(open);
+
+      # ---- Decoded: Rear Door State (CAN ID 0x351 / 849) ----
+      - can_id: 0x351
+        then:
+          - lambda: |-
+              if (x.size() < 1) return;
+              // RearDoorState: start_bit=0, length=2. VAL: 1=Closed, 2=Open
+              uint8_t state = x[0] & 0x03;
+              bool open = (state == 2);
+              ESP_LOGI("CAN", "0x351 Rear Door (CAN): %s (raw=%d)", open ? "OPEN" : "CLOSED", state);
+              id(can_rear_door_open).publish_state(open);
+
+      # ---- Decoded: Driver Window (CAN ID 0x31A / 794) ----
+      - can_id: 0x31A
+        then:
+          - lambda: |-
+              if (x.size() < 2) return;
+              // DriverWindowClosed: start_bit=13, length=1
+              bool closed = (x[1] >> 5) & 0x01;
+              ESP_LOGI("CAN", "0x31A Driver Window (CAN): %s", closed ? "CLOSED" : "OPEN");
+              id(can_driver_window_closed).publish_state(closed);
+
+      # ---- Decoded: Passenger Window (CAN ID 0x320 / 800) ----
+      - can_id: 0x320
+        then:
+          - lambda: |-
+              if (x.size() < 2) return;
+              // PassengerWindowClosed: start_bit=13, length=1
+              bool closed = (x[1] >> 5) & 0x01;
+              ESP_LOGI("CAN", "0x320 Passenger Window (CAN): %s", closed ? "CLOSED" : "OPEN");
+              id(can_passenger_window_closed).publish_state(closed);
+
+      # ---- Decoded: Odometer (CAN ID 0x375 / 885) ----
+      - can_id: 0x375
+        then:
+          - lambda: |-
+              if (x.size() < 6) return;
+              // Odometer: start_bit=16, length=32, little-endian, scale=0.01, unit=km
+              uint32_t raw = x[2] | (x[3] << 8) | (x[4] << 16) | (x[5] << 24);
+              float km = raw * 0.01;
+              id(can_odometer).publish_state(km);
+
+      # ---- Decoded: Handbrake State (CAN ID 0x225 / 549) ----
+      - can_id: 0x225
+        then:
+          - lambda: |-
+              if (x.size() < 3) return;
+              // HandbrakeState: start_bit=16, length=3. VAL: 3=On, 4=Off
+              uint8_t state = (x[2]) & 0x07;
+              bool engaged = (state == 3);
+              ESP_LOGI("CAN", "0x225 Handbrake (CAN): %s (raw=%d)", engaged ? "ON" : "OFF", state);
+              id(can_handbrake_on).publish_state(engaged);
+
+      # ---- Decoded: Central Locking (CAN ID 0x307 / 775) ----
+      # 50Hz rate, 10 frames transmitted on state changes
+      - can_id: 0x307
+        then:
+          - lambda: |-
+              if (x.size() < 4) return;
+              // CentralLockingFlagsB3: start_bit=24, length=8
+              uint8_t flags = x[3];
+              if (flags == 0) return;  // Idle, skip
+              const char* action = "Unknown";
+              switch (flags) {
+                case 1: action = "Interior lock request"; break;
+                case 10: action = "Interior unlock request"; break;
+                case 21: action = "Keyfob lock (doors open)"; break;
+                case 85: action = "Keyfob lock (doors closed)"; break;
+                case 170: action = "Keyfob unlock"; break;
+              }
+              ESP_LOGI("CAN", "0x307 Central Locking: %s (0x%02X)", action, flags);
+              id(can_central_locking_event).publish_state(action);
+
 sensor:
   # Rear wheel speeds
   - platform: template
@@ -185,6 +358,16 @@ sensor:
       return count > 0 ? sum / count : NAN;
     update_interval: 1s
 
+  # Odometer
+  - platform: template
+    id: can_odometer
+    name: "Odometer (CAN)"
+    unit_of_measurement: "km"
+    accuracy_decimals: 1
+    icon: "mdi:counter"
+    state_class: total_increasing
+    entity_category: diagnostic
+
 text_sensor:
   - platform: template
     id: can_rear_wheel_dir_right
@@ -196,12 +379,52 @@ text_sensor:
     name: "Rear Wheel Direction (Left)"
     icon: "mdi:arrow-left-right"
 
+  - platform: template
+    id: can_central_locking_event
+    name: "Central Locking Event (CAN)"
+    icon: "mdi:car-key"
+
 binary_sensor:
   - platform: template
     id: can_sliding_door_closed
     name: "Sliding Door Closed (CAN)"
     icon: "mdi:car-door"
     device_class: door
+
+  - platform: template
+    id: can_driver_door_open
+    name: "Driver Door Open (CAN)"
+    icon: "mdi:car-door"
+    device_class: door
+
+  - platform: template
+    id: can_passenger_door_open
+    name: "Passenger Door Open (CAN)"
+    icon: "mdi:car-door"
+    device_class: door
+
+  - platform: template
+    id: can_rear_door_open
+    name: "Rear Door Open (CAN)"
+    icon: "mdi:car-door"
+    device_class: door
+
+  - platform: template
+    id: can_driver_window_closed
+    name: "Driver Window Closed (CAN)"
+    icon: "mdi:car-door"
+    device_class: window
+
+  - platform: template
+    id: can_passenger_window_closed
+    name: "Passenger Window Closed (CAN)"
+    icon: "mdi:car-door"
+    device_class: window
+
+  - platform: template
+    id: can_handbrake_on
+    name: "Handbrake Engaged (CAN)"
+    icon: "mdi:car-brake-parking"
 
   - platform: template
     id: any_door_open
