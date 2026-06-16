@@ -10,6 +10,13 @@
 #    12V battery - -- Pololu GND
 #    Pololu GND -- XIAO GND
 #
+#    XIAO Power (via buck converter, e.g. MP1584 or mini-360):
+#      Pololu VM pad -- Buck converter IN+  (reverse-voltage protected)
+#      Pololu GND pad -- Buck converter IN-
+#      Buck converter OUT+ (5V) -- XIAO 5V pin
+#      Buck converter OUT- -- XIAO GND
+#      NOTE: Adjust trimpot to exactly 5.0V with multimeter BEFORE connecting XIAO
+#
 #    Motor Control (Direct GPIO):
 #      XIAO D2 (GPIO3) -- Pololu PWM (motor enable/speed)
 #      XIAO D3 (GPIO4) -- Pololu DIR (direction: HIGH=forward, LOW=backward)
@@ -17,12 +24,58 @@
 #    Current Sensing (Direct ADC):
 #      XIAO D0 (GPIO1) -- Pololu CURRENT (analog voltage feedback proportional to motor current)
 #
+#    Fault Detection (open-drain, active-low):
+#      XIAO D1 (GPIO2) -- Pololu FLT (driven low on fault; use internal pull-up)
+#
 #    Physical Buttons (momentary, active-low):
 #      XIAO D8 (GPIO7) -- OPEN button -- GND
 #      XIAO D9 (GPIO8) -- CLOSE button -- GND
 #
 #    Pololu OUT A -- Motor terminal 1
 #    Pololu OUT B -- Motor terminal 2
+#
+#  Board Pinouts:
+#
+#    XIAO ESP32-S3 (USB-C at top):
+#         ┌─────────────────┐
+#     USB │  ┌───────────┐  │
+#         │  └───────────┘  │
+#         │                 │
+#  ►CS  D0│ (GPIO1)   (5V)  │5V ◄── Buck OUT+
+#  ►FLT D1│ (GPIO2)   (GND) │GND ── Common GND
+#  ►PWM D2│ (GPIO3)   (3V3) │3V3
+#  ►DIR D3│ (GPIO4)  (GPIO9)│D10
+#       D4│ (GPIO5)  (GPIO8)│D9 ◄── CLOSE btn
+#       D5│ (GPIO6)  (GPIO7)│D8 ◄── OPEN btn
+#       D6│ (GPIO43)(GPIO44)│D7
+#         └─────────────────┘
+#
+#    Pololu G2 18v17 Motor Driver:
+#         ┌─────────────────────────────────────┐
+#         │          Pololu G2 18v17            │
+#         │                                     │
+#    VIN ─┤■  VIN                        OUTA  ■├─ Motor +
+#    GND ─┤■  GND                        OUTB  ■├─ Motor -
+#         │                                     │
+#         │  ■ EN (tied high or NC)             │
+#    D2 ──┤  ■ PWM (motor speed/enable)         │
+#    D3 ──┤  ■ DIR (direction)                  │
+#         │  ■ SLP (sleep, tied high or NC)     │
+#    D1 ──┤  ■ FLT (fault output, active-low)   │
+#    D0 ──┤  ■ CS  (current sense output)       │
+#         │                                     │
+#         └─────────────────────────────────────┘
+#
+#    Power Distribution:
+#         12V Battery
+#           │
+#           └──────► Pololu VIN (motor power)
+#                       │
+#                       └──► Pololu VM (reverse-protected output)
+#                               │
+#                               └──► Buck Converter (12V → 5V)
+#                                       │
+#                                       └──► XIAO 5V pin (MCU power)
 #
 #  If motor runs the wrong direction, toggle the "Reverse Direction" switch
 #  in Home Assistant (persists across reboots), or swap the motor wires.
@@ -62,6 +115,9 @@ substitutions:
 
   # --- Pololu Current Sensing (ADC) ---
   current_sense_pin: GPIO1   # D0 - analog voltage feedback from Pololu CURRENT pin
+
+  # --- Pololu Fault Detection (open-drain, active-low) ---
+  fault_pin: GPIO2           # D1 - driven low when Pololu detects a fault
 
   # --- Physical control buttons (active-low to GND) ---
   open_button_pin: GPIO7
@@ -156,6 +212,21 @@ switch:
     restore_mode: RESTORE_DEFAULT_OFF
 
 binary_sensor:
+  - platform: gpio
+    name: "Motor Driver Fault"
+    pin:
+      number: ${fault_pin}
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+    device_class: problem
+    on_press:
+      - logger.log:
+          level: ERROR
+          format: "Pololu G2 FAULT detected - over-temp or over-current!"
+      - switch.turn_off: motor_pwm
+
   - platform: gpio
     name: "Awning Open Button"
     pin:
