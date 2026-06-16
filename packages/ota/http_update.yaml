@@ -20,7 +20,9 @@ esphome:
   on_boot:
     priority: -10
     then:
-      - delay: 10s
+      - wait_until:
+          wifi.connected:
+      - delay: 30s
       - update.check: firmware_update
 
 button:
