@@ -468,14 +468,14 @@ binary_sensor:
               - light.is_off: bed_can_lights
           then:
             - logger.log:
-               format: "Button 1 pressed - main/bed lights are off, turning on to 20%"
+               format: "Button 1 pressed - main/bed lights are off, turning on to 10%"
                level: INFO
             - light.turn_on:
                 id: main_can_lights
-                brightness: 20%
+                brightness: 10%
             - light.turn_on:
                 id: bed_can_lights
-                brightness: 20%
+                brightness: 10%
       - while:
           condition:
             binary_sensor.is_on: button_1
@@ -535,7 +535,7 @@ binary_sensor:
                       id: cwww_led_capsule_lights
                       relative_brightness: !lambda 'return id(brightness_step).state;'
                       transition_length: 100ms
-            - delay: 200ms
+            - delay: 100ms
     on_release:
       - logger.log:
           format: "Button 1 released"
@@ -643,7 +643,7 @@ binary_sensor:
                             id: cwww_led_capsule_lights
                             relative_brightness: !lambda 'return -id(brightness_step).state;'
                             transition_length: 100ms
-                  - delay: 200ms
+                  - delay: 100ms
             # Only turn off if we exited loop because of threshold, not because button was released
             - if:
                 condition:
@@ -692,14 +692,14 @@ binary_sensor:
               - light.is_off: light_exterior_passenger_capsule
           then:
             - logger.log:
-                format: "Button 3 pressed - capsule lights are off, turning on to 20%"
+                format: "Button 3 pressed - capsule lights are off, turning on to 10%"
                 level: INFO
             - light.turn_on:
                 id: light_exterior_driver_capsule
-                brightness: 20%
+                brightness: 10%
             - light.turn_on:
                 id: light_exterior_passenger_capsule
-                brightness: 20%
+                brightness: 10%
       - while:
           condition:
             binary_sensor.is_on: button_3
@@ -732,17 +732,17 @@ binary_sensor:
                           - light.is_off: light_exterior_roof_passenger
                       then:
                         - logger.log:
-                            format: "Button 3 pressed - roof lights are off, turning on to 20%"
+                            format: "Button 3 pressed - roof lights are off, turning on to 10%"
                             level: INFO
                         - light.turn_on:
                             id: light_exterior_roof_rear
-                            brightness: 20%
+                            brightness: 10%
                         - light.turn_on:
                             id: light_exterior_roof_driver
-                            brightness: 20%
+                            brightness: 10%
                         - light.turn_on:
                             id: light_exterior_roof_passenger
-                            brightness: 20%
+                            brightness: 10%
                   # Capsule lights at 100%, now work on roof lights
                   - logger.log:
                       format: "Button 3 held - capsule lights at 100%, increasing roof lights brightness 5%"
@@ -759,7 +759,7 @@ binary_sensor:
                       id: light_exterior_roof_passenger
                       relative_brightness: !lambda 'return id(brightness_step).state;'
                       transition_length: 100ms
-            - delay: 200ms
+            - delay: 100ms
     on_release:
       - logger.log:
           format: "Button 3 released"
@@ -866,7 +866,7 @@ binary_sensor:
                             id: light_exterior_passenger_capsule
                             relative_brightness: !lambda 'return -id(brightness_step).state;'
                             transition_length: 100ms
-                  - delay: 200ms
+                  - delay: 100ms
             # Only turn off if we exited loop because of threshold, not because button was released
             - if:
                 condition:
@@ -1090,7 +1090,7 @@ binary_sensor:
                       id: garage_led_lights
                       relative_brightness: !lambda 'return id(brightness_step).state;'
                       transition_length: 100ms
-            - delay: 200ms
+            - delay: 100ms
     on_release:
       - logger.log:
           format: "PCF8574 Button 5 released"
@@ -1283,7 +1283,7 @@ number:
     min_value: 0.01
     max_value: 0.5
     step: 0.01
-    initial_value: 0.1
+    initial_value: 0.05
     restore_value: true
     entity_category: config
     icon: "mdi:brightness-percent"
