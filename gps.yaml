@@ -110,6 +110,24 @@ globals:
   - id: speed_lock_val
     type: float
     initial_value: '1.0'
+  - id: position_lock_enabled
+    type: bool
+    initial_value: 'true'
+
+switch:
+  - platform: template
+    name: "Position Lock Enabled"
+    id: position_lock_switch
+    icon: mdi:crosshairs-gps
+    entity_category: config
+    restore_mode: RESTORE_DEFAULT_ON
+    optimistic: true
+    turn_on_action:
+      - lambda: 'id(position_lock_enabled) = true;'
+    turn_off_action:
+      - lambda: |-
+          id(position_lock_enabled) = false;
+          id(is_position_locked) = false;
 
 # Override the GPS component from package
 gps:
@@ -158,6 +176,11 @@ sensor:
       float speed = id(gps_speed).state;
       int sats = id(satellite_count);
       
+      // If position lock is disabled, pass through raw coordinates
+      if (!id(position_lock_enabled)) {
+        return raw_lat;
+      }
+      
       // Calculate distance from locked position (in meters)
       float dist = 0;
       if (id(is_position_locked)) {
@@ -195,7 +218,7 @@ sensor:
     update_interval: never
     state_class: measurement
     lambda: |-
-      if (id(is_position_locked)) {
+      if (id(position_lock_enabled) && id(is_position_locked)) {
         return id(locked_lon);
       }
       return id(raw_longitude);
@@ -227,27 +250,6 @@ text_sensor:
       if (sats >= 6) return {"Good"};
       if (sats >= 4) return {"Fair"};
       return {"Poor/No Fix"};
-
-interval:
-  - interval: 30s
-    then:
-      - lambda: |-
-          int sats = id(satellite_count);
-          float hdop = id(gps_hdop).state;
-          float speed = id(gps_speed).state;
-          float lat = id(gps_latitude).state;
-          float lon = id(raw_longitude);
-          ESP_LOGI("gps_status", "--- GPS heartbeat ---");
-          ESP_LOGI("gps_status", "  Satellites : %d  (need >=4 for fix)", sats);
-          ESP_LOGI("gps_status", "  HDOP       : %.2f  (need <=5.0 for usable fix)", hdop);
-          ESP_LOGI("gps_status", "  Speed      : %.2f km/h", speed);
-          ESP_LOGI("gps_status", "  Lat/Lon    : %.6f, %.6f%s", lat, lon,
-            (lat == 0.0f && lon == 0.0f) ? "  <-- still 0,0: no NMEA position data received" : "");
-          if (sats == 0) {
-            ESP_LOGW("gps_status", "  !! 0 satellites: GPS module may not be responding (check baud rate / wiring)");
-          } else if (sats < 4) {
-            ESP_LOGW("gps_status", "  !! Partial view: only %d sats, move to open sky", sats);
-          }
 
 esphome:
   name: ${device_name}

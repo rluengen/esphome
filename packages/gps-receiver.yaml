@@ -79,7 +79,8 @@ text_sensor:
   - platform: template
     name: "GPS Time"
     id: gps_time_text
-    update_interval: 1s
+    internal: true
+    update_interval: 10s
     lambda: |-
       char buffer[20];
       auto time = id(gps_time).now();
