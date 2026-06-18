@@ -130,8 +130,7 @@ font:
     size: 22
     bpp: 4
     glyphs: [
-      "\U000F081C", # mdi-door-open
-      "\U000F081B", # mdi-door-closed
+      "\U000F0B6B", # mdi-car-door
     ]
 
   # MDI icons - alert
@@ -304,7 +303,7 @@ lvgl:
                   id: lbl_door_driver_icon
                   x: 10
                   y: 0
-                  text: "\U000F081B"
+                  text: "\U000F0B6B"
                   text_font: mdi_door
                   text_color: ${color_text_dim}
               - label:
@@ -321,7 +320,7 @@ lvgl:
                   id: lbl_door_pass_icon
                   x: 90
                   y: 0
-                  text: "\U000F081B"
+                  text: "\U000F0B6B"
                   text_font: mdi_door
                   text_color: ${color_text_dim}
               - label:
@@ -338,7 +337,7 @@ lvgl:
                   id: lbl_door_slide_icon
                   x: 170
                   y: 0
-                  text: "\U000F081B"
+                  text: "\U000F0B6B"
                   text_font: mdi_door
                   text_color: ${color_text_dim}
               - label:
@@ -355,7 +354,7 @@ lvgl:
                   id: lbl_door_rear_icon
                   x: 250
                   y: 0
-                  text: "\U000F081B"
+                  text: "\U000F0B6B"
                   text_font: mdi_door
                   text_color: ${color_text_dim}
               - label:
@@ -1019,7 +1018,6 @@ binary_sensor:
       then:
         - lvgl.label.update:
             id: lbl_door_driver_icon
-            text: !lambda 'return x ? "\U000F081C" : "\U000F081B";'
             text_color: !lambda 'return x ? lv_color_hex(${color_alert}) : lv_color_hex(${color_text_dim});'
         - lvgl.label.update:
             id: lbl_door_driver
@@ -1033,7 +1031,6 @@ binary_sensor:
       then:
         - lvgl.label.update:
             id: lbl_door_pass_icon
-            text: !lambda 'return x ? "\U000F081C" : "\U000F081B";'
             text_color: !lambda 'return x ? lv_color_hex(${color_alert}) : lv_color_hex(${color_text_dim});'
         - lvgl.label.update:
             id: lbl_door_pass
@@ -1047,7 +1044,6 @@ binary_sensor:
       then:
         - lvgl.label.update:
             id: lbl_door_slide_icon
-            text: !lambda 'return x ? "\U000F081C" : "\U000F081B";'
             text_color: !lambda 'return x ? lv_color_hex(${color_alert}) : lv_color_hex(${color_text_dim});'
         - lvgl.label.update:
             id: lbl_door_slide
@@ -1061,7 +1057,6 @@ binary_sensor:
       then:
         - lvgl.label.update:
             id: lbl_door_rear_icon
-            text: !lambda 'return x ? "\U000F081C" : "\U000F081B";'
             text_color: !lambda 'return x ? lv_color_hex(${color_alert}) : lv_color_hex(${color_text_dim});'
         - lvgl.label.update:
             id: lbl_door_rear
