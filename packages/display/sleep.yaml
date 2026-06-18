@@ -14,8 +14,8 @@
 # Optional substitutions:
 #   default_timeout_seconds: default sleep timeout in seconds (default: 60)
 #   default_dim_seconds: how long to stay in dim mode before full off (default: 30)
-#   dim_brightness: backlight brightness during dim phase 0.0-1.0 (default: 0.25)
-#   active_brightness: backlight brightness during active phase 0.0-1.0 (default: 1.0)
+#   dim_brightness: backlight brightness during dim phase in % (default: 25)
+#   active_brightness: backlight brightness during active phase in % (default: 100)
 #
 # Provides these IDs for consumers to reference:
 #   screen_bump_activity (script): call from encoder/other handlers to reset the timeout
@@ -46,8 +46,8 @@ substitutions:
   touchscreen_id: my_touchscreen
   default_timeout_seconds: "60"
   default_dim_seconds: "30"
-  dim_brightness: "0.25"
-  active_brightness: "1.0"
+  dim_brightness: "25"
+  active_brightness: "100"
 
 number:
   - platform: template
@@ -82,7 +82,7 @@ number:
     entity_category: config
     id: display_active_brightness
     unit_of_measurement: "%"
-    initial_value: !lambda 'return ${active_brightness} * 100.0f;'
+    initial_value: ${active_brightness}
     restore_value: true
     min_value: 1
     max_value: 100
@@ -95,7 +95,7 @@ number:
     entity_category: config
     id: display_dim_brightness
     unit_of_measurement: "%"
-    initial_value: !lambda 'return ${dim_brightness} * 100.0f;'
+    initial_value: ${dim_brightness}
     restore_value: true
     min_value: 1
     max_value: 100
