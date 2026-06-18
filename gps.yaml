@@ -2,7 +2,7 @@ substitutions:
   device_name: gps
   friendly_name: Global Positioning System
   project_name: gps-receiver
-  project_version: "1.0.11"
+  project_version: "1.0.12"
   log_level: INFO
 
 packages:
@@ -299,7 +299,5 @@ logger:
   level: ${log_level}
   hardware_uart: USB_CDC
   logs:
-    gps: DEBUG        # logs every parsed NMEA sentence and fix state
-    uart: DEBUG       # logs raw UART bytes — confirms GPS is actually talking
     sensor: INFO
 
