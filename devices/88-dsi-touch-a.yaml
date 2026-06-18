@@ -59,6 +59,15 @@ output:
     write_action:
       - lambda: |-
           uint8_t brightness = (uint8_t)(state * 255);
+          static int last_brightness = -1;
+          if ((int) brightness != last_brightness) {
+            last_brightness = (int) brightness;
+            if (brightness == 0) {
+              ESP_LOGI("backlight", "Display backlight set: OFF (raw=0)");
+            } else {
+              ESP_LOGI("backlight", "Display backlight set: raw=%u (%.0f%%)", brightness, state * 100.0f);
+            }
+          }
           id(display_backlight_i2c).write_byte(0x96, brightness);
 
 light:
