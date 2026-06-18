@@ -1,6 +1,10 @@
 # Base WiFi Configuration
 # Include this in your device configs with: <<: !include templates/base/wifi.yaml
 
+logger:
+  logs:
+    wifi: WARN
+
 wifi:
   # power_save_mode: Disables ESP-IDF modem sleep so the radio stays fully active.
   # Prevents silent API disconnects and delayed service calls on interactive devices.
