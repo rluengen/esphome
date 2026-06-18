@@ -15,6 +15,7 @@
 #   default_timeout_seconds: default sleep timeout in seconds (default: 60)
 #   default_dim_seconds: how long to stay in dim mode before full off (default: 30)
 #   dim_brightness: backlight brightness during dim phase 0.0-1.0 (default: 0.25)
+#   active_brightness: backlight brightness during active phase 0.0-1.0 (default: 1.0)
 #
 # Provides these IDs for consumers to reference:
 #   screen_bump_activity (script): call from encoder/other handlers to reset the timeout
@@ -46,6 +47,7 @@ substitutions:
   default_timeout_seconds: "60"
   default_dim_seconds: "30"
   dim_brightness: "0.25"
+  active_brightness: "1.0"
 
 number:
   - platform: template
@@ -73,6 +75,32 @@ number:
     max_value: 300
     step: 5
     mode: box
+
+  - platform: template
+    name: Screen Active Brightness
+    optimistic: true
+    entity_category: config
+    id: display_active_brightness
+    unit_of_measurement: "%"
+    initial_value: !lambda 'return ${active_brightness} * 100.0f;'
+    restore_value: true
+    min_value: 1
+    max_value: 100
+    step: 5
+    mode: slider
+
+  - platform: template
+    name: Screen Dim Brightness
+    optimistic: true
+    entity_category: config
+    id: display_dim_brightness
+    unit_of_measurement: "%"
+    initial_value: !lambda 'return ${dim_brightness} * 100.0f;'
+    restore_value: true
+    min_value: 1
+    max_value: 100
+    step: 5
+    mode: slider
 
 globals:
   - id: screen_is_off
@@ -121,7 +149,7 @@ script:
             - lambda: 'id(screen_is_dim) = true;'
             - light.turn_on:
                 id: ${backlight_id}
-                brightness: ${dim_brightness}
+                brightness: !lambda 'return id(display_dim_brightness).state / 100.0f;'
             - delay: !lambda 'return (uint32_t)(id(display_dim_duration).state * 1000);'
             - script.execute: enter_screen_off
 
@@ -148,7 +176,9 @@ script:
           id(screen_is_dim) = false;
           id(wake_touch) = true;
       - lvgl.resume:
-      - light.turn_on: ${backlight_id}
+      - light.turn_on:
+          id: ${backlight_id}
+          brightness: !lambda 'return id(display_active_brightness).state / 100.0f;'
       - delay: 60ms   # give panel rails time to rise
 
 touchscreen:

@@ -62,7 +62,7 @@ touchscreen:
             - logger.log: "Active state with low backlight detected; forcing full brightness"
             - light.turn_on:
                 id: display_backlight
-                brightness: 100%
+                brightness: !lambda 'return id(display_active_brightness).state / 100.0f;'
       - script.execute: screen_bump_activity
       - lambda: |-
           for (auto &tp : touches) {
@@ -136,7 +136,7 @@ script:
       - lvgl.resume:
       - light.turn_on:
           id: display_backlight
-          brightness: 100%
+          brightness: !lambda 'return id(display_active_brightness).state / 100.0f;'
       - delay: 60ms
       - script.execute: refresh_time_display
       - lambda: |-
@@ -2226,13 +2226,6 @@ interval:
   - interval: 60s
     then:
       - script.execute: refresh_time_display
-  - interval: 5s
-    then:
-      - lambda: |-
-          ESP_LOGD("screen", "state: off=%d dim=%d keep=%d backlight=%.2f timeout=%.1fs dim_for=%.1fs",
-                   id(screen_is_off), id(screen_is_dim), id(keep_display_awake),
-                   id(display_backlight).current_values.get_brightness(),
-                   id(display_timeout).state, id(display_dim_duration).state);
   - interval: 60s
     then:
       - lambda: |-
