@@ -14,7 +14,7 @@
 # Optional substitutions:
 #   default_timeout_seconds: default sleep timeout in seconds (default: 60)
 #   default_dim_seconds: how long to stay in dim mode before full off (default: 30)
-#   dim_brightness: backlight brightness during dim phase 0.0-1.0 (default: 0.05)
+#   dim_brightness: backlight brightness during dim phase 0.0-1.0 (default: 0.25)
 #
 # Provides these IDs for consumers to reference:
 #   screen_bump_activity (script): call from encoder/other handlers to reset the timeout
@@ -45,7 +45,7 @@ substitutions:
   touchscreen_id: my_touchscreen
   default_timeout_seconds: "60"
   default_dim_seconds: "30"
-  dim_brightness: "0.05"
+  dim_brightness: "0.25"
 
 number:
   - platform: template

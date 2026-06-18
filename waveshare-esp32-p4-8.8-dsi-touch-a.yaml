@@ -51,6 +51,20 @@ touchscreen:
       mirror_y: false
     on_touch:
       - lambda: |-
+          ESP_LOGI("screen", "touch: off=%d dim=%d keep=%d timeout=%.1fs dim_for=%.1fs backlight=%.2f",
+                   id(screen_is_off), id(screen_is_dim), id(keep_display_awake),
+                   id(display_timeout).state, id(display_dim_duration).state,
+                   id(display_backlight).current_values.get_brightness());
+      - if:
+          condition:
+            lambda: 'return !id(screen_is_off) && !id(screen_is_dim) && id(display_backlight).current_values.get_brightness() < 0.99f;'
+          then:
+            - logger.log: "Active state with low backlight detected; forcing full brightness"
+            - light.turn_on:
+                id: display_backlight
+                brightness: 100%
+      - script.execute: screen_bump_activity
+      - lambda: |-
           for (auto &tp : touches) {
             ESP_LOGI("touch", "x=%d y=%d (display: 1920x480)", tp.x, tp.y);
           }
@@ -100,14 +114,36 @@ script:
   - id: !extend enter_screen_off
     then:
       - lambda: 'id(sleep_start_millis) = millis();'
+      - if:
+          condition:
+            lambda: 'return !id(screen_is_off);'
+          then:
+            - logger.log: "Putting display to sleep"
+            - lambda: |-
+                id(screen_is_off) = true;
+                id(screen_is_dim) = false;
+            - light.turn_off: display_backlight
+            - lvgl.pause:
 
   # On wake: refresh time immediately + if asleep >= 5 minutes, switch to home tab
   - id: !extend exit_screen_off
     then:
+      - logger.log: "Waking display"
+      - lambda: |-
+          id(screen_is_off) = false;
+          id(screen_is_dim) = false;
+          id(wake_touch) = true;
+      - lvgl.resume:
+      - light.turn_on:
+          id: display_backlight
+          brightness: 100%
+      - delay: 60ms
       - script.execute: refresh_time_display
       - lambda: |-
           uint32_t now = millis();
           uint32_t elapsed = now - id(sleep_start_millis);
+          ESP_LOGI("screen", "wake: elapsed=%ums backlight=%.2f", elapsed,
+                   id(display_backlight).current_values.get_brightness());
           if (elapsed >= 300000) {  // 5 minutes in ms
             id(show_home_on_wake).execute();
           }
@@ -2163,21 +2199,21 @@ font:
     id: roboto_small
     size: 28
     bpp: 4
-    glyphs: " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~°%"
+    glyphs: " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~°"
 
   # UI text font - primary labels, section headers
   - file: "fonts/Roboto-Regular.ttf"
     id: roboto_medium
     size: 36
     bpp: 4
-    glyphs: " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~°%"
+    glyphs: " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~°"
 
   # Large value font - key metrics
   - file: "fonts/Roboto-Regular.ttf"
     id: roboto_large
     size: 52
     bpp: 4
-    glyphs: " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~°%·"
+    glyphs: " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~°·"
 
   - file: "fonts/Roboto-Regular.ttf"
     id: roboto_xlarge
@@ -2190,6 +2226,13 @@ interval:
   - interval: 60s
     then:
       - script.execute: refresh_time_display
+  - interval: 5s
+    then:
+      - lambda: |-
+          ESP_LOGD("screen", "state: off=%d dim=%d keep=%d backlight=%.2f timeout=%.1fs dim_for=%.1fs",
+                   id(screen_is_off), id(screen_is_dim), id(keep_display_awake),
+                   id(display_backlight).current_values.get_brightness(),
+                   id(display_timeout).state, id(display_dim_duration).state);
   - interval: 60s
     then:
       - lambda: |-
