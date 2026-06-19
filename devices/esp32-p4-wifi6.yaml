@@ -6,11 +6,9 @@
 esp32:
   board: esp32-p4-evboard
   variant: esp32p4
-  flash_size: 32MB   # Waveshare ESP32-P4-WIFI6: onboard 32MB Nor Flash
+  flash_size: 16MB   # Using 16MB partition scheme; 32MB crashes on ESP32-P4 + IDF 5.5 (cache_utils assert)
   framework:
     type: esp-idf
-    advanced:
-      enable_idf_experimental_features: true
 
 psram:
   mode: hex
