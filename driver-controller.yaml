@@ -71,6 +71,22 @@ globals:
   - id: manual_mode
     type: int
     initial_value: '0'
+  # Passenger-door open state (drives which window overlay is shown)
+  - id: pass_door_open
+    type: bool
+    initial_value: 'false'
+  # Passenger window position: 0 = closed, 1 = vent, 2 = open
+  - id: pass_window_mode
+    type: int
+    initial_value: '0'
+  # Driver-door open state (drives which driver-window overlay is shown)
+  - id: drv_door_open
+    type: bool
+    initial_value: 'false'
+  # Driver window position: 0 = closed, 1 = vent, 2 = open
+  - id: drv_window_mode
+    type: int
+    initial_value: '0'
 
 script:
   # Apply the effective display mode based on engine state + manual override
@@ -107,6 +123,39 @@ script:
             snprintf(buf, sizeof(buf), "%d:%02d %s", hr, time.minute, time.hour < 12 ? "AM" : "PM");
             return buf;
 
+  # Pick the correct passenger-window overlay from window mode + door state.
+  # The four window images encode {open|vent} x {door closed|door open}.
+  - id: update_pass_window
+    then:
+      - lambda: |-
+          // Hide all four first.
+          lv_obj_add_flag(id(ovl_win_open_dc)->obj, LV_OBJ_FLAG_HIDDEN);
+          lv_obj_add_flag(id(ovl_win_open_do)->obj, LV_OBJ_FLAG_HIDDEN);
+          lv_obj_add_flag(id(ovl_win_vent_dc)->obj, LV_OBJ_FLAG_HIDDEN);
+          lv_obj_add_flag(id(ovl_win_vent_do)->obj, LV_OBJ_FLAG_HIDDEN);
+          bool dopen = id(pass_door_open);
+          int w = id(pass_window_mode);
+          lv_obj_t* show = nullptr;
+          if (w == 2) show = dopen ? id(ovl_win_open_do)->obj : id(ovl_win_open_dc)->obj;
+          else if (w == 1) show = dopen ? id(ovl_win_vent_do)->obj : id(ovl_win_vent_dc)->obj;
+          if (show) lv_obj_clear_flag(show, LV_OBJ_FLAG_HIDDEN);
+
+  # Driver-window equivalent of update_pass_window (uses the driver door state).
+  - id: update_drv_window
+    then:
+      - lambda: |-
+          // Hide all four first.
+          lv_obj_add_flag(id(ovl_dwin_open_dc)->obj, LV_OBJ_FLAG_HIDDEN);
+          lv_obj_add_flag(id(ovl_dwin_open_do)->obj, LV_OBJ_FLAG_HIDDEN);
+          lv_obj_add_flag(id(ovl_dwin_vent_dc)->obj, LV_OBJ_FLAG_HIDDEN);
+          lv_obj_add_flag(id(ovl_dwin_vent_do)->obj, LV_OBJ_FLAG_HIDDEN);
+          bool dopen = id(drv_door_open);
+          int w = id(drv_window_mode);
+          lv_obj_t* show = nullptr;
+          if (w == 2) show = dopen ? id(ovl_dwin_open_do)->obj : id(ovl_dwin_open_dc)->obj;
+          else if (w == 1) show = dopen ? id(ovl_dwin_vent_do)->obj : id(ovl_dwin_vent_dc)->obj;
+          if (show) lv_obj_clear_flag(show, LV_OBJ_FLAG_HIDDEN);
+
 # ---- Home Assistant Sensors ----
 text_sensor:
   # ── Engine running state (drives mode switching) ──
@@ -121,20 +170,24 @@ text_sensor:
         - lambda: 'id(engine_is_running) = (x == "on");'
         - script.execute: apply_display_mode
 
-  # ── Door states (open/closed) ──
-  # TODO VALIDATE all four door entity_ids (WiCAN).
+  # ── Door / lock / window / hood states → image overlays ──
+  # Driver = front-LEFT, passenger = front-right, sliding = rear-right (curb side).
+  # TODO VALIDATE all entity_ids (WiCAN).
   - platform: homeassistant
     id: ha_door_driver_raw
     entity_id: binary_sensor.wican_door_driver  # TODO VALIDATE
     internal: true
     on_value:
       then:
-        - lvgl.widget.update:
-            id: rect_door_driver
-            bg_color: !lambda 'return x=="on"?lv_color_hex(0xF85149):(x=="unavailable"?lv_color_hex(0x30363D):lv_color_hex(0x3FB950));'
-        - lvgl.label.update:
-            id: lbl_door_driver_state
-            text_color: !lambda 'return x=="on"?lv_color_hex(0xF85149):(x=="unavailable"?lv_color_hex(0x555555):lv_color_hex(0x8B949E));'
+        - lambda: 'id(drv_door_open) = (x == "on");'
+        - if:
+            condition:
+              lambda: 'return x == "on";'
+            then:
+              - lvgl.widget.show: ovl_door_drv_open
+            else:
+              - lvgl.widget.hide: ovl_door_drv_open
+        - script.execute: update_drv_window
 
   - platform: homeassistant
     id: ha_door_passenger_raw
@@ -142,12 +195,15 @@ text_sensor:
     internal: true
     on_value:
       then:
-        - lvgl.widget.update:
-            id: rect_door_passenger
-            bg_color: !lambda 'return x=="on"?lv_color_hex(0xF85149):(x=="unavailable"?lv_color_hex(0x30363D):lv_color_hex(0x3FB950));'
-        - lvgl.label.update:
-            id: lbl_door_passenger_state
-            text_color: !lambda 'return x=="on"?lv_color_hex(0xF85149):(x=="unavailable"?lv_color_hex(0x555555):lv_color_hex(0x8B949E));'
+        - lambda: 'id(pass_door_open) = (x == "on");'
+        - if:
+            condition:
+              lambda: 'return x == "on";'
+            then:
+              - lvgl.widget.show: ovl_door_pass_open
+            else:
+              - lvgl.widget.hide: ovl_door_pass_open
+        - script.execute: update_pass_window
 
   - platform: homeassistant
     id: ha_door_sliding_raw
@@ -155,12 +211,13 @@ text_sensor:
     internal: true
     on_value:
       then:
-        - lvgl.widget.update:
-            id: rect_door_sliding
-            bg_color: !lambda 'return x=="on"?lv_color_hex(0xF85149):(x=="unavailable"?lv_color_hex(0x30363D):lv_color_hex(0x3FB950));'
-        - lvgl.label.update:
-            id: lbl_door_sliding_state
-            text_color: !lambda 'return x=="on"?lv_color_hex(0xF85149):(x=="unavailable"?lv_color_hex(0x555555):lv_color_hex(0x8B949E));'
+        - if:
+            condition:
+              lambda: 'return x == "on";'
+            then:
+              - lvgl.widget.show: ovl_door_slide_open
+            else:
+              - lvgl.widget.hide: ovl_door_slide_open
 
   - platform: homeassistant
     id: ha_door_rear_raw
@@ -168,12 +225,79 @@ text_sensor:
     internal: true
     on_value:
       then:
-        - lvgl.widget.update:
-            id: rect_door_rear
-            bg_color: !lambda 'return x=="on"?lv_color_hex(0xF85149):(x=="unavailable"?lv_color_hex(0x30363D):lv_color_hex(0x3FB950));'
-        - lvgl.label.update:
-            id: lbl_door_rear_state
-            text_color: !lambda 'return x=="on"?lv_color_hex(0xF85149):(x=="unavailable"?lv_color_hex(0x555555):lv_color_hex(0x8B949E));'
+        - if:
+            condition:
+              lambda: 'return x == "on";'
+            then:
+              - lvgl.widget.show: ovl_trunk_open
+            else:
+              - lvgl.widget.hide: ovl_trunk_open
+
+  # Central lock state → unlock overlays (passenger + sliding + trunk)
+  - platform: homeassistant
+    id: ha_locks_raw
+    entity_id: lock.wican_doors  # TODO VALIDATE (state: locked / unlocked)
+    internal: true
+    on_value:
+      then:
+        - if:
+            condition:
+              lambda: 'return x == "unlocked";'
+            then:
+              - lvgl.widget.show: ovl_door_drv_unlock
+              - lvgl.widget.show: ovl_door_pass_unlock
+              - lvgl.widget.show: ovl_door_slide_unlock
+              - lvgl.widget.show: ovl_trunk_unlock
+            else:
+              - lvgl.widget.hide: ovl_door_drv_unlock
+              - lvgl.widget.hide: ovl_door_pass_unlock
+              - lvgl.widget.hide: ovl_door_slide_unlock
+              - lvgl.widget.hide: ovl_trunk_unlock
+
+  # Passenger window position (closed / vent / open). The displayed art also
+  # depends on whether the passenger door is open, so defer to the script.
+  - platform: homeassistant
+    id: ha_pass_window_raw
+    entity_id: sensor.wican_window_passenger  # TODO VALIDATE (closed/vent/open)
+    internal: true
+    on_value:
+      then:
+        - lambda: |-
+            std::string s = x;
+            if (s == "open") id(pass_window_mode) = 2;
+            else if (s == "vent" || s == "ventilate" || s == "partial") id(pass_window_mode) = 1;
+            else id(pass_window_mode) = 0;
+        - script.execute: update_pass_window
+
+  # Driver window position (closed / vent / open). Mirrors the passenger window;
+  # the displayed art also depends on whether the driver door is open.
+  - platform: homeassistant
+    id: ha_drv_window_raw
+    entity_id: sensor.wican_window_driver  # TODO VALIDATE (closed/vent/open)
+    internal: true
+    on_value:
+      then:
+        - lambda: |-
+            std::string s = x;
+            if (s == "open") id(drv_window_mode) = 2;
+            else if (s == "vent" || s == "ventilate" || s == "partial") id(drv_window_mode) = 1;
+            else id(drv_window_mode) = 0;
+        - script.execute: update_drv_window
+
+  # Hood / cowl open
+  - platform: homeassistant
+    id: ha_hood_raw
+    entity_id: binary_sensor.wican_hood  # TODO VALIDATE
+    internal: true
+    on_value:
+      then:
+        - if:
+            condition:
+              lambda: 'return x == "on";'
+            then:
+              - lvgl.widget.show: ovl_cowl
+            else:
+              - lvgl.widget.hide: ovl_cowl
 
   # ── Solar charging relay state (EcoFlow) ──
   # TODO VALIDATE entity_id for the solar input relay/switch.
@@ -492,6 +616,13 @@ sensor:
               snprintf(buf, sizeof(buf), "%.0f", x);
               return buf;
             text_color: !lambda 'return isnan(x) ? lv_color_hex(0x555555) : (x < 30 ? lv_color_hex(0xF0883E) : lv_color_hex(0xF0F6FC));'
+        - if:
+            condition:
+              lambda: 'return !isnan(x) && x < 30;'
+            then:
+              - lvgl.widget.show: ovl_tire_fl
+            else:
+              - lvgl.widget.hide: ovl_tire_fl
 
   - platform: homeassistant
     id: ha_tpms_fr
@@ -507,6 +638,13 @@ sensor:
               snprintf(buf, sizeof(buf), "%.0f", x);
               return buf;
             text_color: !lambda 'return isnan(x) ? lv_color_hex(0x555555) : (x < 30 ? lv_color_hex(0xF0883E) : lv_color_hex(0xF0F6FC));'
+        - if:
+            condition:
+              lambda: 'return !isnan(x) && x < 30;'
+            then:
+              - lvgl.widget.show: ovl_tire_fr
+            else:
+              - lvgl.widget.hide: ovl_tire_fr
 
   - platform: homeassistant
     id: ha_tpms_rl
@@ -522,6 +660,13 @@ sensor:
               snprintf(buf, sizeof(buf), "%.0f", x);
               return buf;
             text_color: !lambda 'return isnan(x) ? lv_color_hex(0x555555) : (x < 30 ? lv_color_hex(0xF0883E) : lv_color_hex(0xF0F6FC));'
+        - if:
+            condition:
+              lambda: 'return !isnan(x) && x < 30;'
+            then:
+              - lvgl.widget.show: ovl_tire_rl
+            else:
+              - lvgl.widget.hide: ovl_tire_rl
 
   - platform: homeassistant
     id: ha_tpms_rr
@@ -537,6 +682,13 @@ sensor:
               snprintf(buf, sizeof(buf), "%.0f", x);
               return buf;
             text_color: !lambda 'return isnan(x) ? lv_color_hex(0x555555) : (x < 30 ? lv_color_hex(0xF0883E) : lv_color_hex(0xF0F6FC));'
+        - if:
+            condition:
+              lambda: 'return !isnan(x) && x < 30;'
+            then:
+              - lvgl.widget.show: ovl_tire_rr
+            else:
+              - lvgl.widget.hide: ovl_tire_rr
 
 # ---- Fonts ----
 font:
@@ -593,6 +745,134 @@ font:
     bpp: 4
     glyphs: " -.0123456789:°"
 
+# ---- Vehicle schematic layers ----
+# Top-down van art. Source PNGs are 960x960 on a shared canvas; all layers are
+# uniformly cropped to the shared alpha bounding box (232,84)-(730,958) -> 498x874,
+# then resized by 1/2 to 249x437. Because the crop+scale is identical for every
+# layer they stay pixel-aligned when stacked at the same card offset (116,42).
+# RGB565 + alpha_channel (3 bytes/px) keeps per-pixel transparency; RGB565 is
+# native to color_depth 16. Base = 907600_car.png; overlays toggled by HA signals.
+# Rear inner-dually tires and the driver-side rear sliding door are omitted.
+# Regenerate cropped/ with: python scripts/crop_layers.py
+image:
+  - file: layers/cropped/907600_car.png
+    id: img_van_base
+    type: RGB565
+    transparency: alpha_channel
+    resize: 249x437
+  - file: layers/cropped/907600_cowl.png
+    id: img_cowl
+    type: RGB565
+    transparency: alpha_channel
+    resize: 249x437
+  # Driver (front-left) door
+  - file: layers/cropped/907600_door_frontleft_open.png
+    id: img_door_dl_open
+    type: RGB565
+    transparency: alpha_channel
+    resize: 249x437
+  - file: layers/cropped/907600_door_frontleft_unlock.png
+    id: img_door_dl_unlock
+    type: RGB565
+    transparency: alpha_channel
+    resize: 249x437
+  # Driver (front-left) windows (mutually exclusive states)
+  - file: layers/cropped/907600_window_frontleft_opendoorclosed.png
+    id: img_dwin_open_dc
+    type: RGB565
+    transparency: alpha_channel
+    resize: 249x437
+  - file: layers/cropped/907600_window_frontleft_opendooropened.png
+    id: img_dwin_open_do
+    type: RGB565
+    transparency: alpha_channel
+    resize: 249x437
+  - file: layers/cropped/907600_window_frontleft_ventilatedoorclosed.png
+    id: img_dwin_vent_dc
+    type: RGB565
+    transparency: alpha_channel
+    resize: 249x437
+  - file: layers/cropped/907600_window_frontleft_ventilatedooropened.png
+    id: img_dwin_vent_do
+    type: RGB565
+    transparency: alpha_channel
+    resize: 249x437
+  # Passenger (front-right) door
+  - file: layers/cropped/907600_door_frontright_open.png
+    id: img_door_fr_open
+    type: RGB565
+    transparency: alpha_channel
+    resize: 249x437
+  - file: layers/cropped/907600_door_frontright_unlock.png
+    id: img_door_fr_unlock
+    type: RGB565
+    transparency: alpha_channel
+    resize: 249x437
+  # Sliding (rear-right) door
+  - file: layers/cropped/907600_door_rearright_open.png
+    id: img_door_rr_open
+    type: RGB565
+    transparency: alpha_channel
+    resize: 249x437
+  - file: layers/cropped/907600_door_rearright_unlock.png
+    id: img_door_rr_unlock
+    type: RGB565
+    transparency: alpha_channel
+    resize: 249x437
+  # Rear barn doors / trunk
+  - file: layers/cropped/907600_trunk_open.png
+    id: img_trunk_open
+    type: RGB565
+    transparency: alpha_channel
+    resize: 249x437
+  - file: layers/cropped/907600_trunk_unlock.png
+    id: img_trunk_unlock
+    type: RGB565
+    transparency: alpha_channel
+    resize: 249x437
+  # Passenger (front-right) windows (mutually exclusive states)
+  - file: layers/cropped/907600_window_frontright_opendoorclosed.png
+    id: img_win_open_dc
+    type: RGB565
+    transparency: alpha_channel
+    resize: 249x437
+  - file: layers/cropped/907600_window_frontright_opendooropened.png
+    id: img_win_open_do
+    type: RGB565
+    transparency: alpha_channel
+    resize: 249x437
+  - file: layers/cropped/907600_window_frontright_ventilatedoorclosed.png
+    id: img_win_vent_dc
+    type: RGB565
+    transparency: alpha_channel
+    resize: 249x437
+  - file: layers/cropped/907600_window_frontright_ventilatedooropened.png
+    id: img_win_vent_do
+    type: RGB565
+    transparency: alpha_channel
+    resize: 249x437
+  # Tires (low-pressure warnings)
+  - file: layers/cropped/907600_tire_frontleft.png
+    id: img_tire_fl
+    type: RGB565
+    transparency: alpha_channel
+    resize: 249x437
+  - file: layers/cropped/907600_tire_frontright.png
+    id: img_tire_fr
+    type: RGB565
+    transparency: alpha_channel
+    resize: 249x437
+  - file: layers/cropped/907600_tire_rearleft.png
+    id: img_tire_rl
+    type: RGB565
+    transparency: alpha_channel
+    resize: 249x437
+  - file: layers/cropped/907600_tire_rearright.png
+    id: img_tire_rr
+    type: RGB565
+    transparency: alpha_channel
+    resize: 249x437
+
 # Refresh clock every 30 seconds
 interval:
   - interval: 30s
@@ -634,12 +914,65 @@ lvgl:
       bg_color: 0x010409
       widgets:
         # ═══════════════════════════════════════════════════
+        # DOORS — full-height left column (top-down vehicle schematic)
+        # Base van + transparent overlays, all 480×480 (½ of the 960 art) and
+        # stacked at the same origin so they stay aligned. Front of van = top.
+        # Overlays are toggled by Home Assistant signals; text labels removed.
+        # ═══════════════════════════════════════════════════
+        - obj:
+            id: card_doors
+            width: 480
+            height: 480
+            x: 0
+            y: 0
+            bg_color: 0x0D1117
+            bg_opa: COVER
+            radius: 0
+            border_width: 0
+            scrollbar_mode: "OFF"
+            scrollable: false
+            pad_all: 0
+            widgets:
+              - image:
+                  src: img_van_base
+                  align: TOP_LEFT
+                  x: 116
+                  y: 42
+              # Tires (low-pressure warnings)
+              - image: { id: ovl_tire_fl, src: img_tire_fl, align: TOP_LEFT, x: 116, y: 42, hidden: true }
+              - image: { id: ovl_tire_fr, src: img_tire_fr, align: TOP_LEFT, x: 116, y: 42, hidden: true }
+              - image: { id: ovl_tire_rl, src: img_tire_rl, align: TOP_LEFT, x: 116, y: 42, hidden: true }
+              - image: { id: ovl_tire_rr, src: img_tire_rr, align: TOP_LEFT, x: 116, y: 42, hidden: true }
+              # Cowl / hood
+              - image: { id: ovl_cowl, src: img_cowl, align: TOP_LEFT, x: 116, y: 42, hidden: true }
+              # Unlock indicators
+              - image: { id: ovl_door_drv_unlock, src: img_door_dl_unlock, align: TOP_LEFT, x: 116, y: 42, hidden: true }
+              - image: { id: ovl_door_pass_unlock, src: img_door_fr_unlock, align: TOP_LEFT, x: 116, y: 42, hidden: true }
+              - image: { id: ovl_door_slide_unlock, src: img_door_rr_unlock, align: TOP_LEFT, x: 116, y: 42, hidden: true }
+              - image: { id: ovl_trunk_unlock, src: img_trunk_unlock, align: TOP_LEFT, x: 116, y: 42, hidden: true }
+              # Driver windows (mutually exclusive; chosen by update_drv_window)
+              - image: { id: ovl_dwin_vent_dc, src: img_dwin_vent_dc, align: TOP_LEFT, x: 116, y: 42, hidden: true }
+              - image: { id: ovl_dwin_vent_do, src: img_dwin_vent_do, align: TOP_LEFT, x: 116, y: 42, hidden: true }
+              - image: { id: ovl_dwin_open_dc, src: img_dwin_open_dc, align: TOP_LEFT, x: 116, y: 42, hidden: true }
+              - image: { id: ovl_dwin_open_do, src: img_dwin_open_do, align: TOP_LEFT, x: 116, y: 42, hidden: true }
+              # Passenger windows (mutually exclusive; chosen by update_pass_window)
+              - image: { id: ovl_win_vent_dc, src: img_win_vent_dc, align: TOP_LEFT, x: 116, y: 42, hidden: true }
+              - image: { id: ovl_win_vent_do, src: img_win_vent_do, align: TOP_LEFT, x: 116, y: 42, hidden: true }
+              - image: { id: ovl_win_open_dc, src: img_win_open_dc, align: TOP_LEFT, x: 116, y: 42, hidden: true }
+              - image: { id: ovl_win_open_do, src: img_win_open_do, align: TOP_LEFT, x: 116, y: 42, hidden: true }
+              # Open doors (drawn last so they sit on top of everything)
+              - image: { id: ovl_door_drv_open, src: img_door_dl_open, align: TOP_LEFT, x: 116, y: 42, hidden: true }
+              - image: { id: ovl_door_pass_open, src: img_door_fr_open, align: TOP_LEFT, x: 116, y: 42, hidden: true }
+              - image: { id: ovl_door_slide_open, src: img_door_rr_open, align: TOP_LEFT, x: 116, y: 42, hidden: true }
+              - image: { id: ovl_trunk_open, src: img_trunk_open, align: TOP_LEFT, x: 116, y: 42, hidden: true }
+
+        # ═══════════════════════════════════════════════════
         # TOP BAR
         # ═══════════════════════════════════════════════════
         - obj:
-            width: 1920
+            width: 1440
             height: 44
-            x: 0
+            x: 480
             y: 0
             bg_color: 0x010409
             bg_opa: COVER
@@ -686,9 +1019,9 @@ lvgl:
         # CORE CARDS ROW (always visible)
         # ═══════════════════════════════════════════════════
         - obj:
-            width: 1920
+            width: 1440
             height: 282
-            x: 0
+            x: 480
             y: 50
             bg_opa: TRANSP
             border_width: 0
@@ -704,7 +1037,7 @@ lvgl:
             widgets:
               # ── Vehicle card ──
               - obj:
-                  width: 470
+                  width: 430
                   height: 282
                   bg_color: 0x161B22
                   bg_opa: COVER
@@ -742,7 +1075,7 @@ lvgl:
                         y: 42
                     - bar:
                         id: bar_fuel
-                        width: 438
+                        width: 398
                         height: 18
                         x: 0
                         y: 78
@@ -770,7 +1103,7 @@ lvgl:
                         y: 112
                     - bar:
                         id: bar_def
-                        width: 438
+                        width: 398
                         height: 18
                         x: 0
                         y: 142
@@ -797,136 +1130,9 @@ lvgl:
                         x: 52
                         y: 192
 
-              # ── Doors card (top-down Sprinter schematic) ──
-              # Front of van = top, rear = bottom. Sliding door on the right
-              # (curb/passenger) side, mid-body, per US-spec Sprinter.
-              - obj:
-                  width: 250
-                  height: 282
-                  bg_color: 0x161B22
-                  bg_opa: COVER
-                  radius: 18
-                  border_width: 0
-                  scrollbar_mode: "OFF"
-                  scrollable: false
-                  pad_all: 16
-                  widgets:
-                    - label:
-                        text: "DOORS"
-                        text_font: roboto_small
-                        text_color: 0x484F58
-                        x: 0
-                        y: 0
-                    # Van body outline (front = top)
-                    - obj:
-                        width: 96
-                        height: 180
-                        x: 61
-                        y: 44
-                        bg_color: 0x0D1117
-                        bg_opa: COVER
-                        radius: 18
-                        border_width: 2
-                        border_color: 0x30363D
-                        scrollbar_mode: "OFF"
-                        scrollable: false
-                        widgets:
-                          # Windshield hint (front of vehicle)
-                          - obj:
-                              width: 70
-                              height: 6
-                              align: TOP_MID
-                              y: 8
-                              bg_color: 0x30363D
-                              bg_opa: COVER
-                              radius: 3
-                              border_width: 0
-                    # ── Door panels (recolored by state) ──
-                    # Driver (front-left)
-                    - obj:
-                        id: rect_door_driver
-                        width: 12
-                        height: 52
-                        x: 55
-                        y: 72
-                        bg_color: 0x30363D
-                        bg_opa: COVER
-                        radius: 4
-                        border_width: 0
-                        scrollbar_mode: "OFF"
-                        scrollable: false
-                    # Passenger (front-right)
-                    - obj:
-                        id: rect_door_passenger
-                        width: 12
-                        height: 52
-                        x: 151
-                        y: 72
-                        bg_color: 0x30363D
-                        bg_opa: COVER
-                        radius: 4
-                        border_width: 0
-                        scrollbar_mode: "OFF"
-                        scrollable: false
-                    # Sliding (right side, mid-body)
-                    - obj:
-                        id: rect_door_sliding
-                        width: 12
-                        height: 58
-                        x: 151
-                        y: 134
-                        bg_color: 0x30363D
-                        bg_opa: COVER
-                        radius: 4
-                        border_width: 0
-                        scrollbar_mode: "OFF"
-                        scrollable: false
-                    # Rear (barn doors, bottom)
-                    - obj:
-                        id: rect_door_rear
-                        width: 66
-                        height: 12
-                        x: 76
-                        y: 218
-                        bg_color: 0x30363D
-                        bg_opa: COVER
-                        radius: 4
-                        border_width: 0
-                        scrollbar_mode: "OFF"
-                        scrollable: false
-                    # ── Door identification labels (recolor by state) ──
-                    - label:
-                        id: lbl_door_driver_state
-                        text: "Drv"
-                        text_font: roboto_small
-                        text_color: 0x8B949E
-                        x: 2
-                        y: 88
-                    - label:
-                        id: lbl_door_passenger_state
-                        text: "Pas"
-                        text_font: roboto_small
-                        text_color: 0x8B949E
-                        x: 172
-                        y: 88
-                    - label:
-                        id: lbl_door_sliding_state
-                        text: "Sld"
-                        text_font: roboto_small
-                        text_color: 0x8B949E
-                        x: 172
-                        y: 150
-                    - label:
-                        id: lbl_door_rear_state
-                        text: "Rear"
-                        text_font: roboto_small
-                        text_color: 0x8B949E
-                        align: BOTTOM_MID
-                        y: -2
-
               # ── Power card ──
               - obj:
-                  width: 470
+                  width: 430
                   height: 282
                   bg_color: 0x161B22
                   bg_opa: COVER
@@ -965,7 +1171,7 @@ lvgl:
                         y: 44
                     - bar:
                         id: bar_battery
-                        width: 438
+                        width: 398
                         height: 18
                         x: 0
                         y: 84
@@ -1050,7 +1256,7 @@ lvgl:
 
               # ── Climate card (Home Assistant-style badges) ──
               - obj:
-                  width: 660
+                  width: 520
                   height: 282
                   bg_color: 0x161B22
                   bg_opa: COVER
@@ -1098,13 +1304,13 @@ lvgl:
                         text: "Interior"
                         text_font: roboto_small
                         text_color: 0x8B949E
-                        x: 330
+                        x: 264
                         y: 36
                     - obj:
                         styles: badge_pill
                         width: SIZE_CONTENT
                         height: SIZE_CONTENT
-                        x: 330
+                        x: 264
                         y: 62
                         layout: *flex_badge
                         widgets:
@@ -1146,13 +1352,13 @@ lvgl:
                         text: "Fridge"
                         text_font: roboto_small
                         text_color: 0x8B949E
-                        x: 330
+                        x: 264
                         y: 148
                     - obj:
                         styles: badge_pill
                         width: SIZE_CONTENT
                         height: SIZE_CONTENT
-                        x: 330
+                        x: 264
                         y: 174
                         layout: *flex_badge
                         widgets:
@@ -1171,9 +1377,9 @@ lvgl:
         # ═══════════════════════════════════════════════════
         - obj:
             id: bottom_driving
-            width: 1920
+            width: 1440
             height: 140
-            x: 0
+            x: 480
             y: 338
             bg_opa: TRANSP
             border_width: 0
@@ -1189,7 +1395,7 @@ lvgl:
             widgets:
               # Lights Off
               - button:
-                  width: 612
+                  width: 456
                   height: 116
                   bg_color: 0x21262D
                   radius: 16
@@ -1214,7 +1420,7 @@ lvgl:
                         align: CENTER
               # Close Awnings
               - button:
-                  width: 612
+                  width: 456
                   height: 116
                   bg_color: 0x21262D
                   radius: 16
@@ -1243,7 +1449,7 @@ lvgl:
                         align: CENTER
               # Water Pump Off
               - button:
-                  width: 612
+                  width: 456
                   height: 116
                   bg_color: 0x21262D
                   radius: 16
@@ -1273,9 +1479,9 @@ lvgl:
         - obj:
             id: bottom_parked
             hidden: true
-            width: 1920
+            width: 1440
             height: 140
-            x: 0
+            x: 480
             y: 338
             bg_opa: TRANSP
             border_width: 0
@@ -1287,7 +1493,7 @@ lvgl:
               # ── Controls (left) ──
               # Lights Off
               - button:
-                  width: 150
+                  width: 140
                   height: 116
                   x: 0
                   y: 12
@@ -1315,9 +1521,9 @@ lvgl:
                         y: -12
               # Close Awnings
               - button:
-                  width: 150
+                  width: 140
                   height: 116
-                  x: 162
+                  x: 152
                   y: 12
                   bg_color: 0x21262D
                   radius: 14
@@ -1347,9 +1553,9 @@ lvgl:
                         y: -12
               # Water Pump
               - button:
-                  width: 150
+                  width: 140
                   height: 116
-                  x: 324
+                  x: 304
                   y: 12
                   bg_color: 0x21262D
                   radius: 14
@@ -1376,9 +1582,9 @@ lvgl:
                         y: -12
               # Hot Water Heater
               - button:
-                  width: 150
+                  width: 140
                   height: 116
-                  x: 486
+                  x: 456
                   y: 12
                   bg_color: 0x21262D
                   radius: 14
@@ -1405,9 +1611,9 @@ lvgl:
                         y: -12
               # AC Inverter
               - button:
-                  width: 150
+                  width: 140
                   height: 116
-                  x: 648
+                  x: 608
                   y: 12
                   bg_color: 0x21262D
                   radius: 14
@@ -1435,9 +1641,9 @@ lvgl:
 
               # ── Water tank (center-right) ──
               - obj:
-                  width: 380
+                  width: 300
                   height: 116
-                  x: 820
+                  x: 764
                   y: 12
                   bg_color: 0x161B22
                   bg_opa: COVER
@@ -1463,7 +1669,7 @@ lvgl:
                         y: 2
                     - bar:
                         id: bar_water_pk
-                        width: 290
+                        width: 220
                         height: 16
                         align: BOTTOM_LEFT
                         x: 52
@@ -1479,9 +1685,9 @@ lvgl:
 
               # ── TPMS (right) ──
               - obj:
-                  width: 470
+                  width: 328
                   height: 116
-                  x: 1216
+                  x: 1088
                   y: 12
                   bg_color: 0x161B22
                   bg_opa: COVER
@@ -1502,13 +1708,13 @@ lvgl:
                         text: "--"
                         text_font: roboto_large
                         text_color: 0xF0F6FC
-                        x: 20
+                        x: 8
                         y: 36
                     - label:
                         text: "FL"
                         text_font: roboto_small
                         text_color: 0x8B949E
-                        x: 24
+                        x: 12
                         y: 82
                     # Front Right
                     - label:
@@ -1516,13 +1722,13 @@ lvgl:
                         text: "--"
                         text_font: roboto_large
                         text_color: 0xF0F6FC
-                        x: 140
+                        x: 86
                         y: 36
                     - label:
                         text: "FR"
                         text_font: roboto_small
                         text_color: 0x8B949E
-                        x: 144
+                        x: 90
                         y: 82
                     # Rear Left
                     - label:
@@ -1530,13 +1736,13 @@ lvgl:
                         text: "--"
                         text_font: roboto_large
                         text_color: 0xF0F6FC
-                        x: 260
+                        x: 164
                         y: 36
                     - label:
                         text: "RL"
                         text_font: roboto_small
                         text_color: 0x8B949E
-                        x: 264
+                        x: 168
                         y: 82
                     # Rear Right
                     - label:
@@ -1544,12 +1750,12 @@ lvgl:
                         text: "--"
                         text_font: roboto_large
                         text_color: 0xF0F6FC
-                        x: 380
+                        x: 242
                         y: 36
                     - label:
                         text: "RR"
                         text_font: roboto_small
                         text_color: 0x8B949E
-                        x: 384
+                        x: 246
                         y: 82
 
