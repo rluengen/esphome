@@ -13,10 +13,6 @@ esp32:
       CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_360: "y"
       CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_400: "n"
 
-esphome:
-  platformio_options:
-    board_build.partitions: ../../../partitions/esp32p4_32mb_single_app.csv
-
 psram:
   mode: hex
   speed: 200MHZ
