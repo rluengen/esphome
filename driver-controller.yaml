@@ -6,7 +6,7 @@ substitutions:
   friendly_name: Driver Controller
   project_name: driver-controller
   project_version: "1.0.0"
-  log_level: DEBUG
+  log_level: INFO
 
   # Colors
   color_bg: "0x000000"

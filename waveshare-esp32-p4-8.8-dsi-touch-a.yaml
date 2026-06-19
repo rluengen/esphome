@@ -6,7 +6,7 @@ substitutions:
   friendly_name: Touch Panel Controller
   project_name: waveshare_88_touch_panel
   project_version: "1.0.11"
-  log_level: DEBUG
+  log_level: INFO
 
 esphome:
   name: ${device_name}
