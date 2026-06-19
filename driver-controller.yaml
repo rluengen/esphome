@@ -771,8 +771,8 @@ image:
     type: RGB565
     transparency: alpha_channel
     resize: 249x437
-  - file: layers/cropped/907600_door_frontleft_unlock.png
-    id: img_door_dl_unlock
+  - file: layers/cropped/907600_door_generic_unlock.png
+    id: img_generic_unlock
     type: RGB565
     transparency: alpha_channel
     resize: 249x437
@@ -803,30 +803,15 @@ image:
     type: RGB565
     transparency: alpha_channel
     resize: 249x437
-  - file: layers/cropped/907600_door_frontright_unlock.png
-    id: img_door_fr_unlock
-    type: RGB565
-    transparency: alpha_channel
-    resize: 249x437
   # Sliding (rear-right) door
   - file: layers/cropped/907600_door_rearright_open.png
     id: img_door_rr_open
     type: RGB565
     transparency: alpha_channel
     resize: 249x437
-  - file: layers/cropped/907600_door_rearright_unlock.png
-    id: img_door_rr_unlock
-    type: RGB565
-    transparency: alpha_channel
-    resize: 249x437
   # Rear barn doors / trunk
   - file: layers/cropped/907600_trunk_open.png
     id: img_trunk_open
-    type: RGB565
-    transparency: alpha_channel
-    resize: 249x437
-  - file: layers/cropped/907600_trunk_unlock.png
-    id: img_trunk_unlock
     type: RGB565
     transparency: alpha_channel
     resize: 249x437
@@ -945,11 +930,11 @@ lvgl:
               - image: { id: ovl_tire_rr, src: img_tire_rr, align: TOP_LEFT, x: 116, y: 42, hidden: true }
               # Cowl / hood
               - image: { id: ovl_cowl, src: img_cowl, align: TOP_LEFT, x: 116, y: 42, hidden: true }
-              # Unlock indicators
-              - image: { id: ovl_door_drv_unlock, src: img_door_dl_unlock, align: TOP_LEFT, x: 116, y: 42, hidden: true }
-              - image: { id: ovl_door_pass_unlock, src: img_door_fr_unlock, align: TOP_LEFT, x: 116, y: 42, hidden: true }
-              - image: { id: ovl_door_slide_unlock, src: img_door_rr_unlock, align: TOP_LEFT, x: 116, y: 42, hidden: true }
-              - image: { id: ovl_trunk_unlock, src: img_trunk_unlock, align: TOP_LEFT, x: 116, y: 42, hidden: true }
+              # Unlock indicators (all use generic unlock image)
+              - image: { id: ovl_door_drv_unlock, src: img_generic_unlock, align: TOP_LEFT, x: 116, y: 42, hidden: true }
+              - image: { id: ovl_door_pass_unlock, src: img_generic_unlock, align: TOP_LEFT, x: 116, y: 42, hidden: true }
+              - image: { id: ovl_door_slide_unlock, src: img_generic_unlock, align: TOP_LEFT, x: 116, y: 42, hidden: true }
+              - image: { id: ovl_trunk_unlock, src: img_generic_unlock, align: TOP_LEFT, x: 116, y: 42, hidden: true }
               # Driver windows (mutually exclusive; chosen by update_drv_window)
               - image: { id: ovl_dwin_vent_dc, src: img_dwin_vent_dc, align: TOP_LEFT, x: 116, y: 42, hidden: true }
               - image: { id: ovl_dwin_vent_do, src: img_dwin_vent_do, align: TOP_LEFT, x: 116, y: 42, hidden: true }
