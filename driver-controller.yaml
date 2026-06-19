@@ -18,6 +18,13 @@ esphome:
     name: smartvan.${project_name}
     version: ${project_version}
 
+esp32:
+  cpu_frequency: 360MHZ
+  framework:
+    sdkconfig_options:
+      CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_360: "y"
+      CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_400: "n"
+
 packages:
   remote_packages:
     url: https://github.com/rluengen/esphome
