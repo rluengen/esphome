@@ -100,15 +100,15 @@ script:
           else driving = id(engine_is_running);
 
           if (driving) {
-            lv_obj_clear_flag(id(bottom_driving)->obj, LV_OBJ_FLAG_HIDDEN);
-            lv_obj_add_flag(id(bottom_parked)->obj, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(bottom_driving), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(bottom_parked), LV_OBJ_FLAG_HIDDEN);
           } else {
-            lv_obj_add_flag(id(bottom_driving)->obj, LV_OBJ_FLAG_HIDDEN);
-            lv_obj_clear_flag(id(bottom_parked)->obj, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(bottom_driving), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(bottom_parked), LV_OBJ_FLAG_HIDDEN);
           }
 
           const char* lbl = (m == 1) ? "DRIVE" : (m == 2) ? "PARK" : (driving ? "AUTO\u00B7DRIVE" : "AUTO\u00B7PARK");
-          lv_label_set_text(id(lbl_mode)->obj, lbl);
+          lv_label_set_text(id(lbl_mode), lbl);
 
   - id: refresh_time_display
     then:
@@ -129,15 +129,15 @@ script:
     then:
       - lambda: |-
           // Hide all four first.
-          lv_obj_add_flag(id(ovl_win_open_dc)->obj, LV_OBJ_FLAG_HIDDEN);
-          lv_obj_add_flag(id(ovl_win_open_do)->obj, LV_OBJ_FLAG_HIDDEN);
-          lv_obj_add_flag(id(ovl_win_vent_dc)->obj, LV_OBJ_FLAG_HIDDEN);
-          lv_obj_add_flag(id(ovl_win_vent_do)->obj, LV_OBJ_FLAG_HIDDEN);
+          lv_obj_add_flag(id(ovl_win_open_dc), LV_OBJ_FLAG_HIDDEN);
+          lv_obj_add_flag(id(ovl_win_open_do), LV_OBJ_FLAG_HIDDEN);
+          lv_obj_add_flag(id(ovl_win_vent_dc), LV_OBJ_FLAG_HIDDEN);
+          lv_obj_add_flag(id(ovl_win_vent_do), LV_OBJ_FLAG_HIDDEN);
           bool dopen = id(pass_door_open);
           int w = id(pass_window_mode);
           lv_obj_t* show = nullptr;
-          if (w == 2) show = dopen ? id(ovl_win_open_do)->obj : id(ovl_win_open_dc)->obj;
-          else if (w == 1) show = dopen ? id(ovl_win_vent_do)->obj : id(ovl_win_vent_dc)->obj;
+          if (w == 2) show = dopen ? id(ovl_win_open_do) : id(ovl_win_open_dc);
+          else if (w == 1) show = dopen ? id(ovl_win_vent_do) : id(ovl_win_vent_dc);
           if (show) lv_obj_clear_flag(show, LV_OBJ_FLAG_HIDDEN);
 
   # Driver-window equivalent of update_pass_window (uses the driver door state).
@@ -145,15 +145,15 @@ script:
     then:
       - lambda: |-
           // Hide all four first.
-          lv_obj_add_flag(id(ovl_dwin_open_dc)->obj, LV_OBJ_FLAG_HIDDEN);
-          lv_obj_add_flag(id(ovl_dwin_open_do)->obj, LV_OBJ_FLAG_HIDDEN);
-          lv_obj_add_flag(id(ovl_dwin_vent_dc)->obj, LV_OBJ_FLAG_HIDDEN);
-          lv_obj_add_flag(id(ovl_dwin_vent_do)->obj, LV_OBJ_FLAG_HIDDEN);
+          lv_obj_add_flag(id(ovl_dwin_open_dc), LV_OBJ_FLAG_HIDDEN);
+          lv_obj_add_flag(id(ovl_dwin_open_do), LV_OBJ_FLAG_HIDDEN);
+          lv_obj_add_flag(id(ovl_dwin_vent_dc), LV_OBJ_FLAG_HIDDEN);
+          lv_obj_add_flag(id(ovl_dwin_vent_do), LV_OBJ_FLAG_HIDDEN);
           bool dopen = id(drv_door_open);
           int w = id(drv_window_mode);
           lv_obj_t* show = nullptr;
-          if (w == 2) show = dopen ? id(ovl_dwin_open_do)->obj : id(ovl_dwin_open_dc)->obj;
-          else if (w == 1) show = dopen ? id(ovl_dwin_vent_do)->obj : id(ovl_dwin_vent_dc)->obj;
+          if (w == 2) show = dopen ? id(ovl_dwin_open_do) : id(ovl_dwin_open_dc);
+          else if (w == 1) show = dopen ? id(ovl_dwin_vent_do) : id(ovl_dwin_vent_dc);
           if (show) lv_obj_clear_flag(show, LV_OBJ_FLAG_HIDDEN);
 
 # ---- Home Assistant Sensors ----
