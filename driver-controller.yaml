@@ -39,7 +39,9 @@ packages:
         vars:
           touchscreen_id: dsi_touchscreen
           backlight_id: display_backlight
-      - path: packages/ota/http_update.yaml
+
+# Disable OTA for this device to avoid ESP32-P4 boot crash with 32MB + IDF experimental features.
+ota: !remove
 
 # ---- Display / Touch Orientation ----
 # 1920x480 landscape via LVGL rotation (270). Rotation MUST live in the LVGL
