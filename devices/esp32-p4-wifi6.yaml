@@ -15,7 +15,7 @@ esp32:
 
 esphome:
   platformio_options:
-    board_build.partitions: partitions/esp32p4_32mb_single_app.csv
+    board_build.partitions: ../../../partitions/esp32p4_32mb_single_app.csv
 
 psram:
   mode: hex
