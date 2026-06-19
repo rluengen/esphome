@@ -41,14 +41,1515 @@ packages:
           backlight_id: display_backlight
       - path: packages/ota/http_update.yaml
 
-# ---- LVGL Layout ----
+# ---- Display / Touch Orientation ----
+# 1920x480 landscape via LVGL rotation (270). Rotation MUST live in the LVGL
+# config, not in waveshare_dsi (the display component), otherwise ESPHome errors
+# with "use of 'rotation' in the display config is not compatible with LVGL".
+# The device package (devices/88-dsi-touch-a.yaml) sets rotation: 270 on the
+# panel, so strip it here with !remove and let LVGL own the rotation.
+waveshare_dsi:
+  rotation: !remove
+
+touchscreen:
+  - id: !extend dsi_touchscreen
+    transform:
+      swap_xy: false
+      mirror_x: false
+      mirror_y: false
+
+# ---- Display Mode State ----
+# Two display modes:
+#   Driving (engine on)  -> focused, glanceable vehicle state + quick actions
+#   Parked  (engine off) -> same core dashboard + expanded controls, TPMS, water
+# Mode follows engine state automatically; the top-bar button cycles a manual
+# override: AUTO -> DRIVE -> PARK -> AUTO.
+globals:
+  - id: engine_is_running
+    type: bool
+    initial_value: 'false'
+  # 0 = AUTO (follow engine), 1 = force DRIVE, 2 = force PARK
+  - id: manual_mode
+    type: int
+    initial_value: '0'
+
+script:
+  # Apply the effective display mode based on engine state + manual override
+  - id: apply_display_mode
+    then:
+      - lambda: |-
+          bool driving;
+          int m = id(manual_mode);
+          if (m == 1) driving = true;
+          else if (m == 2) driving = false;
+          else driving = id(engine_is_running);
+
+          if (driving) {
+            lv_obj_clear_flag(id(bottom_driving)->obj, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(bottom_parked)->obj, LV_OBJ_FLAG_HIDDEN);
+          } else {
+            lv_obj_add_flag(id(bottom_driving)->obj, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(bottom_parked)->obj, LV_OBJ_FLAG_HIDDEN);
+          }
+
+          const char* lbl = (m == 1) ? "DRIVE" : (m == 2) ? "PARK" : (driving ? "AUTO\u00B7DRIVE" : "AUTO\u00B7PARK");
+          lv_label_set_text(id(lbl_mode)->obj, lbl);
+
+  - id: refresh_time_display
+    then:
+      - lvgl.label.update:
+          id: lbl_time
+          text: !lambda |-
+            auto time = id(ha_time).now();
+            if (!time.is_valid()) return "--:--";
+            static char buf[12];
+            int hr = time.hour % 12;
+            if (hr == 0) hr = 12;
+            snprintf(buf, sizeof(buf), "%d:%02d %s", hr, time.minute, time.hour < 12 ? "AM" : "PM");
+            return buf;
+
+# ---- Home Assistant Sensors ----
+text_sensor:
+  # ── Engine running state (drives mode switching) ──
+  # TODO VALIDATE entity_id (WiCAN). If your engine state is an RPM sensor instead
+  # of a binary_sensor, change to a `sensor:` reading RPM and treat >0 as running.
+  - platform: homeassistant
+    id: ha_engine_running_raw
+    entity_id: binary_sensor.wican_engine_running  # TODO VALIDATE
+    internal: true
+    on_value:
+      then:
+        - lambda: 'id(engine_is_running) = (x == "on");'
+        - script.execute: apply_display_mode
+
+  # ── Door states (open/closed) ──
+  # TODO VALIDATE all four door entity_ids (WiCAN).
+  - platform: homeassistant
+    id: ha_door_driver_raw
+    entity_id: binary_sensor.wican_door_driver  # TODO VALIDATE
+    internal: true
+    on_value:
+      then:
+        - lvgl.widget.update:
+            id: rect_door_driver
+            bg_color: !lambda 'return x=="on"?lv_color_hex(0xF85149):(x=="unavailable"?lv_color_hex(0x30363D):lv_color_hex(0x3FB950));'
+        - lvgl.label.update:
+            id: lbl_door_driver_state
+            text_color: !lambda 'return x=="on"?lv_color_hex(0xF85149):(x=="unavailable"?lv_color_hex(0x555555):lv_color_hex(0x8B949E));'
+
+  - platform: homeassistant
+    id: ha_door_passenger_raw
+    entity_id: binary_sensor.wican_door_passenger  # TODO VALIDATE
+    internal: true
+    on_value:
+      then:
+        - lvgl.widget.update:
+            id: rect_door_passenger
+            bg_color: !lambda 'return x=="on"?lv_color_hex(0xF85149):(x=="unavailable"?lv_color_hex(0x30363D):lv_color_hex(0x3FB950));'
+        - lvgl.label.update:
+            id: lbl_door_passenger_state
+            text_color: !lambda 'return x=="on"?lv_color_hex(0xF85149):(x=="unavailable"?lv_color_hex(0x555555):lv_color_hex(0x8B949E));'
+
+  - platform: homeassistant
+    id: ha_door_sliding_raw
+    entity_id: binary_sensor.wican_door_sliding  # TODO VALIDATE
+    internal: true
+    on_value:
+      then:
+        - lvgl.widget.update:
+            id: rect_door_sliding
+            bg_color: !lambda 'return x=="on"?lv_color_hex(0xF85149):(x=="unavailable"?lv_color_hex(0x30363D):lv_color_hex(0x3FB950));'
+        - lvgl.label.update:
+            id: lbl_door_sliding_state
+            text_color: !lambda 'return x=="on"?lv_color_hex(0xF85149):(x=="unavailable"?lv_color_hex(0x555555):lv_color_hex(0x8B949E));'
+
+  - platform: homeassistant
+    id: ha_door_rear_raw
+    entity_id: binary_sensor.wican_door_rear  # TODO VALIDATE
+    internal: true
+    on_value:
+      then:
+        - lvgl.widget.update:
+            id: rect_door_rear
+            bg_color: !lambda 'return x=="on"?lv_color_hex(0xF85149):(x=="unavailable"?lv_color_hex(0x30363D):lv_color_hex(0x3FB950));'
+        - lvgl.label.update:
+            id: lbl_door_rear_state
+            text_color: !lambda 'return x=="on"?lv_color_hex(0xF85149):(x=="unavailable"?lv_color_hex(0x555555):lv_color_hex(0x8B949E));'
+
+  # ── Solar charging relay state (EcoFlow) ──
+  # TODO VALIDATE entity_id for the solar input relay/switch.
+  - platform: homeassistant
+    id: ha_solar_relay_raw
+    entity_id: switch.ecoflow_solar_charging  # TODO VALIDATE
+    internal: true
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: lbl_solar_toggle
+            text: !lambda 'return std::string(x=="on"?"ON":(x=="unavailable"?"N/A":"OFF"));'
+            text_color: !lambda 'return x=="on"?lv_color_hex(0x3FB950):(x=="unavailable"?lv_color_hex(0x555555):lv_color_hex(0x8B949E));'
+
+  # ── Alternator charging relay state (EcoFlow) ──
+  # TODO VALIDATE entity_id for the alternator input relay/switch.
+  - platform: homeassistant
+    id: ha_alt_relay_raw
+    entity_id: switch.ecoflow_alternator_charging  # TODO VALIDATE
+    internal: true
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: lbl_alt_toggle
+            text: !lambda 'return std::string(x=="on"?"ON":(x=="unavailable"?"N/A":"OFF"));'
+            text_color: !lambda 'return x=="on"?lv_color_hex(0x3FB950):(x=="unavailable"?lv_color_hex(0x555555):lv_color_hex(0x8B949E));'
+
+  # ── AC inverter state (EcoFlow) ── parked controls
+  - platform: homeassistant
+    id: ha_inverter_raw
+    entity_id: switch.ecoflow_ac_inverter
+    internal: true
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: lbl_inverter_state
+            text: !lambda 'return std::string(x=="on"?"INV ON":(x=="unavailable"?"INV N/A":"INV OFF"));'
+            text_color: !lambda 'return x=="on"?lv_color_hex(0x3FB950):(x=="unavailable"?lv_color_hex(0x555555):lv_color_hex(0x8B949E));'
+
+  # ── Hot water heater state ── parked controls
+  - platform: homeassistant
+    id: ha_heater_raw
+    entity_id: switch.water_tank_display_hot_water_heater
+    internal: true
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: lbl_heater_state
+            text: !lambda 'return std::string(x=="on"?"HEAT ON":(x=="unavailable"?"HEAT N/A":"HEAT OFF"));'
+            text_color: !lambda 'return x=="on"?lv_color_hex(0xF0883E):(x=="unavailable"?lv_color_hex(0x555555):lv_color_hex(0x8B949E));'
+
+  # ── Water pump state ── parked controls + quick action feedback
+  - platform: homeassistant
+    id: ha_pump_raw
+    entity_id: switch.water_tank_display_water_pump
+    internal: true
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: lbl_pump_state
+            text: !lambda 'return std::string(x=="on"?"PUMP ON":(x=="unavailable"?"PUMP N/A":"PUMP OFF"));'
+            text_color: !lambda 'return x=="on"?lv_color_hex(0x58A6FF):(x=="unavailable"?lv_color_hex(0x555555):lv_color_hex(0x8B949E));'
+
+binary_sensor:
+  # Connectivity indicator (Wi-Fi/HA API up)
+  - platform: status
+    id: device_online
+    internal: true
+    on_state:
+      then:
+        - lvgl.label.update:
+            id: lbl_conn
+            text: !lambda 'return std::string(x ? "\U000F05A9" : "\U000F05AA");'
+            text_color: !lambda 'return x ? lv_color_hex(0x3FB950) : lv_color_hex(0xF85149);'
+
+sensor:
+  # ══ Vehicle (WiCAN OBD2) ══
+  # TODO VALIDATE all WiCAN sensor entity_ids below.
+  - platform: homeassistant
+    id: ha_fuel_level
+    entity_id: sensor.wican_fuel_level  # TODO VALIDATE (expects 0-100 %)
+    internal: true
+    on_value:
+      then:
+        - lvgl.bar.update:
+            id: bar_fuel
+            value: !lambda 'return isnan(x) ? 0 : (int)x;'
+        - lvgl.bar.update:
+            id: bar_fuel
+            indicator:
+              bg_color: !lambda |-
+                if (isnan(x)) return lv_color_hex(0x3A3A3A);
+                if (x <= 15) return lv_color_hex(0xF85149);
+                if (x <= 30) return lv_color_hex(0xF0883E);
+                return lv_color_hex(0x3FB950);
+        - lvgl.label.update:
+            id: lbl_fuel_pct
+            text: !lambda |-
+              if (isnan(x)) return "--%";
+              static char buf[8];
+              snprintf(buf, sizeof(buf), "%.0f%%", x);
+              return buf;
+            text_color: !lambda 'return isnan(x) ? lv_color_hex(0x555555) : lv_color_hex(0xF0F6FC);'
+
+  - platform: homeassistant
+    id: ha_def_level
+    entity_id: sensor.wican_def_level  # TODO VALIDATE (expects 0-100 %)
+    internal: true
+    on_value:
+      then:
+        - lvgl.bar.update:
+            id: bar_def
+            value: !lambda 'return isnan(x) ? 0 : (int)x;'
+        - lvgl.bar.update:
+            id: bar_def
+            indicator:
+              bg_color: !lambda |-
+                if (isnan(x)) return lv_color_hex(0x3A3A3A);
+                if (x <= 15) return lv_color_hex(0xF85149);
+                if (x <= 30) return lv_color_hex(0xF0883E);
+                return lv_color_hex(0x58A6FF);
+        - lvgl.label.update:
+            id: lbl_def_pct
+            text: !lambda |-
+              if (isnan(x)) return "--%";
+              static char buf[8];
+              snprintf(buf, sizeof(buf), "%.0f%%", x);
+              return buf;
+            text_color: !lambda 'return isnan(x) ? lv_color_hex(0x555555) : lv_color_hex(0xF0F6FC);'
+
+  - platform: homeassistant
+    id: ha_odometer
+    entity_id: sensor.wican_odometer  # TODO VALIDATE (miles or km)
+    internal: true
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: lbl_odometer
+            text: !lambda |-
+              if (isnan(x)) return "----- mi";
+              static char buf[24];
+              snprintf(buf, sizeof(buf), "%.0f mi", x);
+              return buf;
+            text_color: !lambda 'return isnan(x) ? lv_color_hex(0x555555) : lv_color_hex(0xF0F6FC);'
+
+  - platform: homeassistant
+    id: ha_outside_temp
+    entity_id: sensor.wican_outside_temperature  # TODO VALIDATE (WiCAN ambient)
+    internal: true
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: lbl_outside_temp
+            text: !lambda |-
+              if (isnan(x)) return "--\u00B0F";
+              static char buf[12];
+              snprintf(buf, sizeof(buf), "%.1f\u00B0F", x);
+              return buf;
+            text_color: !lambda 'return isnan(x) ? lv_color_hex(0x555555) : lv_color_hex(0xF0F6FC);'
+
+  # ══ Power (EcoFlow) ══
+  - platform: homeassistant
+    id: ha_battery_soc
+    entity_id: sensor.ecoflow_battery_percentage
+    internal: true
+    on_value:
+      then:
+        - lvgl.bar.update:
+            id: bar_battery
+            value: !lambda 'return isnan(x) ? 0 : (int)x;'
+        - lvgl.bar.update:
+            id: bar_battery
+            indicator:
+              bg_color: !lambda |-
+                if (isnan(x)) return lv_color_hex(0x3A3A3A);
+                if (x <= 15) return lv_color_hex(0xF85149);
+                if (x <= 30) return lv_color_hex(0xF0883E);
+                return lv_color_hex(0x3FB950);
+        - lvgl.label.update:
+            id: lbl_batt_pct
+            text: !lambda |-
+              if (isnan(x)) return "--%";
+              static char buf[8];
+              snprintf(buf, sizeof(buf), "%.0f%%", x);
+              return buf;
+            text_color: !lambda 'return isnan(x) ? lv_color_hex(0x555555) : lv_color_hex(0xF0F6FC);'
+
+  - platform: homeassistant
+    id: ha_solar_w
+    entity_id: sensor.ecoflow_solar_in_power
+    internal: true
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: lbl_solar_w
+            text: !lambda |-
+              if (isnan(x)) return "-- W";
+              static char buf[12];
+              snprintf(buf, sizeof(buf), "%.0f W", x);
+              return buf;
+            text_color: !lambda 'return isnan(x) ? lv_color_hex(0x555555) : lv_color_hex(0xF0F6FC);'
+
+  # TODO VALIDATE alternator input power entity_id (EcoFlow DC/alternator charger).
+  - platform: homeassistant
+    id: ha_alt_w
+    entity_id: sensor.ecoflow_alternator_charging_power  # TODO VALIDATE
+    internal: true
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: lbl_alt_w
+            text: !lambda |-
+              if (isnan(x)) return "-- W";
+              static char buf[12];
+              snprintf(buf, sizeof(buf), "%.0f W", x);
+              return buf;
+            text_color: !lambda 'return isnan(x) ? lv_color_hex(0x555555) : lv_color_hex(0xF0F6FC);'
+
+  - platform: homeassistant
+    id: ha_battery_time
+    entity_id: sensor.ecoflow_battery_time_remaining  # TODO VALIDATE (minutes)
+    internal: true
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: lbl_batt_time
+            text: !lambda |-
+              if (isnan(x)) return "";
+              static char buf[24];
+              if (x >= 1440) snprintf(buf, sizeof(buf), "%.0f days left", x / 1440.0f);
+              else if (x >= 60) snprintf(buf, sizeof(buf), "%.1f hrs left", x / 60.0f);
+              else snprintf(buf, sizeof(buf), "%.0f min left", x);
+              return buf;
+
+  # ══ Climate badges ══
+  # TODO VALIDATE interior temp entity (esparheater cabin average).
+  - platform: homeassistant
+    id: ha_interior_temp
+    entity_id: sensor.cabin_average_temperature  # TODO VALIDATE
+    internal: true
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: lbl_interior_temp
+            text: !lambda |-
+              if (isnan(x)) return "--\u00B0F";
+              static char buf[12];
+              snprintf(buf, sizeof(buf), "%.1f\u00B0F", x);
+              return buf;
+            text_color: !lambda 'return isnan(x) ? lv_color_hex(0x555555) : lv_color_hex(0xF0F6FC);'
+
+  # TODO VALIDATE interior humidity entity.
+  - platform: homeassistant
+    id: ha_humidity
+    entity_id: sensor.interior_humidity  # TODO VALIDATE
+    internal: true
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: lbl_humidity
+            text: !lambda |-
+              if (isnan(x)) return "--%";
+              static char buf[12];
+              snprintf(buf, sizeof(buf), "%.0f%%", x);
+              return buf;
+            text_color: !lambda 'return isnan(x) ? lv_color_hex(0x555555) : lv_color_hex(0xF0F6FC);'
+
+  # TODO VALIDATE fridge temperature entity (user: sensor.fridge_temperature).
+  - platform: homeassistant
+    id: ha_fridge_temp
+    entity_id: sensor.fridge_temperature  # TODO VALIDATE
+    internal: true
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: lbl_fridge_temp
+            text: !lambda |-
+              if (isnan(x)) return "--\u00B0F";
+              static char buf[12];
+              snprintf(buf, sizeof(buf), "%.1f\u00B0F", x);
+              return buf;
+            text_color: !lambda 'return isnan(x) ? lv_color_hex(0x555555) : lv_color_hex(0xF0F6FC);'
+
+  # ══ Water (parked) ══
+  - platform: homeassistant
+    id: ha_water_level
+    entity_id: sensor.water_tank_display_fresh_water_tank_level
+    internal: true
+    on_value:
+      then:
+        - lvgl.bar.update:
+            id: bar_water_pk
+            value: !lambda 'return isnan(x) ? 0 : (int)x;'
+        - lvgl.label.update:
+            id: lbl_water_pct
+            text: !lambda |-
+              if (isnan(x)) return "--%";
+              static char buf[8];
+              snprintf(buf, sizeof(buf), "%.0f%%", x);
+              return buf;
+            text_color: !lambda 'return isnan(x) ? lv_color_hex(0x555555) : lv_color_hex(0xF0F6FC);'
+
+  # ══ TPMS (parked) ══
+  # TODO VALIDATE all four TPMS entity_ids (BLE/sensor pressures, psi).
+  - platform: homeassistant
+    id: ha_tpms_fl
+    entity_id: sensor.tpms_front_left  # TODO VALIDATE
+    internal: true
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: lbl_tpms_fl
+            text: !lambda |-
+              if (isnan(x)) return "--";
+              static char buf[8];
+              snprintf(buf, sizeof(buf), "%.0f", x);
+              return buf;
+            text_color: !lambda 'return isnan(x) ? lv_color_hex(0x555555) : (x < 30 ? lv_color_hex(0xF0883E) : lv_color_hex(0xF0F6FC));'
+
+  - platform: homeassistant
+    id: ha_tpms_fr
+    entity_id: sensor.tpms_front_right  # TODO VALIDATE
+    internal: true
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: lbl_tpms_fr
+            text: !lambda |-
+              if (isnan(x)) return "--";
+              static char buf[8];
+              snprintf(buf, sizeof(buf), "%.0f", x);
+              return buf;
+            text_color: !lambda 'return isnan(x) ? lv_color_hex(0x555555) : (x < 30 ? lv_color_hex(0xF0883E) : lv_color_hex(0xF0F6FC));'
+
+  - platform: homeassistant
+    id: ha_tpms_rl
+    entity_id: sensor.tpms_rear_left  # TODO VALIDATE
+    internal: true
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: lbl_tpms_rl
+            text: !lambda |-
+              if (isnan(x)) return "--";
+              static char buf[8];
+              snprintf(buf, sizeof(buf), "%.0f", x);
+              return buf;
+            text_color: !lambda 'return isnan(x) ? lv_color_hex(0x555555) : (x < 30 ? lv_color_hex(0xF0883E) : lv_color_hex(0xF0F6FC));'
+
+  - platform: homeassistant
+    id: ha_tpms_rr
+    entity_id: sensor.tpms_rear_right  # TODO VALIDATE
+    internal: true
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: lbl_tpms_rr
+            text: !lambda |-
+              if (isnan(x)) return "--";
+              static char buf[8];
+              snprintf(buf, sizeof(buf), "%.0f", x);
+              return buf;
+            text_color: !lambda 'return isnan(x) ? lv_color_hex(0x555555) : (x < 30 ? lv_color_hex(0xF0883E) : lv_color_hex(0xF0F6FC));'
+
+# ---- Fonts ----
+font:
+  - file: "fonts/materialdesignicons-webfont.ttf"
+    id: mdi_small
+    size: 40
+    bpp: 4
+    glyphs: [
+      "\U000F0624", # gas-station (fuel)            -- TODO VALIDATE glyph
+      "\U000F04C5", # speedometer (odometer)        -- TODO VALIDATE glyph
+      "\U000F050F", # thermometer
+      "\U000F058E", # water-percent (humidity)
+      "\U000F0290", # fridge
+      "\U000F0079", # battery
+      "\U000F008E", # battery-outline
+      "\U000F0A72", # solar-power
+      "\U000F010B", # car (alternator)              -- TODO VALIDATE glyph
+      "\U000F06A5", # power-plug
+      "\U000F06A6", # power-plug-off
+      "\U000F0B5F", # car-door                       -- TODO VALIDATE glyph
+      "\U000F05A9", # wifi                           -- TODO VALIDATE glyph
+      "\U000F05AA", # wifi-off                       -- TODO VALIDATE glyph
+      "\U000F0335", # lightbulb
+      "\U000F12A4", # lightbulb-off-outline
+      "\U000F11B3", # awning-outline
+      "\U000F058C", # water
+      "\U000F0F93", # water-pump-off                 -- TODO VALIDATE glyph
+      "\U000F0238", # fire (heater)
+      "\U000F0D34", # car-tire / tire (TPMS)         -- TODO VALIDATE glyph
+      "\U000F02DC", # home
+      ]
+
+  - file: "fonts/Roboto-Regular.ttf"
+    id: roboto_small
+    size: 26
+    bpp: 4
+    glyphs: " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~°·"
+
+  - file: "fonts/Roboto-Regular.ttf"
+    id: roboto_medium
+    size: 34
+    bpp: 4
+    glyphs: " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~°·"
+
+  - file: "fonts/Roboto-Regular.ttf"
+    id: roboto_large
+    size: 46
+    bpp: 4
+    glyphs: " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~°·"
+
+  - file: "fonts/Roboto-Regular.ttf"
+    id: roboto_xlarge
+    size: 58
+    bpp: 4
+    glyphs: " -.0123456789:°"
+
+# Refresh clock every 30 seconds
+interval:
+  - interval: 30s
+    then:
+      - script.execute: refresh_time_display
+  # Initialize display mode shortly after boot
+  - interval: 5s
+    then:
+      - script.execute: apply_display_mode
+
+# ---- LVGL Dashboard ----
+# Layout: 1920x480 landscape.
+#   Top bar (y 0-44):   clock | connectivity + mode toggle
+#   Core cards (y 50):  Vehicle | Doors | Power | Climate  (always visible)
+#   Bottom strip (y 336): Driving quick-actions  OR  Parked controls/TPMS/water
 lvgl:
   displays:
     - dsi_display
+  rotation: 270
   touchscreens:
     - dsi_touchscreen
+  color_depth: 16
+  buffer_size: 100%
+  byte_order: little_endian
+  # Shared pill look for Home-Assistant-style badges (icon + value).
+  style_definitions:
+    - id: badge_pill
+      bg_color: 0x1C2128
+      bg_opa: COVER
+      radius: 100          # clamped to half-height -> full pill
+      border_width: 0
+      pad_top: 7
+      pad_bottom: 7
+      pad_left: 12
+      pad_right: 16
+      pad_column: 8        # gap between icon and value
   pages:
     - id: main_page
-      bg_color: ${color_bg}
-      widgets: []
+      bg_color: 0x010409
+      widgets:
+        # ═══════════════════════════════════════════════════
+        # TOP BAR
+        # ═══════════════════════════════════════════════════
+        - obj:
+            width: 1920
+            height: 44
+            x: 0
+            y: 0
+            bg_color: 0x010409
+            bg_opa: COVER
+            border_width: 0
+            scrollbar_mode: "OFF"
+            scrollable: false
+            widgets:
+              - label:
+                  id: lbl_time
+                  text: "--:--"
+                  text_font: roboto_medium
+                  text_color: 0xF0F6FC
+                  align: LEFT_MID
+                  x: 16
+              - label:
+                  id: lbl_conn
+                  text: "\U000F05AA"
+                  text_font: mdi_small
+                  text_color: 0xF85149
+                  align: RIGHT_MID
+                  x: -210
+              - button:
+                  id: btn_mode
+                  width: 190
+                  height: 38
+                  align: RIGHT_MID
+                  x: -8
+                  bg_color: 0x21262D
+                  radius: 10
+                  border_width: 0
+                  on_press:
+                    then:
+                      - lambda: 'id(manual_mode) = (id(manual_mode) + 1) % 3;'
+                      - script.execute: apply_display_mode
+                  widgets:
+                    - label:
+                        id: lbl_mode
+                        text: "AUTO\u00B7PARK"
+                        text_font: roboto_small
+                        text_color: 0xF0F6FC
+                        align: CENTER
+
+        # ═══════════════════════════════════════════════════
+        # CORE CARDS ROW (always visible)
+        # ═══════════════════════════════════════════════════
+        - obj:
+            width: 1920
+            height: 282
+            x: 0
+            y: 50
+            bg_opa: TRANSP
+            border_width: 0
+            scrollbar_mode: "OFF"
+            scrollable: false
+            pad_left: 12
+            pad_right: 12
+            layout:
+              type: FLEX
+              flex_flow: ROW
+              flex_align_main: SPACE_BETWEEN
+              flex_align_cross: CENTER
+            widgets:
+              # ── Vehicle card ──
+              - obj:
+                  width: 470
+                  height: 282
+                  bg_color: 0x161B22
+                  bg_opa: COVER
+                  radius: 18
+                  border_width: 0
+                  scrollbar_mode: "OFF"
+                  scrollable: false
+                  pad_all: 16
+                  widgets:
+                    - label:
+                        text: "VEHICLE"
+                        text_font: roboto_small
+                        text_color: 0x484F58
+                        x: 0
+                        y: 0
+                    # Fuel
+                    - label:
+                        text_font: mdi_small
+                        text_color: 0xF0883E
+                        text: "\U000F0624"
+                        x: 0
+                        y: 34
+                    - label:
+                        text: "Fuel"
+                        text_font: roboto_small
+                        text_color: 0x8B949E
+                        x: 50
+                        y: 42
+                    - label:
+                        id: lbl_fuel_pct
+                        text: "--%"
+                        text_font: roboto_small
+                        text_color: 0xF0F6FC
+                        align: TOP_RIGHT
+                        y: 42
+                    - bar:
+                        id: bar_fuel
+                        width: 438
+                        height: 18
+                        x: 0
+                        y: 78
+                        radius: 9
+                        bg_color: 0x21262D
+                        indicator:
+                          bg_color: 0x3FB950
+                          radius: 9
+                        min_value: 0
+                        max_value: 100
+                        value: 0
+                    # DEF
+                    - label:
+                        text: "DEF"
+                        text_font: roboto_small
+                        text_color: 0x8B949E
+                        x: 0
+                        y: 112
+                    - label:
+                        id: lbl_def_pct
+                        text: "--%"
+                        text_font: roboto_small
+                        text_color: 0xF0F6FC
+                        align: TOP_RIGHT
+                        y: 112
+                    - bar:
+                        id: bar_def
+                        width: 438
+                        height: 18
+                        x: 0
+                        y: 142
+                        radius: 9
+                        bg_color: 0x21262D
+                        indicator:
+                          bg_color: 0x58A6FF
+                          radius: 9
+                        min_value: 0
+                        max_value: 100
+                        value: 0
+                    # Odometer
+                    - label:
+                        text_font: mdi_small
+                        text_color: 0x8B949E
+                        text: "\U000F04C5"
+                        x: 0
+                        y: 188
+                    - label:
+                        id: lbl_odometer
+                        text: "----- mi"
+                        text_font: roboto_large
+                        text_color: 0xF0F6FC
+                        x: 52
+                        y: 192
+
+              # ── Doors card (top-down Sprinter schematic) ──
+              # Front of van = top, rear = bottom. Sliding door on the right
+              # (curb/passenger) side, mid-body, per US-spec Sprinter.
+              - obj:
+                  width: 250
+                  height: 282
+                  bg_color: 0x161B22
+                  bg_opa: COVER
+                  radius: 18
+                  border_width: 0
+                  scrollbar_mode: "OFF"
+                  scrollable: false
+                  pad_all: 16
+                  widgets:
+                    - label:
+                        text: "DOORS"
+                        text_font: roboto_small
+                        text_color: 0x484F58
+                        x: 0
+                        y: 0
+                    # Van body outline (front = top)
+                    - obj:
+                        width: 96
+                        height: 180
+                        x: 61
+                        y: 44
+                        bg_color: 0x0D1117
+                        bg_opa: COVER
+                        radius: 18
+                        border_width: 2
+                        border_color: 0x30363D
+                        scrollbar_mode: "OFF"
+                        scrollable: false
+                        widgets:
+                          # Windshield hint (front of vehicle)
+                          - obj:
+                              width: 70
+                              height: 6
+                              align: TOP_MID
+                              y: 8
+                              bg_color: 0x30363D
+                              bg_opa: COVER
+                              radius: 3
+                              border_width: 0
+                    # ── Door panels (recolored by state) ──
+                    # Driver (front-left)
+                    - obj:
+                        id: rect_door_driver
+                        width: 12
+                        height: 52
+                        x: 55
+                        y: 72
+                        bg_color: 0x30363D
+                        bg_opa: COVER
+                        radius: 4
+                        border_width: 0
+                        scrollbar_mode: "OFF"
+                        scrollable: false
+                    # Passenger (front-right)
+                    - obj:
+                        id: rect_door_passenger
+                        width: 12
+                        height: 52
+                        x: 151
+                        y: 72
+                        bg_color: 0x30363D
+                        bg_opa: COVER
+                        radius: 4
+                        border_width: 0
+                        scrollbar_mode: "OFF"
+                        scrollable: false
+                    # Sliding (right side, mid-body)
+                    - obj:
+                        id: rect_door_sliding
+                        width: 12
+                        height: 58
+                        x: 151
+                        y: 134
+                        bg_color: 0x30363D
+                        bg_opa: COVER
+                        radius: 4
+                        border_width: 0
+                        scrollbar_mode: "OFF"
+                        scrollable: false
+                    # Rear (barn doors, bottom)
+                    - obj:
+                        id: rect_door_rear
+                        width: 66
+                        height: 12
+                        x: 76
+                        y: 218
+                        bg_color: 0x30363D
+                        bg_opa: COVER
+                        radius: 4
+                        border_width: 0
+                        scrollbar_mode: "OFF"
+                        scrollable: false
+                    # ── Door identification labels (recolor by state) ──
+                    - label:
+                        id: lbl_door_driver_state
+                        text: "Drv"
+                        text_font: roboto_small
+                        text_color: 0x8B949E
+                        x: 2
+                        y: 88
+                    - label:
+                        id: lbl_door_passenger_state
+                        text: "Pas"
+                        text_font: roboto_small
+                        text_color: 0x8B949E
+                        x: 172
+                        y: 88
+                    - label:
+                        id: lbl_door_sliding_state
+                        text: "Sld"
+                        text_font: roboto_small
+                        text_color: 0x8B949E
+                        x: 172
+                        y: 150
+                    - label:
+                        id: lbl_door_rear_state
+                        text: "Rear"
+                        text_font: roboto_small
+                        text_color: 0x8B949E
+                        align: BOTTOM_MID
+                        y: -2
+
+              # ── Power card ──
+              - obj:
+                  width: 470
+                  height: 282
+                  bg_color: 0x161B22
+                  bg_opa: COVER
+                  radius: 18
+                  border_width: 0
+                  scrollbar_mode: "OFF"
+                  scrollable: false
+                  pad_all: 16
+                  widgets:
+                    - label:
+                        text: "POWER"
+                        text_font: roboto_small
+                        text_color: 0x484F58
+                        x: 0
+                        y: 0
+                    # Battery
+                    - label:
+                        text_font: mdi_small
+                        text_color: 0x3FB950
+                        text: "\U000F0079"
+                        x: 0
+                        y: 32
+                    - label:
+                        id: lbl_batt_pct
+                        text: "--%"
+                        text_font: roboto_large
+                        text_color: 0xF0F6FC
+                        x: 52
+                        y: 30
+                    - label:
+                        id: lbl_batt_time
+                        text: ""
+                        text_font: roboto_small
+                        text_color: 0x8B949E
+                        align: TOP_RIGHT
+                        y: 44
+                    - bar:
+                        id: bar_battery
+                        width: 438
+                        height: 18
+                        x: 0
+                        y: 84
+                        radius: 9
+                        bg_color: 0x21262D
+                        indicator:
+                          bg_color: 0x3FB950
+                          radius: 9
+                        min_value: 0
+                        max_value: 100
+                        value: 0
+                    # Solar row + toggle
+                    - label:
+                        text_font: mdi_small
+                        text_color: 0xFFD700
+                        text: "\U000F0A72"
+                        x: 0
+                        y: 122
+                    - label:
+                        id: lbl_solar_w
+                        text: "-- W"
+                        text_font: roboto_medium
+                        text_color: 0xF0F6FC
+                        x: 52
+                        y: 126
+                    - button:
+                        width: 120
+                        height: 48
+                        align: TOP_RIGHT
+                        y: 116
+                        bg_color: 0x21262D
+                        radius: 10
+                        border_width: 0
+                        on_press:
+                          then:
+                            - homeassistant.service:
+                                service: switch.toggle
+                                data:
+                                  entity_id: switch.ecoflow_solar_charging  # TODO VALIDATE
+                        widgets:
+                          - label:
+                              id: lbl_solar_toggle
+                              text: "OFF"
+                              text_font: roboto_small
+                              text_color: 0x8B949E
+                              align: CENTER
+                    # Alternator row + toggle
+                    - label:
+                        text_font: mdi_small
+                        text_color: 0x58A6FF
+                        text: "\U000F010B"
+                        x: 0
+                        y: 188
+                    - label:
+                        id: lbl_alt_w
+                        text: "-- W"
+                        text_font: roboto_medium
+                        text_color: 0xF0F6FC
+                        x: 52
+                        y: 192
+                    - button:
+                        width: 120
+                        height: 48
+                        align: TOP_RIGHT
+                        y: 182
+                        bg_color: 0x21262D
+                        radius: 10
+                        border_width: 0
+                        on_press:
+                          then:
+                            - homeassistant.service:
+                                service: switch.toggle
+                                data:
+                                  entity_id: switch.ecoflow_alternator_charging  # TODO VALIDATE
+                        widgets:
+                          - label:
+                              id: lbl_alt_toggle
+                              text: "OFF"
+                              text_font: roboto_small
+                              text_color: 0x8B949E
+                              align: CENTER
+
+              # ── Climate card (Home Assistant-style badges) ──
+              - obj:
+                  width: 660
+                  height: 282
+                  bg_color: 0x161B22
+                  bg_opa: COVER
+                  radius: 18
+                  border_width: 0
+                  scrollbar_mode: "OFF"
+                  scrollable: false
+                  pad_all: 16
+                  widgets:
+                    - label:
+                        text: "CLIMATE"
+                        text_font: roboto_small
+                        text_color: 0x484F58
+                        x: 0
+                        y: 0
+                    # ── Outside (top-left) ──
+                    - label:
+                        text: "Outside"
+                        text_font: roboto_small
+                        text_color: 0x8B949E
+                        x: 8
+                        y: 36
+                    - obj:
+                        styles: badge_pill
+                        width: SIZE_CONTENT
+                        height: SIZE_CONTENT
+                        x: 8
+                        y: 62
+                        layout: &flex_badge
+                          type: FLEX
+                          flex_flow: ROW
+                          flex_align_cross: CENTER
+                        widgets:
+                          - label:
+                              text_font: mdi_small
+                              text_color: 0x79C0FF
+                              text: "\U000F050F"
+                          - label:
+                              id: lbl_outside_temp
+                              text_font: roboto_medium
+                              text_color: 0xF0F6FC
+                              text: "--\u00B0F"
+                    # ── Interior (top-right) ──
+                    - label:
+                        text: "Interior"
+                        text_font: roboto_small
+                        text_color: 0x8B949E
+                        x: 330
+                        y: 36
+                    - obj:
+                        styles: badge_pill
+                        width: SIZE_CONTENT
+                        height: SIZE_CONTENT
+                        x: 330
+                        y: 62
+                        layout: *flex_badge
+                        widgets:
+                          - label:
+                              text_font: mdi_small
+                              text_color: 0xF85149
+                              text: "\U000F050F"
+                          - label:
+                              id: lbl_interior_temp
+                              text_font: roboto_medium
+                              text_color: 0xF0F6FC
+                              text: "--\u00B0F"
+                    # ── Humidity (bottom-left) ──
+                    - label:
+                        text: "Humidity"
+                        text_font: roboto_small
+                        text_color: 0x8B949E
+                        x: 8
+                        y: 148
+                    - obj:
+                        styles: badge_pill
+                        width: SIZE_CONTENT
+                        height: SIZE_CONTENT
+                        x: 8
+                        y: 174
+                        layout: *flex_badge
+                        widgets:
+                          - label:
+                              text_font: mdi_small
+                              text_color: 0x58A6FF
+                              text: "\U000F058E"
+                          - label:
+                              id: lbl_humidity
+                              text_font: roboto_medium
+                              text_color: 0xF0F6FC
+                              text: "--%"
+                    # ── Fridge (bottom-right) ──
+                    - label:
+                        text: "Fridge"
+                        text_font: roboto_small
+                        text_color: 0x8B949E
+                        x: 330
+                        y: 148
+                    - obj:
+                        styles: badge_pill
+                        width: SIZE_CONTENT
+                        height: SIZE_CONTENT
+                        x: 330
+                        y: 174
+                        layout: *flex_badge
+                        widgets:
+                          - label:
+                              text_font: mdi_small
+                              text_color: 0x81D4FA
+                              text: "\U000F0290"
+                          - label:
+                              id: lbl_fridge_temp
+                              text_font: roboto_medium
+                              text_color: 0xF0F6FC
+                              text: "--\u00B0F"
+
+        # ═══════════════════════════════════════════════════
+        # BOTTOM STRIP — DRIVING (quick actions)
+        # ═══════════════════════════════════════════════════
+        - obj:
+            id: bottom_driving
+            width: 1920
+            height: 140
+            x: 0
+            y: 338
+            bg_opa: TRANSP
+            border_width: 0
+            scrollbar_mode: "OFF"
+            scrollable: false
+            pad_left: 12
+            pad_right: 12
+            layout:
+              type: FLEX
+              flex_flow: ROW
+              flex_align_main: SPACE_BETWEEN
+              flex_align_cross: CENTER
+            widgets:
+              # Lights Off
+              - button:
+                  width: 612
+                  height: 116
+                  bg_color: 0x21262D
+                  radius: 16
+                  border_width: 0
+                  on_press:
+                    then:
+                      - homeassistant.service:
+                          service: light.turn_off
+                          data:
+                            entity_id: light.all_lights  # TODO VALIDATE (all-lights group)
+                  widgets:
+                    - label:
+                        text_font: mdi_small
+                        text_color: 0xFFD700
+                        text: "\U000F12A4"
+                        align: LEFT_MID
+                        x: 30
+                    - label:
+                        text: "Lights Off"
+                        text_font: roboto_large
+                        text_color: 0xF0F6FC
+                        align: CENTER
+              # Close Awnings
+              - button:
+                  width: 612
+                  height: 116
+                  bg_color: 0x21262D
+                  radius: 16
+                  border_width: 0
+                  on_press:
+                    then:
+                      - homeassistant.service:
+                          service: cover.close_cover
+                          data:
+                            entity_id: cover.awning
+                      - homeassistant.service:
+                          service: cover.close_cover
+                          data:
+                            entity_id: cover.solar_panel_awning
+                  widgets:
+                    - label:
+                        text_font: mdi_small
+                        text_color: 0xF0883E
+                        text: "\U000F11B3"
+                        align: LEFT_MID
+                        x: 30
+                    - label:
+                        text: "Close Awnings"
+                        text_font: roboto_large
+                        text_color: 0xF0F6FC
+                        align: CENTER
+              # Water Pump Off
+              - button:
+                  width: 612
+                  height: 116
+                  bg_color: 0x21262D
+                  radius: 16
+                  border_width: 0
+                  on_press:
+                    then:
+                      - homeassistant.service:
+                          service: switch.turn_off
+                          data:
+                            entity_id: switch.water_tank_display_water_pump
+                  widgets:
+                    - label:
+                        text_font: mdi_small
+                        text_color: 0x58A6FF
+                        text: "\U000F0F93"
+                        align: LEFT_MID
+                        x: 30
+                    - label:
+                        text: "Pump Off"
+                        text_font: roboto_large
+                        text_color: 0xF0F6FC
+                        align: CENTER
+
+        # ═══════════════════════════════════════════════════
+        # BOTTOM STRIP — PARKED (expanded controls + TPMS + water)
+        # ═══════════════════════════════════════════════════
+        - obj:
+            id: bottom_parked
+            hidden: true
+            width: 1920
+            height: 140
+            x: 0
+            y: 338
+            bg_opa: TRANSP
+            border_width: 0
+            scrollbar_mode: "OFF"
+            scrollable: false
+            pad_left: 12
+            pad_right: 12
+            widgets:
+              # ── Controls (left) ──
+              # Lights Off
+              - button:
+                  width: 150
+                  height: 116
+                  x: 0
+                  y: 12
+                  bg_color: 0x21262D
+                  radius: 14
+                  border_width: 0
+                  on_press:
+                    then:
+                      - homeassistant.service:
+                          service: light.turn_off
+                          data:
+                            entity_id: light.all_lights  # TODO VALIDATE
+                  widgets:
+                    - label:
+                        text_font: mdi_small
+                        text_color: 0xFFD700
+                        text: "\U000F12A4"
+                        align: TOP_MID
+                        y: 14
+                    - label:
+                        text: "Lights"
+                        text_font: roboto_small
+                        text_color: 0x8B949E
+                        align: BOTTOM_MID
+                        y: -12
+              # Close Awnings
+              - button:
+                  width: 150
+                  height: 116
+                  x: 162
+                  y: 12
+                  bg_color: 0x21262D
+                  radius: 14
+                  border_width: 0
+                  on_press:
+                    then:
+                      - homeassistant.service:
+                          service: cover.close_cover
+                          data:
+                            entity_id: cover.awning
+                      - homeassistant.service:
+                          service: cover.close_cover
+                          data:
+                            entity_id: cover.solar_panel_awning
+                  widgets:
+                    - label:
+                        text_font: mdi_small
+                        text_color: 0xF0883E
+                        text: "\U000F11B3"
+                        align: TOP_MID
+                        y: 14
+                    - label:
+                        text: "Awnings"
+                        text_font: roboto_small
+                        text_color: 0x8B949E
+                        align: BOTTOM_MID
+                        y: -12
+              # Water Pump
+              - button:
+                  width: 150
+                  height: 116
+                  x: 324
+                  y: 12
+                  bg_color: 0x21262D
+                  radius: 14
+                  border_width: 0
+                  on_press:
+                    then:
+                      - homeassistant.service:
+                          service: switch.toggle
+                          data:
+                            entity_id: switch.water_tank_display_water_pump
+                  widgets:
+                    - label:
+                        text_font: mdi_small
+                        text_color: 0x58A6FF
+                        text: "\U000F058C"
+                        align: TOP_MID
+                        y: 14
+                    - label:
+                        id: lbl_pump_state
+                        text: "PUMP --"
+                        text_font: roboto_small
+                        text_color: 0x8B949E
+                        align: BOTTOM_MID
+                        y: -12
+              # Hot Water Heater
+              - button:
+                  width: 150
+                  height: 116
+                  x: 486
+                  y: 12
+                  bg_color: 0x21262D
+                  radius: 14
+                  border_width: 0
+                  on_press:
+                    then:
+                      - homeassistant.service:
+                          service: switch.toggle
+                          data:
+                            entity_id: switch.water_tank_display_hot_water_heater
+                  widgets:
+                    - label:
+                        text_font: mdi_small
+                        text_color: 0xF0883E
+                        text: "\U000F0238"
+                        align: TOP_MID
+                        y: 14
+                    - label:
+                        id: lbl_heater_state
+                        text: "HEAT --"
+                        text_font: roboto_small
+                        text_color: 0x8B949E
+                        align: BOTTOM_MID
+                        y: -12
+              # AC Inverter
+              - button:
+                  width: 150
+                  height: 116
+                  x: 648
+                  y: 12
+                  bg_color: 0x21262D
+                  radius: 14
+                  border_width: 0
+                  on_press:
+                    then:
+                      - homeassistant.service:
+                          service: switch.toggle
+                          data:
+                            entity_id: switch.ecoflow_ac_inverter
+                  widgets:
+                    - label:
+                        text_font: mdi_small
+                        text_color: 0x3FB950
+                        text: "\U000F06A5"
+                        align: TOP_MID
+                        y: 14
+                    - label:
+                        id: lbl_inverter_state
+                        text: "INV --"
+                        text_font: roboto_small
+                        text_color: 0x8B949E
+                        align: BOTTOM_MID
+                        y: -12
+
+              # ── Water tank (center-right) ──
+              - obj:
+                  width: 380
+                  height: 116
+                  x: 820
+                  y: 12
+                  bg_color: 0x161B22
+                  bg_opa: COVER
+                  radius: 14
+                  border_width: 0
+                  scrollbar_mode: "OFF"
+                  scrollable: false
+                  pad_all: 14
+                  widgets:
+                    - label:
+                        text_font: mdi_small
+                        text_color: 0x4FC3F7
+                        text: "\U000F058C"
+                        align: LEFT_MID
+                        x: 0
+                    - label:
+                        id: lbl_water_pct
+                        text: "--%"
+                        text_font: roboto_large
+                        text_color: 0xF0F6FC
+                        align: TOP_LEFT
+                        x: 52
+                        y: 2
+                    - bar:
+                        id: bar_water_pk
+                        width: 290
+                        height: 16
+                        align: BOTTOM_LEFT
+                        x: 52
+                        y: -8
+                        radius: 8
+                        bg_color: 0x21262D
+                        indicator:
+                          bg_color: 0x4FC3F7
+                          radius: 8
+                        min_value: 0
+                        max_value: 100
+                        value: 0
+
+              # ── TPMS (right) ──
+              - obj:
+                  width: 470
+                  height: 116
+                  x: 1216
+                  y: 12
+                  bg_color: 0x161B22
+                  bg_opa: COVER
+                  radius: 14
+                  border_width: 0
+                  scrollbar_mode: "OFF"
+                  scrollable: false
+                  pad_all: 12
+                  widgets:
+                    - label:
+                        text: "TPMS (psi)"
+                        text_font: roboto_small
+                        text_color: 0x484F58
+                        align: TOP_LEFT
+                    # Front Left
+                    - label:
+                        id: lbl_tpms_fl
+                        text: "--"
+                        text_font: roboto_large
+                        text_color: 0xF0F6FC
+                        x: 20
+                        y: 36
+                    - label:
+                        text: "FL"
+                        text_font: roboto_small
+                        text_color: 0x8B949E
+                        x: 24
+                        y: 82
+                    # Front Right
+                    - label:
+                        id: lbl_tpms_fr
+                        text: "--"
+                        text_font: roboto_large
+                        text_color: 0xF0F6FC
+                        x: 140
+                        y: 36
+                    - label:
+                        text: "FR"
+                        text_font: roboto_small
+                        text_color: 0x8B949E
+                        x: 144
+                        y: 82
+                    # Rear Left
+                    - label:
+                        id: lbl_tpms_rl
+                        text: "--"
+                        text_font: roboto_large
+                        text_color: 0xF0F6FC
+                        x: 260
+                        y: 36
+                    - label:
+                        text: "RL"
+                        text_font: roboto_small
+                        text_color: 0x8B949E
+                        x: 264
+                        y: 82
+                    # Rear Right
+                    - label:
+                        id: lbl_tpms_rr
+                        text: "--"
+                        text_font: roboto_large
+                        text_color: 0xF0F6FC
+                        x: 380
+                        y: 36
+                    - label:
+                        text: "RR"
+                        text_font: roboto_small
+                        text_color: 0x8B949E
+                        x: 384
+                        y: 82
 

@@ -42,7 +42,9 @@ waveshare_dsi:
   id: dsi_display
   rotation: 0
 
-# Touch debug logging
+# Touch transform + active-state brightness guard.
+# Wake-on-touch / sleep-timeout reset is handled by the sleep package
+# (packages/display/sleep.yaml adds on_touch: screen_bump_activity).
 touchscreen:
   - id: !extend dsi_touchscreen
     transform:
@@ -50,11 +52,8 @@ touchscreen:
       mirror_x: false
       mirror_y: false
     on_touch:
-      - lambda: |-
-          ESP_LOGI("screen", "touch: off=%d dim=%d keep=%d timeout=%.1fs dim_for=%.1fs backlight=%.2f",
-                   id(screen_is_off), id(screen_is_dim), id(keep_display_awake),
-                   id(display_timeout).state, id(display_dim_duration).state,
-                   id(display_backlight).current_values.get_brightness());
+      # If a touch lands while nominally "active" but the backlight is low,
+      # force full brightness (covers an edge case the sleep package misses).
       - if:
           condition:
             lambda: 'return !id(screen_is_off) && !id(screen_is_dim) && id(display_backlight).current_values.get_brightness() < 0.99f;'
@@ -63,11 +62,6 @@ touchscreen:
             - light.turn_on:
                 id: display_backlight
                 brightness: !lambda 'return id(display_active_brightness).state / 100.0f;'
-      - script.execute: screen_bump_activity
-      - lambda: |-
-          for (auto &tp : touches) {
-            ESP_LOGI("touch", "x=%d y=%d (display: 1920x480)", tp.x, tp.y);
-          }
 
 # ---- Home Assistant Sensors ----
 
