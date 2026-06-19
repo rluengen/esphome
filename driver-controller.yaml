@@ -244,15 +244,9 @@ text_sensor:
             condition:
               lambda: 'return x == "unlocked";'
             then:
-              - lvgl.widget.show: ovl_door_drv_unlock
-              - lvgl.widget.show: ovl_door_pass_unlock
-              - lvgl.widget.show: ovl_door_slide_unlock
-              - lvgl.widget.show: ovl_trunk_unlock
+              - lvgl.widget.show: ovl_generic_unlock
             else:
-              - lvgl.widget.hide: ovl_door_drv_unlock
-              - lvgl.widget.hide: ovl_door_pass_unlock
-              - lvgl.widget.hide: ovl_door_slide_unlock
-              - lvgl.widget.hide: ovl_trunk_unlock
+              - lvgl.widget.hide: ovl_generic_unlock
 
   # Passenger window position (closed / vent / open). The displayed art also
   # depends on whether the passenger door is open, so defer to the script.
@@ -931,10 +925,7 @@ lvgl:
               # Cowl / hood
               - image: { id: ovl_cowl, src: img_cowl, align: TOP_LEFT, x: 116, y: 42, hidden: true }
               # Unlock indicators (all use generic unlock image)
-              - image: { id: ovl_door_drv_unlock, src: img_generic_unlock, align: TOP_LEFT, x: 116, y: 42, hidden: true }
-              - image: { id: ovl_door_pass_unlock, src: img_generic_unlock, align: TOP_LEFT, x: 116, y: 42, hidden: true }
-              - image: { id: ovl_door_slide_unlock, src: img_generic_unlock, align: TOP_LEFT, x: 116, y: 42, hidden: true }
-              - image: { id: ovl_trunk_unlock, src: img_generic_unlock, align: TOP_LEFT, x: 116, y: 42, hidden: true }
+              - image: { id: ovl_generic_unlock, src: img_generic_unlock, align: TOP_LEFT, x: 116, y: 42, hidden: true }
               # Driver windows (mutually exclusive; chosen by update_drv_window)
               - image: { id: ovl_dwin_vent_dc, src: img_dwin_vent_dc, align: TOP_LEFT, x: 116, y: 42, hidden: true }
               - image: { id: ovl_dwin_vent_do, src: img_dwin_vent_do, align: TOP_LEFT, x: 116, y: 42, hidden: true }
