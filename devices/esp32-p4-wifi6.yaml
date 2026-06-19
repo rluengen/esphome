@@ -7,6 +7,8 @@ esp32:
   board: esp32-p4-evboard
   variant: esp32p4
   flash_size: 32MB
+  advanced:
+    enable_idf_experimental_features: true
   framework:
     type: esp-idf
 
