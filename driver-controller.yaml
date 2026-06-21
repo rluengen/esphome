@@ -38,9 +38,7 @@ packages:
         vars:
           touchscreen_id: dsi_touchscreen
           backlight_id: display_backlight
-
-# Remove hosted co-processor firmware updater payload on this node to save flash.
-update: !remove
+      - path: packages/ota/esp32_hosted_http.yaml
 
 # ---- Display / Touch Orientation ----
 # 1920x480 landscape via LVGL rotation (270). Rotation MUST live in the LVGL

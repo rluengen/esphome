@@ -37,6 +37,7 @@ packages:
         vars:
           touchscreen_id: dsi_touchscreen
           backlight_id: display_backlight
+      - path: packages/ota/esp32_hosted_http.yaml
 
 waveshare_dsi:
   id: dsi_display

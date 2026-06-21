@@ -1,0 +1,30 @@
+# ESP32 Hosted HTTP mode (manifest-driven)
+# Uses ESPHome hosted manifest and checks once after boot when WiFi is connected.
+# Manual check button is also exposed; install remains manual.
+
+http_request:
+
+update:
+  - platform: esp32_hosted
+    id: esp32_c6_firmware
+    name: "ESP32-C6 Firmware"
+    type: http
+    source: https://esphome.github.io/esp-hosted-firmware/manifest/esp32c6.json
+    update_interval: never
+
+esphome:
+  on_boot:
+    priority: -10
+    then:
+      - wait_until:
+          wifi.connected:
+      - delay: 30s
+      - update.check: esp32_c6_firmware
+
+button:
+  - platform: template
+    name: "Check ESP32-C6 Firmware"
+    icon: mdi:update
+    entity_category: config
+    on_press:
+      - update.check: esp32_c6_firmware

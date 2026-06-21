@@ -1,0 +1,18 @@
+# ESP32 Hosted bootstrap mode (static pinned firmware)
+# Use this for initial provisioning or tightly controlled deployments.
+#
+# Pinned version: 2.11.7
+# Firmware URL: https://esphome.github.io/esp-hosted-firmware/v2.11.7/network_adapter_esp32c6.bin
+# Check newer versions at:
+# https://esphome.github.io/esp-hosted-firmware/manifest/esp32c6.json
+#
+# Keep update_interval: never so firmware only changes when this file is edited.
+
+update:
+  - platform: esp32_hosted
+    id: esp32_c6_firmware
+    name: "ESP32-C6 Firmware"
+    type: embedded
+    path: network_adapter_esp32c6.bin
+    sha256: 2aa46dbcd18f5b2046f58b82cdc62bdf21af137930e67c4b3b114f6e3e0daf15
+    update_interval: never

@@ -35,14 +35,9 @@ esp32_hosted:
   d2_pin: GPIO16
   d3_pin: GPIO17
 
-# Embedded co-processor firmware update
-update:
-  - platform: esp32_hosted
-    name: "ESP32-C6 Firmware"
-    type: embedded
-    path: network_adapter_esp32c6.bin
-    sha256: 2aa46dbcd18f5b2046f58b82cdc62bdf21af137930e67c4b3b114f6e3e0daf15
-    update_interval: never
+# ESP32-C6 hosted updater mode is intentionally split into separate packages:
+# - packages/ota/esp32_hosted_bootstrap.yaml (pinned embedded .bin)
+# - packages/ota/esp32_hosted_http.yaml      (HTTP manifest with auto-run)
 
 # I2C bus (GT911 touchscreen, backlight MCU, ES8311 codec)
 i2c:
