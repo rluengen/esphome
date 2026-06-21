@@ -49,6 +49,16 @@ substitutions:
   dim_brightness: "25"
   active_brightness: "100"
 
+esphome:
+  on_boot:
+    # Wake the display at boot, then start the inactivity timeout so it dims
+    # and sleeps after no touch activity. Runs late (priority -100) so the
+    # backlight light + LVGL are fully initialized first.
+    - priority: -100
+      then:
+        - script.execute: exit_screen_off
+        - script.execute: screen_bump_activity
+
 number:
   - platform: template
     name: Screen Timeout
