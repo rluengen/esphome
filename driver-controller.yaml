@@ -41,12 +41,12 @@ packages:
       - path: packages/ota/esp32_hosted_http.yaml
 
 # ---- Display / Touch Orientation ----
-# 1920x480 landscape via LVGL rotation (270). Rotation MUST live in the LVGL
-# config, not in waveshare_dsi (the display component). The device package
-# (devices/88-dsi-touch-a.yaml) sets rotation: 270 on the panel, so strip it
-# here with !remove and let LVGL own the rotation.
+# 1920x480 landscape via LVGL rotation (270). The panel itself stays unrotated
+# (rotation 0) because LVGL owns the rotation; setting rotation on waveshare_dsi
+# while LVGL is active is not allowed. The device package defaults it to 270,
+# so override to 0 here (matches the known-good waveshare-esp32-p4 config).
 waveshare_dsi:
-  rotation: !remove
+  rotation: 0
 
 touchscreen:
   - id: !extend dsi_touchscreen
