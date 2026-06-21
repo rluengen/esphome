@@ -9,9 +9,6 @@ esp32:
   flash_size: 16MB
   framework:
     type: esp-idf
-    sdkconfig_options:
-      CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_360: "y"
-      CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_400: "n"
 
 psram:
   mode: hex
