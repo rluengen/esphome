@@ -74,7 +74,15 @@ try {
   $yaml = Get-Content -Path $bootstrapPath -Raw
   $yaml = [regex]::Replace($yaml, "(?m)^# Pinned version: .*$", "# Pinned version: $($selected.version)")
   $yaml = [regex]::Replace($yaml, "(?m)^# Firmware URL: .*$", "# Firmware URL: $($selected.url)")
-  $yaml = [regex]::Replace($yaml, "(?m)^(\s*sha256:\s*).*$", ('$1' + $manifestHash))
+  $shaPattern = "(?m)^(\s*sha256:\s*).*$"
+  if (-not [regex]::IsMatch($yaml, $shaPattern)) {
+    throw "Could not find a 'sha256:' line in $bootstrapPath"
+  }
+  $yaml = [regex]::Replace(
+    $yaml,
+    $shaPattern,
+    { param($m) $m.Groups[1].Value + $manifestHash }
+  )
 
   Set-Content -Path $bootstrapPath -Value $yaml -NoNewline
   Write-Host "Updated bootstrap YAML: $bootstrapPath"
