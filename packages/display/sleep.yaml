@@ -145,7 +145,10 @@ script:
           condition:
             lambda: 'return !id(keep_display_awake);'
           then:
-            - delay: !lambda 'return (uint32_t)(id(display_timeout).state * 1000);'
+            - delay: !lambda |-
+                float t = id(display_timeout).state;
+                if (std::isnan(t) || t < 5) t = ${default_timeout_seconds};
+                return (uint32_t)(t * 1000);
             - script.execute: enter_screen_dim
 
   # Phase 1: Dim backlight (LVGL still running for glanceability)
@@ -159,8 +162,14 @@ script:
             - lambda: 'id(screen_is_dim) = true;'
             - light.turn_on:
                 id: ${backlight_id}
-                brightness: !lambda 'return id(display_dim_brightness).state / 100.0f;'
-            - delay: !lambda 'return (uint32_t)(id(display_dim_duration).state * 1000);'
+                brightness: !lambda |-
+                  float b = id(display_dim_brightness).state;
+                  if (std::isnan(b)) b = ${dim_brightness};
+                  return b / 100.0f;
+            - delay: !lambda |-
+                float d = id(display_dim_duration).state;
+                if (std::isnan(d) || d < 1) d = ${default_dim_seconds};
+                return (uint32_t)(d * 1000);
             - script.execute: enter_screen_off
 
   # Phase 2: Fully off - backlight off + LVGL paused
@@ -186,9 +195,13 @@ script:
           id(screen_is_dim) = false;
           id(wake_touch) = true;
       - lvgl.resume:
+      - lvgl.widget.redraw:   # force a full repaint after resuming from pause
       - light.turn_on:
           id: ${backlight_id}
-          brightness: !lambda 'return id(display_active_brightness).state / 100.0f;'
+          brightness: !lambda |-
+            float b = id(display_active_brightness).state;
+            if (std::isnan(b)) b = ${active_brightness};
+            return b / 100.0f;
       - delay: 60ms   # give panel rails time to rise
 
 touchscreen:
