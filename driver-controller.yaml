@@ -5,7 +5,7 @@ substitutions:
   device_name: driver-controller
   friendly_name: Driver Controller
   project_name: driver-controller
-  project_version: "1.0.0"
+  project_version: "1.0.1"
   log_level: INFO
 
   # Colors
