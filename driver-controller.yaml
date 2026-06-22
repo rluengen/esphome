@@ -54,6 +54,10 @@ touchscreen:
       swap_xy: false
       mirror_x: false
       mirror_y: false
+    on_touch:
+      - logger.log:
+          format: "Touch at x=%d y=%d (raw x=%d y=%d)"
+          args: ['touch.x', 'touch.y', 'touch.x_raw', 'touch.y_raw']
 
 # ---- LVGL: Hello World ----
 lvgl:

@@ -20,6 +20,7 @@ esphome:
         - lambda: |-
             // === Waveshare OTA7290B Bridge Init (BSP-matched order) ===
             // BSP: HW Reset -> MCU Init -> delay -> DSI bus -> DCS -> DPI
+            ESP_LOGI("waveshare", "OTA7290B bridge init START (priority 600)");
 
             // Step 1: Hardware reset via GPIO27 (BSP_LCD_DSI_RST)
             gpio_set_direction(GPIO_NUM_27, GPIO_MODE_OUTPUT);
@@ -43,6 +44,16 @@ esphome:
             ESP_LOGI("waveshare", "OTA7290B bridge init complete");
     - priority: 200
       then:
+        # Re-run the bridge MCU/backlight init right before turning the light on.
+        # The OTA7290B occasionally needs this re-asserted after the DSI/DPI
+        # video stage; without it the brightness register writes but the panel
+        # stays dark. Idempotent — safe to repeat.
+        - lambda: |-
+            ESP_LOGI("waveshare", "Re-asserting bridge backlight init (priority 200)");
+            id(display_backlight_i2c).write_byte(0x95, 0x11);
+            delay(10);
+            id(display_backlight_i2c).write_byte(0x95, 0x17);
+            id(display_backlight_i2c).write_byte(0x96, 0xFF);
         - light.turn_on:
             id: display_backlight
 
