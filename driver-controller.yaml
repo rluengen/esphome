@@ -26,6 +26,7 @@ packages:
     files:
       - path: devices/esp32-p4-wifi6.yaml
       - path: devices/88-dsi-touch-a.yaml
+      - path: packages/webserver.yaml
       - path: packages/common.yaml
         vars:
           api_encryption_key: !secret encryption_key
@@ -59,7 +60,320 @@ touchscreen:
           format: "Touch at x=%d y=%d (raw x=%d y=%d)"
           args: ['touch.x', 'touch.y', 'touch.x_raw', 'touch.y_raw']
 
-# ---- LVGL: Hello World ----
+# ---- Vehicle schematic overlay state ----
+# These globals drive which window/door overlays are shown. No Home Assistant
+# wiring yet — set them from HA sensors later, or toggle for testing.
+globals:
+  # Passenger-door open state (drives which window overlay is shown)
+  - id: pass_door_open
+    type: bool
+    initial_value: 'false'
+  # Passenger window position: 0 = closed, 1 = vent, 2 = open
+  - id: pass_window_mode
+    type: int
+    initial_value: '0'
+  # Driver-door open state (drives which driver-window overlay is shown)
+  - id: drv_door_open
+    type: bool
+    initial_value: 'false'
+  # Driver window position: 0 = closed, 1 = vent, 2 = open
+  - id: drv_window_mode
+    type: int
+    initial_value: '0'
+
+script:
+  # Pick the correct passenger-window overlay from window mode + door state.
+  # The four window images encode {open|vent} x {door closed|door open}.
+  - id: update_pass_window
+    then:
+      - lambda: |-
+          // Hide all four first.
+          lv_obj_add_flag(id(ovl_win_open_dc), LV_OBJ_FLAG_HIDDEN);
+          lv_obj_add_flag(id(ovl_win_open_do), LV_OBJ_FLAG_HIDDEN);
+          lv_obj_add_flag(id(ovl_win_vent_dc), LV_OBJ_FLAG_HIDDEN);
+          lv_obj_add_flag(id(ovl_win_vent_do), LV_OBJ_FLAG_HIDDEN);
+          bool dopen = id(pass_door_open);
+          int w = id(pass_window_mode);
+          lv_obj_t* show = nullptr;
+          if (w == 2) show = dopen ? id(ovl_win_open_do) : id(ovl_win_open_dc);
+          else if (w == 1) show = dopen ? id(ovl_win_vent_do) : id(ovl_win_vent_dc);
+          if (show) lv_obj_clear_flag(show, LV_OBJ_FLAG_HIDDEN);
+
+  # Driver-window equivalent of update_pass_window (uses the driver door state).
+  - id: update_drv_window
+    then:
+      - lambda: |-
+          // Hide all four first.
+          lv_obj_add_flag(id(ovl_dwin_open_dc), LV_OBJ_FLAG_HIDDEN);
+          lv_obj_add_flag(id(ovl_dwin_open_do), LV_OBJ_FLAG_HIDDEN);
+          lv_obj_add_flag(id(ovl_dwin_vent_dc), LV_OBJ_FLAG_HIDDEN);
+          lv_obj_add_flag(id(ovl_dwin_vent_do), LV_OBJ_FLAG_HIDDEN);
+          bool dopen = id(drv_door_open);
+          int w = id(drv_window_mode);
+          lv_obj_t* show = nullptr;
+          if (w == 2) show = dopen ? id(ovl_dwin_open_do) : id(ovl_dwin_open_dc);
+          else if (w == 1) show = dopen ? id(ovl_dwin_vent_do) : id(ovl_dwin_vent_dc);
+          if (show) lv_obj_clear_flag(show, LV_OBJ_FLAG_HIDDEN);
+
+# ---- Fonts ----
+font:
+  - file: "fonts/Roboto-Regular.ttf"
+    id: roboto_small
+    size: 26
+    bpp: 4
+    glyphs: " !\"#%'()+,-./0123456789:;<=>?ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz"
+  - file: "fonts/Roboto-Regular.ttf"
+    id: roboto_medium
+    size: 34
+    bpp: 4
+    glyphs: " !\"#%'()+,-./0123456789:;<=>?ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz"
+  - file: "fonts/Roboto-Regular.ttf"
+    id: roboto_large
+    size: 46
+    bpp: 4
+    glyphs: " !\"#%'()+,-./0123456789:;<=>?ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz"
+
+# ---- Home Assistant Sensors ----
+sensor:
+  # Fuel tank level (0-100 %)
+  - platform: homeassistant
+    id: ha_fuel_level
+    entity_id: sensor.wican_fc012cdbd495_local_2f_fueltanklevel
+    internal: true
+    on_value:
+      then:
+        - lvgl.bar.update:
+            id: bar_fuel
+            value: !lambda 'return isnan(x) ? 0 : (int)x;'
+        - lvgl.bar.update:
+            id: bar_fuel
+            indicator:
+              bg_color: !lambda |-
+                if (isnan(x)) return lv_color_hex(0x3A3A3A);
+                if (x <= 15) return lv_color_hex(0xF85149);
+                if (x <= 30) return lv_color_hex(0xF0883E);
+                return lv_color_hex(0x3FB950);
+        - lvgl.label.update:
+            id: lbl_fuel_pct
+            text: !lambda |-
+              if (isnan(x)) return std::string("--%");
+              char buf[8]; snprintf(buf, sizeof(buf), "%.0f%%", x); return std::string(buf);
+            text_color: !lambda 'return isnan(x) ? lv_color_hex(0x555555) : lv_color_hex(0xF0F6FC);'
+
+  # DEF (Diesel Exhaust Fluid) level (0-100 %)
+  - platform: homeassistant
+    id: ha_def_level
+    entity_id: sensor.wican_fc012cdbd495_local_9b_dieselexhaustfluidsensordata
+    internal: true
+    on_value:
+      then:
+        - lvgl.bar.update:
+            id: bar_def
+            value: !lambda 'return isnan(x) ? 0 : (int)x;'
+        - lvgl.bar.update:
+            id: bar_def
+            indicator:
+              bg_color: !lambda |-
+                if (isnan(x)) return lv_color_hex(0x3A3A3A);
+                if (x <= 15) return lv_color_hex(0xF85149);
+                if (x <= 30) return lv_color_hex(0xF0883E);
+                return lv_color_hex(0x58A6FF);
+        - lvgl.label.update:
+            id: lbl_def_pct
+            text: !lambda |-
+              if (isnan(x)) return std::string("--%");
+              char buf[8]; snprintf(buf, sizeof(buf), "%.0f%%", x); return std::string(buf);
+            text_color: !lambda 'return isnan(x) ? lv_color_hex(0x555555) : lv_color_hex(0xF0F6FC);'
+
+  # Fuel remaining (HA number entity, numeric state)
+  - platform: homeassistant
+    id: ha_fuel_remaining
+    entity_id: number.fuel_remaining
+    internal: true
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: lbl_fuel_remaining
+            text: !lambda |-
+              if (isnan(x)) return std::string("Fuel: --");
+              char buf[24]; snprintf(buf, sizeof(buf), "Fuel: %.1f gal", x); return std::string(buf);
+            text_color: !lambda 'return isnan(x) ? lv_color_hex(0x555555) : lv_color_hex(0xF0F6FC);'
+
+  # Range / miles remaining (HA number entity, numeric state)
+  - platform: homeassistant
+    id: ha_miles_remaining
+    entity_id: number.miles_remaining
+    internal: true
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: lbl_range
+            text: !lambda |-
+              if (isnan(x)) return std::string("Range: --");
+              char buf[24]; snprintf(buf, sizeof(buf), "Range: %.0f mi", x); return std::string(buf);
+            text_color: !lambda 'return isnan(x) ? lv_color_hex(0x555555) : lv_color_hex(0xF0F6FC);'
+
+binary_sensor:
+  # When HA/API connection drops, reset bars + labels to the disconnected state.
+  - platform: status
+    id: device_online
+    internal: true
+    on_state:
+      then:
+        - if:
+            condition:
+              lambda: 'return !x;'
+            then:
+              - lvgl.bar.update:
+                  id: bar_fuel
+                  value: 0
+              - lvgl.bar.update:
+                  id: bar_fuel
+                  indicator: { bg_color: 0x3A3A3A }
+              - lvgl.bar.update:
+                  id: bar_def
+                  value: 0
+              - lvgl.bar.update:
+                  id: bar_def
+                  indicator: { bg_color: 0x3A3A3A }
+              - lvgl.label.update:
+                  id: lbl_fuel_pct
+                  text: "--%"
+                  text_color: 0x555555
+              - lvgl.label.update:
+                  id: lbl_def_pct
+                  text: "--%"
+                  text_color: 0x555555
+              - lvgl.label.update:
+                  id: lbl_fuel_remaining
+                  text: "Fuel: --"
+                  text_color: 0x555555
+              - lvgl.label.update:
+                  id: lbl_range
+                  text: "Range: --"
+                  text_color: 0x555555
+
+# ---- Vehicle schematic layers ----
+# Top-down van art. Each layer is cropped to its OWN alpha bounding box and
+# placed at its own x/y offset (= source bbox top-left / 2) so they stay
+# pixel-aligned when stacked. RGB565 + alpha_channel keeps per-pixel
+# transparency. Regenerate cropped/ with: python scripts/crop_layers.py
+image:
+  - file: layers/cropped/907600_car.png
+    id: img_van_base
+    type: RGB565
+    transparency: alpha_channel
+    resize: 169x396
+  - file: layers/cropped/907600_cowl.png
+    id: img_cowl
+    type: RGB565
+    transparency: alpha_channel
+    resize: 118x59
+  - file: layers/cropped/907600_door_frontleft_open.png
+    id: img_door_drv
+    type: RGB565
+    transparency: alpha_channel
+    resize: 70x78
+  - file: layers/cropped/907600_door_frontleft_unlock.png
+    id: img_unlock_drv
+    type: RGB565
+    transparency: alpha_channel
+    resize: 9x71
+  - file: layers/cropped/907600_window_frontleft_opendoorclosed.png
+    id: img_dwin_open_dc
+    type: RGB565
+    transparency: alpha_channel
+    resize: 3x35
+  - file: layers/cropped/907600_window_frontleft_opendooropened.png
+    id: img_dwin_open_do
+    type: RGB565
+    transparency: alpha_channel
+    resize: 33x16
+  - file: layers/cropped/907600_window_frontleft_ventilatedoorclosed.png
+    id: img_dwin_vent_dc
+    type: RGB565
+    transparency: alpha_channel
+    resize: 117x35
+  - file: layers/cropped/907600_window_frontleft_ventilatedooropened.png
+    id: img_dwin_vent_do
+    type: RGB565
+    transparency: alpha_channel
+    resize: 34x16
+  - file: layers/cropped/907600_door_frontright_open.png
+    id: img_door_pass
+    type: RGB565
+    transparency: alpha_channel
+    resize: 70x74
+  - file: layers/cropped/907600_door_frontright_unlock.png
+    id: img_unlock_pass
+    type: RGB565
+    transparency: alpha_channel
+    resize: 8x71
+  - file: layers/cropped/907600_window_frontright_opendoorclosed.png
+    id: img_win_open_dc
+    type: RGB565
+    transparency: alpha_channel
+    resize: 3x36
+  - file: layers/cropped/907600_window_frontright_opendooropened.png
+    id: img_win_open_do
+    type: RGB565
+    transparency: alpha_channel
+    resize: 34x13
+  - file: layers/cropped/907600_window_frontright_ventilatedoorclosed.png
+    id: img_win_vent_dc
+    type: RGB565
+    transparency: alpha_channel
+    resize: 4x36
+  - file: layers/cropped/907600_window_frontright_ventilatedooropened.png
+    id: img_win_vent_do
+    type: RGB565
+    transparency: alpha_channel
+    resize: 34x13
+  - file: layers/cropped/907600_door_rearright_open.png
+    id: img_door_slide
+    type: RGB565
+    transparency: alpha_channel
+    resize: 24x185
+  - file: layers/cropped/907600_door_rearright_unlock.png
+    id: img_unlock_slide
+    type: RGB565
+    transparency: alpha_channel
+    resize: 19x99
+  - file: layers/cropped/907600_trunk_open.png
+    id: img_trunk_open
+    type: RGB565
+    transparency: alpha_channel
+    resize: 128x65
+  - file: layers/cropped/907600_trunk_unlock.png
+    id: img_unlock_trunk
+    type: RGB565
+    transparency: alpha_channel
+    resize: 104x13
+  - file: layers/cropped/907600_tire_frontleft.png
+    id: img_tire_fl
+    type: RGB565
+    transparency: alpha_channel
+    resize: 15x46
+  - file: layers/cropped/907600_tire_frontright.png
+    id: img_tire_fr
+    type: RGB565
+    transparency: alpha_channel
+    resize: 15x46
+  - file: layers/cropped/907600_tire_rearleft.png
+    id: img_tire_rl
+    type: RGB565
+    transparency: alpha_channel
+    resize: 15x46
+  - file: layers/cropped/907600_tire_rearright.png
+    id: img_tire_rr
+    type: RGB565
+    transparency: alpha_channel
+    resize: 15x46
+
+# ---- LVGL Dashboard ----
+# Left column shows a top-down van schematic: base art + transparent overlays
+# (doors, windows, tires, unlock indicators) toggled via overlay ids. No HA
+# wiring yet — overlays start hidden.
 lvgl:
   displays:
     - dsi_display
@@ -69,11 +383,138 @@ lvgl:
   color_depth: 16
   buffer_size: 100%
   byte_order: little_endian
+  # Thick horizontal bar look for fuel / DEF gauges.
+  style_definitions:
+    - id: gauge_bar
+      radius: 8
+      border_width: 0
+      bg_color: 0x21262D
+      bg_opa: COVER
   pages:
     - id: main_page
       bg_color: 0x010409
       widgets:
+        - obj:
+            id: card_doors
+            width: 480
+            height: 480
+            x: 0
+            y: 0
+            bg_opa: TRANSP
+            radius: 0
+            border_width: 0
+            scrollbar_mode: "OFF"
+            scrollable: false
+            pad_all: 0
+            widgets:
+              # Base van (always shown)
+              - image: { src: img_van_base, align: TOP_LEFT, x: 155, y: 42 }
+              # Cowl / hood
+              - image: { id: ovl_cowl, src: img_cowl, align: TOP_LEFT, x: 181, y: 56, hidden: true }
+              # Driver (front-left) door + unlock + windows
+              - image: { id: ovl_door_drv_open, src: img_door_drv, align: TOP_LEFT, x: 116, y: 124, hidden: true }
+              - image: { id: ovl_unlock_drv, src: img_unlock_drv, align: TOP_LEFT, x: 177, y: 131, hidden: true }
+              - image: { id: ovl_dwin_open_dc, src: img_dwin_open_dc, align: TOP_LEFT, x: 181, y: 160, hidden: true }
+              - image: { id: ovl_dwin_open_do, src: img_dwin_open_do, align: TOP_LEFT, x: 123, y: 145, hidden: true }
+              - image: { id: ovl_dwin_vent_dc, src: img_dwin_vent_dc, align: TOP_LEFT, x: 181, y: 160, hidden: true }
+              - image: { id: ovl_dwin_vent_do, src: img_dwin_vent_do, align: TOP_LEFT, x: 123, y: 145, hidden: true }
+              # Passenger (front-right) door + unlock + windows
+              - image: { id: ovl_door_pass_open, src: img_door_pass, align: TOP_LEFT, x: 295, y: 128, hidden: true }
+              - image: { id: ovl_unlock_pass, src: img_unlock_pass, align: TOP_LEFT, x: 295, y: 131, hidden: true }
+              - image: { id: ovl_win_open_dc, src: img_win_open_dc, align: TOP_LEFT, x: 296, y: 159, hidden: true }
+              - image: { id: ovl_win_open_do, src: img_win_open_do, align: TOP_LEFT, x: 323, y: 147, hidden: true }
+              - image: { id: ovl_win_vent_dc, src: img_win_vent_dc, align: TOP_LEFT, x: 295, y: 160, hidden: true }
+              - image: { id: ovl_win_vent_do, src: img_win_vent_do, align: TOP_LEFT, x: 323, y: 147, hidden: true }
+              # Sliding (rear-right) door + unlock
+              - image: { id: ovl_door_slide_open, src: img_door_slide, align: TOP_LEFT, x: 284, y: 203, hidden: true }
+              - image: { id: ovl_unlock_slide, src: img_unlock_slide, align: TOP_LEFT, x: 284, y: 203, hidden: true }
+              # Rear barn doors / trunk + unlock
+              - image: { id: ovl_trunk_open, src: img_trunk_open, align: TOP_LEFT, x: 176, y: 414, hidden: true }
+              - image: { id: ovl_unlock_trunk, src: img_unlock_trunk, align: TOP_LEFT, x: 188, y: 414, hidden: true }
+              # Tires (low-pressure warnings)
+              - image: { id: ovl_tire_fl, src: img_tire_fl, align: TOP_LEFT, x: 179, y: 95, hidden: true }
+              - image: { id: ovl_tire_fr, src: img_tire_fr, align: TOP_LEFT, x: 287, y: 95, hidden: true }
+              - image: { id: ovl_tire_rl, src: img_tire_rl, align: TOP_LEFT, x: 179, y: 325, hidden: true }
+              - image: { id: ovl_tire_rr, src: img_tire_rr, align: TOP_LEFT, x: 287, y: 325, hidden: true }
+
+        # ═══════════════════════════════════════════════════
+        # FUEL + DEF gauges (right of the van schematic)
+        # ═══════════════════════════════════════════════════
+        # ── Fuel ──
         - label:
-            align: CENTER
-            text: "Hello, World!"
-            text_color: 0xF0F6FC
+            id: lbl_fuel_title
+            text: "FUEL"
+            text_font: roboto_small
+            text_color: 0x8B949E
+            align: TOP_LEFT
+            x: 540
+            y: 70
+        - label:
+            id: lbl_fuel_pct
+            text: "--%"
+            text_font: roboto_medium
+            text_color: 0x555555
+            align: TOP_RIGHT
+            x: -60
+            y: 66
+        - bar:
+            id: bar_fuel
+            styles: gauge_bar
+            x: 540
+            y: 110
+            width: 760
+            height: 48
+            min_value: 0
+            max_value: 100
+            value: 0
+            indicator:
+              bg_color: 0x3A3A3A
+              radius: 8
+        # Fuel remaining + range, below the fuel bar
+        - label:
+            id: lbl_fuel_remaining
+            text: "Fuel: --"
+            text_font: roboto_small
+            text_color: 0x555555
+            align: TOP_LEFT
+            x: 540
+            y: 172
+        - label:
+            id: lbl_range
+            text: "Range: --"
+            text_font: roboto_small
+            text_color: 0x555555
+            align: TOP_LEFT
+            x: 900
+            y: 172
+
+        # ── DEF ──
+        - label:
+            id: lbl_def_title
+            text: "DEF"
+            text_font: roboto_small
+            text_color: 0x8B949E
+            align: TOP_LEFT
+            x: 540
+            y: 250
+        - label:
+            id: lbl_def_pct
+            text: "--%"
+            text_font: roboto_medium
+            text_color: 0x555555
+            align: TOP_RIGHT
+            x: -60
+            y: 246
+        - bar:
+            id: bar_def
+            styles: gauge_bar
+            x: 540
+            y: 290
+            width: 760
+            height: 48
+            min_value: 0
+            max_value: 100
+            value: 0
+            indicator:
+              bg_color: 0x3A3A3A
+              radius: 8
