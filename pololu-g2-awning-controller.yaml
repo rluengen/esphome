@@ -18,8 +18,8 @@
 #      NOTE: Adjust trimpot to exactly 5.0V with multimeter BEFORE connecting XIAO
 #
 #    Motor Control (Direct GPIO):
-#      XIAO D2 (GPIO3) -- Pololu PWM (motor enable/speed)
-#      XIAO D3 (GPIO4) -- Pololu DIR (direction: HIGH=forward, LOW=backward)
+#      XIAO D2 (GPIO3) -- Pololu DIR (direction: HIGH=forward, LOW=backward)
+#      XIAO D3 (GPIO4) -- Pololu PWM (motor enable/speed)
 #
 #    Current Sensing (Direct ADC):
 #      XIAO D0 (GPIO1) -- Pololu CURRENT (analog voltage feedback proportional to motor current)
@@ -43,8 +43,8 @@
 #         │                 │
 #  ►CS  D0│ (GPIO1)   (5V)  │5V ◄── Buck OUT+
 #  ►FLT D1│ (GPIO2)   (GND) │GND ── Common GND
-#  ►PWM D2│ (GPIO3)   (3V3) │3V3
-#  ►DIR D3│ (GPIO4)  (GPIO9)│D10
+#  ►DIR D2│ (GPIO3)   (3V3) │3V3
+#  ►PWM D3│ (GPIO4)  (GPIO9)│D10
 #       D4│ (GPIO5)  (GPIO8)│D9 ◄── CLOSE btn
 #       D5│ (GPIO6)  (GPIO7)│D8 ◄── OPEN btn
 #       D6│ (GPIO43)(GPIO44)│D7
@@ -58,8 +58,8 @@
 #    GND ─┤■  GND                        OUTB  ■├─ Motor -
 #         │                                     │
 #         │  ■ EN (tied high or NC)             │
-#    D2 ──┤  ■ PWM (motor speed/enable)         │
-#    D3 ──┤  ■ DIR (direction)                  │
+#    D2 ──┤  ■ DIR (direction)                  │
+#    D3 ──┤  ■ PWM (motor speed/enable)         │
 #         │  ■ SLP (sleep, tied high or NC)     │
 #    D1 ──┤  ■ FLT (fault output, active-low)   │
 #    D0 ──┤  ■ CS  (current sense output)       │
@@ -110,8 +110,8 @@ substitutions:
 
   # --- Pololu G2 18v17 GPIO pins ---
   # Direct GPIO connections from XIAO to Pololu
-  pwm_pin: GPIO3     # Motor enable/speed  (PWM input)
-  dir_pin: GPIO4     # Direction control   (logic input: HIGH=forward, LOW=backward)
+  dir_pin: GPIO3     # D2 - Direction control   (logic input: HIGH=forward, LOW=backward)
+  pwm_pin: GPIO4     # D3 - Motor enable/speed  (PWM input)
 
   # --- Pololu Current Sensing (ADC) ---
   current_sense_pin: GPIO1   # D0 - analog voltage feedback from Pololu CURRENT pin
