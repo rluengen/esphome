@@ -49,15 +49,12 @@ substitutions:
   dim_brightness: "25"
   active_brightness: "100"
 
-esphome:
-  on_boot:
-    # Wake the display at boot, then start the inactivity timeout so it dims
-    # and sleeps after no touch activity. Runs late (priority -100) so the
-    # backlight light + LVGL are fully initialized first.
-    - priority: -100
-      then:
-        - script.execute: exit_screen_off
-        - script.execute: screen_bump_activity
+# NOTE: This package intentionally does NOT define esphome.on_boot.
+# ESPHome package merging lets a later-loaded package's on_boot REPLACE an
+# earlier one rather than appending, which previously clobbered the display
+# device package's critical bridge/backlight init. Devices that want the
+# inactivity timeout to start at boot should call screen_bump_activity from
+# their own on_boot (see devices/88-dsi-touch-a.yaml).
 
 number:
   - platform: template
