@@ -14,6 +14,9 @@ substitutions:
   color_critical: "0xF85149"      # critical level (<= 15%)
   color_warning: "0xF0883E"       # warning level (<= 30%)
 
+  # Charging graph full-scale (watts)
+  graph_max_w: "1000"
+
 esphome:
   name: ${device_name}
   friendly_name: ${friendly_name}
@@ -83,6 +86,13 @@ globals:
   - id: drv_window_mode
     type: int
     initial_value: '0'
+  # Latest charging power (W) for the time graph
+  - id: solar_w
+    type: float
+    initial_value: '0'
+  - id: alt_w
+    type: float
+    initial_value: '0'
 
 script:
   # Pick the correct passenger-window overlay from window mode + door state.
@@ -118,6 +128,35 @@ script:
           else if (w == 1) show = dopen ? id(ovl_dwin_vent_do) : id(ovl_dwin_vent_dc);
           if (show) lv_obj_clear_flag(show, LV_OBJ_FLAG_HIDDEN);
 
+# ---- Charging graph scroll ----
+# Every tick, append the latest solar/alternator watts and redraw the two
+# polylines. Plot is 648x270 px (matches the line widgets inside card_charge);
+# full-scale = ${graph_max_w} W. set_points() copies into the widget's internal
+# buffer, so no static storage is needed for the points themselves.
+interval:
+  - interval: 3s
+    then:
+      - lambda: |-
+          static const int N = 60;
+          static float solar_hist[N] = {0};
+          static float alt_hist[N] = {0};
+          const float plot_w = 648.0f, plot_h = 270.0f;
+          const float maxW = ${graph_max_w};
+          for (int i = 1; i < N; i++) { solar_hist[i-1] = solar_hist[i]; alt_hist[i-1] = alt_hist[i]; }
+          solar_hist[N-1] = isnan(id(solar_w)) ? 0.0f : id(solar_w);
+          alt_hist[N-1]   = isnan(id(alt_w))   ? 0.0f : id(alt_w);
+          std::vector<lv_point_t> sp, ap;
+          sp.reserve(N); ap.reserve(N);
+          for (int i = 0; i < N; i++) {
+            lv_coord_t px = (lv_coord_t)((float)i * plot_w / (float)(N - 1));
+            float s = solar_hist[i] / maxW; if (s < 0) s = 0; if (s > 1) s = 1;
+            float a = alt_hist[i]   / maxW; if (a < 0) a = 0; if (a > 1) a = 1;
+            sp.push_back(lv_point_t{ px, (lv_coord_t)(plot_h - s * plot_h) });
+            ap.push_back(lv_point_t{ px, (lv_coord_t)(plot_h - a * plot_h) });
+          }
+          id(line_solar)->set_points(sp);
+          id(line_alt)->set_points(ap);
+
 # ---- Fonts ----
 font:
   - file: "fonts/Roboto-Regular.ttf"
@@ -129,12 +168,22 @@ font:
     id: roboto_medium
     size: 34
     bpp: 4
-    glyphs: " !\"#%'()+,-./0123456789:;<=>?ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz"
+    glyphs: " !\"#%'()+,-./0123456789:;<=>?ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz°"
   - file: "fonts/Roboto-Regular.ttf"
     id: roboto_large
     size: 46
     bpp: 4
     glyphs: " !\"#%'()+,-./0123456789:;<=>?ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz"
+
+  # Material Design Icons used by the climate badges.
+  - file: "fonts/materialdesignicons-webfont.ttf"
+    id: mdi_badge
+    size: 36
+    bpp: 4
+    glyphs:
+      - "\U000F050F"  # thermometer (interior temp)
+      - "\U000F058E"  # water-percent (humidity)
+      - "\U000F0290"  # fridge
 
 # ---- Home Assistant Sensors ----
 sensor:
@@ -216,6 +265,123 @@ sensor:
               char buf[24]; snprintf(buf, sizeof(buf), "Range: %.0f mi", x); return std::string(buf);
             text_color: !lambda 'return isnan(x) ? lv_color_hex(0x555555) : lv_color_hex(0xF0F6FC);'
 
+  # ── Battery state of charge (0-100 %) ──
+  - platform: homeassistant
+    id: ha_battery_soc
+    entity_id: sensor.ecoflow_battery_percentage  # TODO VALIDATE
+    internal: true
+    on_value:
+      then:
+        - lvgl.bar.update:
+            id: bar_battery
+            value: !lambda 'return isnan(x) ? 0 : (int)x;'
+        - lvgl.bar.update:
+            id: bar_battery
+            indicator:
+              bg_color: !lambda |-
+                if (isnan(x)) return lv_color_hex(${color_unavailable});
+                if (x <= 15) return lv_color_hex(${color_critical});
+                if (x <= 30) return lv_color_hex(${color_warning});
+                return lv_color_hex(0x3FB950);
+        - lvgl.label.update:
+            id: lbl_batt_pct
+            text: !lambda |-
+              if (isnan(x)) return std::string("--%");
+              char buf[8]; snprintf(buf, sizeof(buf), "%.0f%%", x); return std::string(buf);
+            text_color: !lambda 'return isnan(x) ? lv_color_hex(0x555555) : lv_color_hex(0xF0F6FC);'
+
+  # ── Solar charging power (W) → graph + label ──
+  - platform: homeassistant
+    id: ha_solar_w
+    entity_id: sensor.ecoflow_solar_in_power  # TODO VALIDATE
+    internal: true
+    on_value:
+      then:
+        - lambda: 'id(solar_w) = x;'
+        - lvgl.label.update:
+            id: lbl_solar_w
+            text: !lambda |-
+              if (isnan(x)) return std::string("-- W");
+              char buf[12]; snprintf(buf, sizeof(buf), "%.0f W", x); return std::string(buf);
+
+  # ── Alternator charging power (W) → graph + label ──
+  - platform: homeassistant
+    id: ha_alt_w
+    entity_id: sensor.ecoflow_alternator_charging_power  # TODO VALIDATE
+    internal: true
+    on_value:
+      then:
+        - lambda: 'id(alt_w) = x;'
+        - lvgl.label.update:
+            id: lbl_alt_w
+            text: !lambda |-
+              if (isnan(x)) return std::string("-- W");
+              char buf[12]; snprintf(buf, sizeof(buf), "%.0f W", x); return std::string(buf);
+
+  # ── Interior temperature (°F) ──
+  - platform: homeassistant
+    id: ha_interior_temp
+    entity_id: sensor.cabin_average_temperature  # TODO VALIDATE
+    internal: true
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: lbl_interior_val
+            text: !lambda |-
+              if (isnan(x)) return std::string("--°");
+              char buf[12]; snprintf(buf, sizeof(buf), "%.0f°", x); return std::string(buf);
+            text_color: !lambda 'return isnan(x) ? lv_color_hex(0x555555) : lv_color_hex(0xF0F6FC);'
+        - lvgl.label.update:
+            id: lbl_interior_icon
+            text_color: !lambda |-
+              if (isnan(x)) return lv_color_hex(${color_unavailable});
+              if (x >= 85) return lv_color_hex(${color_critical});
+              if (x >= 78) return lv_color_hex(${color_warning});
+              if (x <= 55) return lv_color_hex(0x58A6FF);
+              return lv_color_hex(0x3FB950);
+
+  # ── Interior humidity (%) ──
+  - platform: homeassistant
+    id: ha_humidity
+    entity_id: sensor.interior_humidity  # TODO VALIDATE
+    internal: true
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: lbl_humidity_val
+            text: !lambda |-
+              if (isnan(x)) return std::string("--%");
+              char buf[8]; snprintf(buf, sizeof(buf), "%.0f%%", x); return std::string(buf);
+            text_color: !lambda 'return isnan(x) ? lv_color_hex(0x555555) : lv_color_hex(0xF0F6FC);'
+        - lvgl.label.update:
+            id: lbl_humidity_icon
+            text_color: !lambda |-
+              if (isnan(x)) return lv_color_hex(${color_unavailable});
+              if (x >= 70) return lv_color_hex(${color_warning});
+              if (x <= 25) return lv_color_hex(${color_warning});
+              return lv_color_hex(0x58A6FF);
+
+  # ── Fridge temperature (°F) ──
+  - platform: homeassistant
+    id: ha_fridge_temp
+    entity_id: sensor.fridge_temperature  # TODO VALIDATE
+    internal: true
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: lbl_fridge_val
+            text: !lambda |-
+              if (isnan(x)) return std::string("--°");
+              char buf[12]; snprintf(buf, sizeof(buf), "%.0f°", x); return std::string(buf);
+            text_color: !lambda 'return isnan(x) ? lv_color_hex(0x555555) : lv_color_hex(0xF0F6FC);'
+        - lvgl.label.update:
+            id: lbl_fridge_icon
+            text_color: !lambda |-
+              if (isnan(x)) return lv_color_hex(${color_unavailable});
+              if (x >= 45) return lv_color_hex(${color_critical});
+              if (x >= 40) return lv_color_hex(${color_warning});
+              return lv_color_hex(0x81D4FA);
+
 binary_sensor:
   # When HA/API connection drops, reset bars + labels to the disconnected state.
   - platform: status
@@ -256,6 +422,35 @@ binary_sensor:
               - lvgl.label.update:
                   id: lbl_range
                   text: "Range: --"
+                  text_color: 0x555555
+              - lvgl.bar.update:
+                  id: bar_battery
+                  value: 0
+              - lvgl.bar.update:
+                  id: bar_battery
+                  indicator:
+                    bg_color: ${color_unavailable}
+              - lvgl.label.update:
+                  id: lbl_batt_pct
+                  text: "--%"
+                  text_color: 0x555555
+              - lvgl.label.update:
+                  id: lbl_solar_w
+                  text: "-- W"
+              - lvgl.label.update:
+                  id: lbl_alt_w
+                  text: "-- W"
+              - lvgl.label.update:
+                  id: lbl_interior_val
+                  text: "--°"
+                  text_color: 0x555555
+              - lvgl.label.update:
+                  id: lbl_humidity_val
+                  text: "--%"
+                  text_color: 0x555555
+              - lvgl.label.update:
+                  id: lbl_fridge_val
+                  text: "--°"
                   text_color: 0x555555
 
 # ---- Vehicle schematic layers ----
@@ -395,6 +590,18 @@ lvgl:
       border_width: 0
       bg_color: 0x21262D
       bg_opa: COVER
+    # Rounded card behind a HA-style icon+value badge.
+    - id: badge_card
+      radius: 14
+      border_width: 0
+      bg_color: 0x161B22
+      bg_opa: COVER
+    # Rounded panel behind the charging graph.
+    - id: panel_card
+      radius: 14
+      border_width: 0
+      bg_color: 0x0D1117
+      bg_opa: COVER
   pages:
     - id: main_page
       bg_color: 0x010409
@@ -443,83 +650,160 @@ lvgl:
               - image: { id: ovl_tire_rr, src: img_tire_rr, align: TOP_LEFT, x: 287, y: 325, hidden: true }
 
         # ═══════════════════════════════════════════════════
-        # FUEL + DEF gauges (right of the van schematic)
+        # FLUIDS / POWER column (x 540..1180): Fuel · DEF · Battery
         # ═══════════════════════════════════════════════════
         # ── Fuel ──
-        - label:
-            id: lbl_fuel_title
-            text: "FUEL"
-            text_font: roboto_small
-            text_color: 0x8B949E
-            align: TOP_LEFT
-            x: 540
-            y: 70
-        - label:
-            id: lbl_fuel_pct
-            text: "--%"
-            text_font: roboto_medium
-            text_color: 0x555555
-            align: TOP_RIGHT
-            x: -60
-            y: 66
+        - label: { id: lbl_fuel_title, text: "FUEL", text_font: roboto_small, text_color: 0x8B949E, align: TOP_LEFT, x: 540, y: 56 }
+        - label: { id: lbl_fuel_pct, text: "--%", text_font: roboto_medium, text_color: 0x555555, align: TOP_LEFT, x: 1086, y: 50 }
         - bar:
             id: bar_fuel
             styles: gauge_bar
             x: 540
-            y: 110
-            width: 760
-            height: 48
+            y: 86
+            width: 640
+            height: 40
             min_value: 0
             max_value: 100
             value: 0
             indicator:
               bg_color: ${color_unavailable}
               radius: 8
-        # Fuel remaining + range, below the fuel bar
-        - label:
-            id: lbl_fuel_remaining
-            text: "Fuel: --"
-            text_font: roboto_small
-            text_color: 0x555555
-            align: TOP_LEFT
-            x: 540
-            y: 172
-        - label:
-            id: lbl_range
-            text: "Range: --"
-            text_font: roboto_small
-            text_color: 0x555555
-            align: TOP_LEFT
-            x: 900
-            y: 172
-
         # ── DEF ──
-        - label:
-            id: lbl_def_title
-            text: "DEF"
-            text_font: roboto_small
-            text_color: 0x8B949E
-            align: TOP_LEFT
-            x: 540
-            y: 250
-        - label:
-            id: lbl_def_pct
-            text: "--%"
-            text_font: roboto_medium
-            text_color: 0x555555
-            align: TOP_RIGHT
-            x: -60
-            y: 246
+        - label: { id: lbl_def_title, text: "DEF", text_font: roboto_small, text_color: 0x8B949E, align: TOP_LEFT, x: 540, y: 146 }
+        - label: { id: lbl_def_pct, text: "--%", text_font: roboto_medium, text_color: 0x555555, align: TOP_LEFT, x: 1086, y: 140 }
         - bar:
             id: bar_def
             styles: gauge_bar
             x: 540
-            y: 290
-            width: 760
-            height: 48
+            y: 176
+            width: 640
+            height: 40
             min_value: 0
             max_value: 100
             value: 0
             indicator:
               bg_color: ${color_unavailable}
               radius: 8
+        # ── Battery ──
+        - label: { id: lbl_batt_title, text: "BATTERY", text_font: roboto_small, text_color: 0x8B949E, align: TOP_LEFT, x: 540, y: 236 }
+        - label: { id: lbl_batt_pct, text: "--%", text_font: roboto_medium, text_color: 0x555555, align: TOP_LEFT, x: 1086, y: 230 }
+        - bar:
+            id: bar_battery
+            styles: gauge_bar
+            x: 540
+            y: 266
+            width: 640
+            height: 40
+            min_value: 0
+            max_value: 100
+            value: 0
+            indicator:
+              bg_color: ${color_unavailable}
+              radius: 8
+        # ── Fuel remaining + range ──
+        - label: { id: lbl_fuel_remaining, text: "Fuel: --", text_font: roboto_small, text_color: 0x555555, align: TOP_LEFT, x: 540, y: 322 }
+        - label: { id: lbl_range, text: "Range: --", text_font: roboto_small, text_color: 0x555555, align: TOP_LEFT, x: 860, y: 322 }
+
+        # ── Climate badges (icon + value) ──
+        - obj:
+            id: badge_interior
+            styles: badge_card
+            x: 540
+            y: 372
+            width: 200
+            height: 58
+            pad_left: 16
+            pad_right: 14
+            scrollbar_mode: "OFF"
+            scrollable: false
+            layout:
+              type: FLEX
+              flex_flow: ROW
+              flex_align_cross: CENTER
+              flex_align_main: START
+              pad_column: 10
+            widgets:
+              - label: { id: lbl_interior_icon, text: "\U000F050F", text_font: mdi_badge, text_color: 0x79C0FF }
+              - label: { id: lbl_interior_val, text: "--°", text_font: roboto_medium, text_color: 0x555555 }
+        - obj:
+            id: badge_humidity
+            styles: badge_card
+            x: 760
+            y: 372
+            width: 200
+            height: 58
+            pad_left: 16
+            pad_right: 14
+            scrollbar_mode: "OFF"
+            scrollable: false
+            layout:
+              type: FLEX
+              flex_flow: ROW
+              flex_align_cross: CENTER
+              flex_align_main: START
+              pad_column: 10
+            widgets:
+              - label: { id: lbl_humidity_icon, text: "\U000F058E", text_font: mdi_badge, text_color: 0x58A6FF }
+              - label: { id: lbl_humidity_val, text: "--%", text_font: roboto_medium, text_color: 0x555555 }
+        - obj:
+            id: badge_fridge
+            styles: badge_card
+            x: 980
+            y: 372
+            width: 200
+            height: 58
+            pad_left: 16
+            pad_right: 14
+            scrollbar_mode: "OFF"
+            scrollable: false
+            layout:
+              type: FLEX
+              flex_flow: ROW
+              flex_align_cross: CENTER
+              flex_align_main: START
+              pad_column: 10
+            widgets:
+              - label: { id: lbl_fridge_icon, text: "\U000F0290", text_font: mdi_badge, text_color: 0x81D4FA }
+              - label: { id: lbl_fridge_val, text: "--°", text_font: roboto_medium, text_color: 0x555555 }
+
+        # ═══════════════════════════════════════════════════
+        # CHARGING graph (solar + alternator watts over time)
+        # ═══════════════════════════════════════════════════
+        - obj:
+            id: card_charge
+            styles: panel_card
+            x: 1220
+            y: 56
+            width: 680
+            height: 374
+            scrollbar_mode: "OFF"
+            scrollable: false
+            pad_all: 0
+            widgets:
+              - label: { id: lbl_charge_title, text: "CHARGING (W)", text_font: roboto_small, text_color: 0x8B949E, align: TOP_LEFT, x: 16, y: 12 }
+              - label: { text: "SOLAR", text_font: roboto_small, text_color: 0xFFD700, align: TOP_LEFT, x: 360, y: 12 }
+              - label: { id: lbl_solar_w, text: "-- W", text_font: roboto_small, text_color: 0xFFD700, align: TOP_LEFT, x: 470, y: 12 }
+              - label: { text: "ALT", text_font: roboto_small, text_color: 0x58A6FF, align: TOP_LEFT, x: 360, y: 40 }
+              - label: { id: lbl_alt_w, text: "-- W", text_font: roboto_small, text_color: 0x58A6FF, align: TOP_LEFT, x: 470, y: 40 }
+              - line:
+                  id: line_alt
+                  x: 16
+                  y: 80
+                  width: 648
+                  height: 270
+                  line_color: 0x58A6FF
+                  line_width: 3
+                  points:
+                    - [0, 270]
+                    - [648, 270]
+              - line:
+                  id: line_solar
+                  x: 16
+                  y: 80
+                  width: 648
+                  height: 270
+                  line_color: 0xFFD700
+                  line_width: 3
+                  points:
+                    - [0, 270]
+                    - [648, 270]
