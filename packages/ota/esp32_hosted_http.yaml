@@ -1,6 +1,12 @@
 # ESP32 Hosted HTTP mode (manifest-driven)
-# Uses ESPHome hosted manifest and checks once after boot when WiFi is connected.
-# Manual check button is also exposed; install remains manual.
+# Checks for ESP32-C6 firmware via the ESPHome hosted manifest. Checks are
+# MANUAL ONLY (press the "Check ESP32-C6 Firmware" button); install is manual.
+#
+# NOTE: Do NOT add an esphome.on_boot auto-check here. On the ESP32-P4 + C6
+# esp-hosted DSI board, an on_boot `wait_until: wifi.connected` + esp32_hosted
+# update.check stalls/disrupts the DSI panel bring-up and leaves the display
+# dark. Confirmed via isolation test 2026-06-21. Use the manual button instead,
+# or packages/ota/esp32_hosted_bootstrap.yaml for pinned firmware.
 
 http_request:
 
@@ -11,18 +17,6 @@ update:
     type: http
     source: https://esphome.github.io/esp-hosted-firmware/manifest/esp32c6.json
     update_interval: never
-
-# ISOLATION TEST: on_boot auto-check temporarily removed to confirm whether it
-# is what breaks the display. http_request + http update platform + manual
-# button remain. If the display works with this, the on_boot was the culprit.
-# esphome:
-#   on_boot:
-#     priority: -10
-#     then:
-#       - wait_until:
-#           wifi.connected:
-#       - delay: 30s
-#       - update.check: esp32_c6_firmware
 
 button:
   - platform: template
