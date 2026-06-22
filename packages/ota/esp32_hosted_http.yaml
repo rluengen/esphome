@@ -12,14 +12,17 @@ update:
     source: https://esphome.github.io/esp-hosted-firmware/manifest/esp32c6.json
     update_interval: never
 
-esphome:
-  on_boot:
-    priority: -10
-    then:
-      - wait_until:
-          wifi.connected:
-      - delay: 30s
-      - update.check: esp32_c6_firmware
+# ISOLATION TEST: on_boot auto-check temporarily removed to confirm whether it
+# is what breaks the display. http_request + http update platform + manual
+# button remain. If the display works with this, the on_boot was the culprit.
+# esphome:
+#   on_boot:
+#     priority: -10
+#     then:
+#       - wait_until:
+#           wifi.connected:
+#       - delay: 30s
+#       - update.check: esp32_c6_firmware
 
 button:
   - platform: template
