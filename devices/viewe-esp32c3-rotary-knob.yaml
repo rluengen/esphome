@@ -42,7 +42,7 @@ light:
     name: "Display Backlight"
     id: display_backlight_id
     output: backlight_output
-    restore_mode: RESTORE_DEFAULT_ON
+    restore_mode: ALWAYS_ON
 
 sensor:
   - platform: rotary_encoder
