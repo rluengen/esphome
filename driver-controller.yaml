@@ -10,6 +10,9 @@ substitutions:
 
   # Colors
   color_bg: "0x000000"
+  color_unavailable: "0x3A3A3A"   # no data / disconnected indicator
+  color_critical: "0xF85149"      # critical level (<= 15%)
+  color_warning: "0xF0883E"       # warning level (<= 30%)
 
 esphome:
   name: ${device_name}
@@ -149,9 +152,9 @@ sensor:
             id: bar_fuel
             indicator:
               bg_color: !lambda |-
-                if (isnan(x)) return lv_color_hex(0x3A3A3A);
-                if (x <= 15) return lv_color_hex(0xF85149);
-                if (x <= 30) return lv_color_hex(0xF0883E);
+                if (isnan(x)) return lv_color_hex(${color_unavailable});
+                if (x <= 15) return lv_color_hex(${color_critical});
+                if (x <= 30) return lv_color_hex(${color_warning});
                 return lv_color_hex(0x3FB950);
         - lvgl.label.update:
             id: lbl_fuel_pct
@@ -174,9 +177,9 @@ sensor:
             id: bar_def
             indicator:
               bg_color: !lambda |-
-                if (isnan(x)) return lv_color_hex(0x3A3A3A);
-                if (x <= 15) return lv_color_hex(0xF85149);
-                if (x <= 30) return lv_color_hex(0xF0883E);
+                if (isnan(x)) return lv_color_hex(${color_unavailable});
+                if (x <= 30) return lv_color_hex(${color_critical});
+                if (x <= 50) return lv_color_hex(${color_warning});
                 return lv_color_hex(0x58A6FF);
         - lvgl.label.update:
             id: lbl_def_pct
@@ -229,13 +232,15 @@ binary_sensor:
                   value: 0
               - lvgl.bar.update:
                   id: bar_fuel
-                  indicator: { bg_color: 0x3A3A3A }
+                  indicator:
+                    bg_color: ${color_unavailable}
               - lvgl.bar.update:
                   id: bar_def
                   value: 0
               - lvgl.bar.update:
                   id: bar_def
-                  indicator: { bg_color: 0x3A3A3A }
+                  indicator:
+                    bg_color: ${color_unavailable}
               - lvgl.label.update:
                   id: lbl_fuel_pct
                   text: "--%"
@@ -468,7 +473,7 @@ lvgl:
             max_value: 100
             value: 0
             indicator:
-              bg_color: 0x3A3A3A
+              bg_color: ${color_unavailable}
               radius: 8
         # Fuel remaining + range, below the fuel bar
         - label:
@@ -516,5 +521,5 @@ lvgl:
             max_value: 100
             value: 0
             indicator:
-              bg_color: 0x3A3A3A
+              bg_color: ${color_unavailable}
               radius: 8
