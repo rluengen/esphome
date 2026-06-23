@@ -79,20 +79,47 @@ globals:
     type: int
     initial_value: '0'
   # Driver-door open state (drives which driver-window overlay is shown)
-  - id: drv_door_open
+  - id: driver_door_open
     type: bool
     initial_value: 'false'
   # Driver window position: 0 = closed, 1 = vent, 2 = open
-  - id: drv_window_mode
+  - id: driver_window_mode
     type: int
     initial_value: '0'
   # Latest charging power (W) for the time graph
-  - id: solar_w
+  - id: solar_watts
     type: float
     initial_value: '0'
-  - id: alt_w
+  - id: alternator_watts
     type: float
     initial_value: '0'
+  - id: ac_watts
+    type: float
+    initial_value: '0'
+
+  # ── DEF range tracking ──
+  # Estimates miles until the DEF tank is empty from the consumption rate
+  # measured since the last refill (odometer delta vs DEF % consumed).
+  - id: def_level_now        # latest DEF reading (%), -1 = unknown
+    type: float
+    restore_value: no
+    initial_value: '-1'
+  - id: def_ref_level        # DEF % captured at the last refill / baseline
+    type: float
+    restore_value: yes
+    initial_value: '-1'
+  - id: def_ref_odometer     # odometer (mi) captured at the last refill / baseline
+    type: float
+    restore_value: yes
+    initial_value: '-1'
+  - id: def_last_level       # previous DEF % (used to detect a refill)
+    type: float
+    restore_value: yes
+    initial_value: '-1'
+  - id: def_miles_remaining  # computed estimate (mi), -1 = not enough data
+    type: float
+    restore_value: no
+    initial_value: '-1'
 
 script:
   # Pick the correct passenger-window overlay from window mode + door state.
@@ -101,32 +128,85 @@ script:
     then:
       - lambda: |-
           // Hide all four first.
-          lv_obj_add_flag(id(ovl_win_open_dc), LV_OBJ_FLAG_HIDDEN);
-          lv_obj_add_flag(id(ovl_win_open_do), LV_OBJ_FLAG_HIDDEN);
-          lv_obj_add_flag(id(ovl_win_vent_dc), LV_OBJ_FLAG_HIDDEN);
-          lv_obj_add_flag(id(ovl_win_vent_do), LV_OBJ_FLAG_HIDDEN);
-          bool dopen = id(pass_door_open);
-          int w = id(pass_window_mode);
-          lv_obj_t* show = nullptr;
-          if (w == 2) show = dopen ? id(ovl_win_open_do) : id(ovl_win_open_dc);
-          else if (w == 1) show = dopen ? id(ovl_win_vent_do) : id(ovl_win_vent_dc);
-          if (show) lv_obj_clear_flag(show, LV_OBJ_FLAG_HIDDEN);
+          lv_obj_add_flag(id(ovl_win_open_doorclosed), LV_OBJ_FLAG_HIDDEN);
+          lv_obj_add_flag(id(ovl_win_open_dooropen), LV_OBJ_FLAG_HIDDEN);
+          lv_obj_add_flag(id(ovl_win_vent_doorclosed), LV_OBJ_FLAG_HIDDEN);
+          lv_obj_add_flag(id(ovl_win_vent_dooropen), LV_OBJ_FLAG_HIDDEN);
+          bool door_open = id(pass_door_open);
+          int window_mode = id(pass_window_mode);
+          lv_obj_t* overlay_to_show = nullptr;
+          if (window_mode == 2) overlay_to_show = door_open ? id(ovl_win_open_dooropen) : id(ovl_win_open_doorclosed);
+          else if (window_mode == 1) overlay_to_show = door_open ? id(ovl_win_vent_dooropen) : id(ovl_win_vent_doorclosed);
+          if (overlay_to_show) lv_obj_clear_flag(overlay_to_show, LV_OBJ_FLAG_HIDDEN);
 
   # Driver-window equivalent of update_pass_window (uses the driver door state).
-  - id: update_drv_window
+  - id: update_driver_window
     then:
       - lambda: |-
           // Hide all four first.
-          lv_obj_add_flag(id(ovl_dwin_open_dc), LV_OBJ_FLAG_HIDDEN);
-          lv_obj_add_flag(id(ovl_dwin_open_do), LV_OBJ_FLAG_HIDDEN);
-          lv_obj_add_flag(id(ovl_dwin_vent_dc), LV_OBJ_FLAG_HIDDEN);
-          lv_obj_add_flag(id(ovl_dwin_vent_do), LV_OBJ_FLAG_HIDDEN);
-          bool dopen = id(drv_door_open);
-          int w = id(drv_window_mode);
-          lv_obj_t* show = nullptr;
-          if (w == 2) show = dopen ? id(ovl_dwin_open_do) : id(ovl_dwin_open_dc);
-          else if (w == 1) show = dopen ? id(ovl_dwin_vent_do) : id(ovl_dwin_vent_dc);
-          if (show) lv_obj_clear_flag(show, LV_OBJ_FLAG_HIDDEN);
+          lv_obj_add_flag(id(ovl_driver_window_open_doorclosed), LV_OBJ_FLAG_HIDDEN);
+          lv_obj_add_flag(id(ovl_driver_window_open_dooropen), LV_OBJ_FLAG_HIDDEN);
+          lv_obj_add_flag(id(ovl_driver_window_vent_doorclosed), LV_OBJ_FLAG_HIDDEN);
+          lv_obj_add_flag(id(ovl_driver_window_vent_dooropen), LV_OBJ_FLAG_HIDDEN);
+          bool door_open = id(driver_door_open);
+          int window_mode = id(driver_window_mode);
+          lv_obj_t* overlay_to_show = nullptr;
+          if (window_mode == 2) overlay_to_show = door_open ? id(ovl_driver_window_open_dooropen) : id(ovl_driver_window_open_doorclosed);
+          else if (window_mode == 1) overlay_to_show = door_open ? id(ovl_driver_window_vent_dooropen) : id(ovl_driver_window_vent_doorclosed);
+          if (overlay_to_show) lv_obj_clear_flag(overlay_to_show, LV_OBJ_FLAG_HIDDEN);
+
+  # Estimate miles until the DEF tank is empty. DEF is consumed roughly in
+  # proportion to distance, so we measure the %/mile burn rate since the last
+  # refill and project the current level forward.
+  - id: update_def_range
+    then:
+      - lambda: |-
+          const float FILL_THRESHOLD = 5.0f;   // % jump that counts as a refill
+          const float MIN_USED = 3.0f;         // need >= this % consumed for a stable slope
+          const float MIN_MILES = 100.0f;      // and >= this many miles since the baseline
+
+          float def_now = id(def_level_now);
+          float odometer_now = id(ha_odometer).state;
+
+          // Need both a DEF reading and an odometer reading to do anything.
+          if (def_now < 0 || isnan(odometer_now)) {
+            return;
+          }
+
+          // Seed the baseline on the first valid sample (or after a flash erase).
+          if (id(def_ref_level) < 0 || id(def_ref_odometer) < 0) {
+            id(def_ref_level) = def_now;
+            id(def_ref_odometer) = odometer_now;
+            id(def_last_level) = def_now;
+          }
+
+          // Detect a refill (level jumped up): reset the baseline to now.
+          if (id(def_last_level) >= 0 && def_now > id(def_last_level) + FILL_THRESHOLD) {
+            ESP_LOGI("def", "DEF refill detected (%.0f%% -> %.0f%%) at %.0f mi",
+                     id(def_last_level), def_now, odometer_now);
+            id(def_ref_level) = def_now;
+            id(def_ref_odometer) = odometer_now;
+          }
+          id(def_last_level) = def_now;
+
+          float miles_since_baseline = odometer_now - id(def_ref_odometer);
+          float percent_used = id(def_ref_level) - def_now;   // % consumed since baseline
+
+          if (miles_since_baseline >= MIN_MILES && percent_used >= MIN_USED) {
+            float percent_per_mile = percent_used / miles_since_baseline;
+            float estimated_miles = def_now / percent_per_mile;   // miles until empty
+            id(def_miles_remaining) = estimated_miles < 0 ? 0.0f : estimated_miles;
+          } else {
+            id(def_miles_remaining) = -1.0f;           // not enough data yet
+          }
+      - lvgl.label.update:
+          id: lbl_def_range
+          text: !lambda |-
+            if (id(def_miles_remaining) < 0) return std::string("~-- mi");
+            char buf[24];
+            snprintf(buf, sizeof(buf), "~%.0f mi", id(def_miles_remaining));
+            return std::string(buf);
+          text_color: !lambda 'return id(def_miles_remaining) < 0 ? lv_color_hex(0x555555) : lv_color_hex(0xF0F6FC);'
 
 # ---- Charging graph scroll ----
 # Every tick, append the latest solar/alternator watts and redraw the two
@@ -137,25 +217,42 @@ interval:
   - interval: 3s
     then:
       - lambda: |-
-          static const int N = 60;
-          static float solar_hist[N] = {0};
-          static float alt_hist[N] = {0};
-          const float plot_w = 648.0f, plot_h = 270.0f;
-          const float maxW = ${graph_max_w};
-          for (int i = 1; i < N; i++) { solar_hist[i-1] = solar_hist[i]; alt_hist[i-1] = alt_hist[i]; }
-          solar_hist[N-1] = isnan(id(solar_w)) ? 0.0f : id(solar_w);
-          alt_hist[N-1]   = isnan(id(alt_w))   ? 0.0f : id(alt_w);
-          std::vector<lv_point_t> sp, ap;
-          sp.reserve(N); ap.reserve(N);
-          for (int i = 0; i < N; i++) {
-            lv_coord_t px = (lv_coord_t)((float)i * plot_w / (float)(N - 1));
-            float s = solar_hist[i] / maxW; if (s < 0) s = 0; if (s > 1) s = 1;
-            float a = alt_hist[i]   / maxW; if (a < 0) a = 0; if (a > 1) a = 1;
-            sp.push_back(lv_point_t{ px, (lv_coord_t)(plot_h - s * plot_h) });
-            ap.push_back(lv_point_t{ px, (lv_coord_t)(plot_h - a * plot_h) });
+          static const int POINT_COUNT = 60;
+          static float solar_history[POINT_COUNT] = {0};
+          static float alternator_history[POINT_COUNT] = {0};
+          static float ac_history[POINT_COUNT] = {0};
+          const float plot_width = 648.0f, plot_height = 270.0f;
+          const float max_watts = ${graph_max_w};
+          for (int i = 1; i < POINT_COUNT; i++) {
+            solar_history[i-1] = solar_history[i];
+            alternator_history[i-1] = alternator_history[i];
+            ac_history[i-1] = ac_history[i];
           }
-          id(line_solar)->set_points(sp);
-          id(line_alt)->set_points(ap);
+          solar_history[POINT_COUNT-1]      = isnan(id(solar_watts))      ? 0.0f : id(solar_watts);
+          alternator_history[POINT_COUNT-1] = isnan(id(alternator_watts)) ? 0.0f : id(alternator_watts);
+          ac_history[POINT_COUNT-1]         = isnan(id(ac_watts))         ? 0.0f : id(ac_watts);
+          std::vector<lv_point_t> solar_points, alternator_points, ac_points;
+          solar_points.reserve(POINT_COUNT);
+          alternator_points.reserve(POINT_COUNT);
+          ac_points.reserve(POINT_COUNT);
+          for (int i = 0; i < POINT_COUNT; i++) {
+            lv_coord_t point_x = (lv_coord_t)((float)i * plot_width / (float)(POINT_COUNT - 1));
+            float solar_fraction = solar_history[i] / max_watts;
+            if (solar_fraction < 0) solar_fraction = 0;
+            if (solar_fraction > 1) solar_fraction = 1;
+            float alternator_fraction = alternator_history[i] / max_watts;
+            if (alternator_fraction < 0) alternator_fraction = 0;
+            if (alternator_fraction > 1) alternator_fraction = 1;
+            float ac_fraction = ac_history[i] / max_watts;
+            if (ac_fraction < 0) ac_fraction = 0;
+            if (ac_fraction > 1) ac_fraction = 1;
+            solar_points.push_back(lv_point_t{ point_x, (lv_coord_t)(plot_height - solar_fraction * plot_height) });
+            alternator_points.push_back(lv_point_t{ point_x, (lv_coord_t)(plot_height - alternator_fraction * plot_height) });
+            ac_points.push_back(lv_point_t{ point_x, (lv_coord_t)(plot_height - ac_fraction * plot_height) });
+          }
+          id(line_solar)->set_points(solar_points);
+          id(line_alternator)->set_points(alternator_points);
+          id(line_ac)->set_points(ac_points);
 
 # ---- Fonts ----
 font:
@@ -206,7 +303,7 @@ sensor:
                 if (x <= 30) return lv_color_hex(${color_warning});
                 return lv_color_hex(0x3FB950);
         - lvgl.label.update:
-            id: lbl_fuel_pct
+            id: lbl_fuel_percent
             text: !lambda |-
               if (isnan(x)) return std::string("--%");
               char buf[8]; snprintf(buf, sizeof(buf), "%.0f%%", x); return std::string(buf);
@@ -219,6 +316,7 @@ sensor:
     internal: true
     on_value:
       then:
+        - lambda: 'id(def_level_now) = isnan(x) ? -1.0f : x;'
         - lvgl.bar.update:
             id: bar_def
             value: !lambda 'return isnan(x) ? 0 : (int)x;'
@@ -231,11 +329,21 @@ sensor:
                 if (x <= 50) return lv_color_hex(${color_warning});
                 return lv_color_hex(0x58A6FF);
         - lvgl.label.update:
-            id: lbl_def_pct
+            id: lbl_def_percent
             text: !lambda |-
               if (isnan(x)) return std::string("--%");
               char buf[8]; snprintf(buf, sizeof(buf), "%.0f%%", x); return std::string(buf);
             text_color: !lambda 'return isnan(x) ? lv_color_hex(0x555555) : lv_color_hex(0xF0F6FC);'
+        - script.execute: update_def_range
+
+  # ── Odometer (total vehicle distance, miles) — drives the DEF range estimate ──
+  - platform: homeassistant
+    id: ha_odometer
+    entity_id: sensor.odometer  # TODO VALIDATE (must report miles)
+    internal: true
+    on_value:
+      then:
+        - script.execute: update_def_range
 
   # Fuel remaining (HA number entity, numeric state)
   - platform: homeassistant
@@ -284,7 +392,7 @@ sensor:
                 if (x <= 30) return lv_color_hex(${color_warning});
                 return lv_color_hex(0x3FB950);
         - lvgl.label.update:
-            id: lbl_batt_pct
+            id: lbl_battery_percent
             text: !lambda |-
               if (isnan(x)) return std::string("--%");
               char buf[8]; snprintf(buf, sizeof(buf), "%.0f%%", x); return std::string(buf);
@@ -292,28 +400,42 @@ sensor:
 
   # ── Solar charging power (W) → graph + label ──
   - platform: homeassistant
-    id: ha_solar_w
+    id: ha_solar_watts
     entity_id: sensor.ecoflow_solar_in_power  # TODO VALIDATE
     internal: true
     on_value:
       then:
-        - lambda: 'id(solar_w) = x;'
+        - lambda: 'id(solar_watts) = x;'
         - lvgl.label.update:
-            id: lbl_solar_w
+            id: lbl_solar_watts
             text: !lambda |-
               if (isnan(x)) return std::string("-- W");
               char buf[12]; snprintf(buf, sizeof(buf), "%.0f W", x); return std::string(buf);
 
   # ── Alternator charging power (W) → graph + label ──
   - platform: homeassistant
-    id: ha_alt_w
+    id: ha_alternator_watts
     entity_id: sensor.ecoflow_alternator_charging_power  # TODO VALIDATE
     internal: true
     on_value:
       then:
-        - lambda: 'id(alt_w) = x;'
+        - lambda: 'id(alternator_watts) = x;'
         - lvgl.label.update:
-            id: lbl_alt_w
+            id: lbl_alternator_watts
+            text: !lambda |-
+              if (isnan(x)) return std::string("-- W");
+              char buf[12]; snprintf(buf, sizeof(buf), "%.0f W", x); return std::string(buf);
+
+  # ── A/C (shore power) charging input (W) → graph + label ──
+  - platform: homeassistant
+    id: ha_ac_watts
+    entity_id: sensor.ecoflow_ac_in_power  # TODO VALIDATE
+    internal: true
+    on_value:
+      then:
+        - lambda: 'id(ac_watts) = x;'
+        - lvgl.label.update:
+            id: lbl_ac_watts
             text: !lambda |-
               if (isnan(x)) return std::string("-- W");
               char buf[12]; snprintf(buf, sizeof(buf), "%.0f W", x); return std::string(buf);
@@ -326,7 +448,7 @@ sensor:
     on_value:
       then:
         - lvgl.label.update:
-            id: lbl_interior_val
+            id: lbl_interior_value
             text: !lambda |-
               if (isnan(x)) return std::string("--°");
               char buf[12]; snprintf(buf, sizeof(buf), "%.0f°", x); return std::string(buf);
@@ -348,7 +470,7 @@ sensor:
     on_value:
       then:
         - lvgl.label.update:
-            id: lbl_humidity_val
+            id: lbl_humidity_value
             text: !lambda |-
               if (isnan(x)) return std::string("--%");
               char buf[8]; snprintf(buf, sizeof(buf), "%.0f%%", x); return std::string(buf);
@@ -369,7 +491,7 @@ sensor:
     on_value:
       then:
         - lvgl.label.update:
-            id: lbl_fridge_val
+            id: lbl_fridge_value
             text: !lambda |-
               if (isnan(x)) return std::string("--°");
               char buf[12]; snprintf(buf, sizeof(buf), "%.0f°", x); return std::string(buf);
@@ -408,12 +530,16 @@ binary_sensor:
                   indicator:
                     bg_color: ${color_unavailable}
               - lvgl.label.update:
-                  id: lbl_fuel_pct
+                  id: lbl_fuel_percent
                   text: "--%"
                   text_color: 0x555555
               - lvgl.label.update:
-                  id: lbl_def_pct
+                  id: lbl_def_percent
                   text: "--%"
+                  text_color: 0x555555
+              - lvgl.label.update:
+                  id: lbl_def_range
+                  text: "~-- mi"
                   text_color: 0x555555
               - lvgl.label.update:
                   id: lbl_fuel_remaining
@@ -431,27 +557,60 @@ binary_sensor:
                   indicator:
                     bg_color: ${color_unavailable}
               - lvgl.label.update:
-                  id: lbl_batt_pct
+                  id: lbl_battery_percent
                   text: "--%"
                   text_color: 0x555555
               - lvgl.label.update:
-                  id: lbl_solar_w
+                  id: lbl_solar_watts
                   text: "-- W"
               - lvgl.label.update:
-                  id: lbl_alt_w
+                  id: lbl_alternator_watts
                   text: "-- W"
               - lvgl.label.update:
-                  id: lbl_interior_val
+                  id: lbl_ac_watts
+                  text: "-- W"
+              - lvgl.label.update:
+                  id: lbl_interior_value
                   text: "--°"
                   text_color: 0x555555
               - lvgl.label.update:
-                  id: lbl_humidity_val
+                  id: lbl_humidity_value
                   text: "--%"
                   text_color: 0x555555
               - lvgl.label.update:
-                  id: lbl_fridge_val
+                  id: lbl_fridge_value
                   text: "--°"
                   text_color: 0x555555
+
+  # Water pump on/off state — only show the "off" button when it's running.
+  - platform: homeassistant
+    id: ha_water_pump_state
+    entity_id: switch.water_pump  # TODO VALIDATE
+    internal: true
+    on_state:
+      then:
+        - if:
+            condition:
+              lambda: 'return x;'
+            then:
+              - lvgl.widget.show: btn_water_pump_off
+            else:
+              - lvgl.widget.hide: btn_water_pump_off
+
+  # A/C inverter on/off state — only show the "off" button when it's running.
+  - platform: homeassistant
+    id: ha_ac_inverter_state
+    entity_id: switch.ac_inverter  # TODO VALIDATE
+    internal: true
+    on_state:
+      then:
+        - if:
+            condition:
+              lambda: 'return x;'
+            then:
+              - lvgl.widget.show: btn_ac_inverter_off
+            else:
+              - lvgl.widget.hide: btn_ac_inverter_off
 
 # ---- Vehicle schematic layers ----
 # Top-down van art. Each layer is cropped to its OWN alpha bounding box and
@@ -470,32 +629,32 @@ image:
     transparency: alpha_channel
     resize: 118x59
   - file: layers/cropped/907600_door_frontleft_open.png
-    id: img_door_drv
+    id: img_door_driver
     type: RGB565
     transparency: alpha_channel
     resize: 70x78
   - file: layers/cropped/907600_door_frontleft_unlock.png
-    id: img_unlock_drv
+    id: img_unlock_driver
     type: RGB565
     transparency: alpha_channel
     resize: 9x71
   - file: layers/cropped/907600_window_frontleft_opendoorclosed.png
-    id: img_dwin_open_dc
+    id: img_driver_window_open_doorclosed
     type: RGB565
     transparency: alpha_channel
     resize: 3x35
   - file: layers/cropped/907600_window_frontleft_opendooropened.png
-    id: img_dwin_open_do
+    id: img_driver_window_open_dooropen
     type: RGB565
     transparency: alpha_channel
     resize: 33x16
   - file: layers/cropped/907600_window_frontleft_ventilatedoorclosed.png
-    id: img_dwin_vent_dc
+    id: img_driver_window_vent_doorclosed
     type: RGB565
     transparency: alpha_channel
     resize: 117x35
   - file: layers/cropped/907600_window_frontleft_ventilatedooropened.png
-    id: img_dwin_vent_do
+    id: img_driver_window_vent_dooropen
     type: RGB565
     transparency: alpha_channel
     resize: 34x16
@@ -510,22 +669,22 @@ image:
     transparency: alpha_channel
     resize: 8x71
   - file: layers/cropped/907600_window_frontright_opendoorclosed.png
-    id: img_win_open_dc
+    id: img_win_open_doorclosed
     type: RGB565
     transparency: alpha_channel
     resize: 3x36
   - file: layers/cropped/907600_window_frontright_opendooropened.png
-    id: img_win_open_do
+    id: img_win_open_dooropen
     type: RGB565
     transparency: alpha_channel
     resize: 34x13
   - file: layers/cropped/907600_window_frontright_ventilatedoorclosed.png
-    id: img_win_vent_dc
+    id: img_win_vent_doorclosed
     type: RGB565
     transparency: alpha_channel
     resize: 4x36
   - file: layers/cropped/907600_window_frontright_ventilatedooropened.png
-    id: img_win_vent_do
+    id: img_win_vent_dooropen
     type: RGB565
     transparency: alpha_channel
     resize: 34x13
@@ -624,19 +783,19 @@ lvgl:
               # Cowl / hood
               - image: { id: ovl_cowl, src: img_cowl, align: TOP_LEFT, x: 181, y: 56, hidden: true }
               # Driver (front-left) door + unlock + windows
-              - image: { id: ovl_door_drv_open, src: img_door_drv, align: TOP_LEFT, x: 116, y: 124, hidden: true }
-              - image: { id: ovl_unlock_drv, src: img_unlock_drv, align: TOP_LEFT, x: 177, y: 131, hidden: true }
-              - image: { id: ovl_dwin_open_dc, src: img_dwin_open_dc, align: TOP_LEFT, x: 181, y: 160, hidden: true }
-              - image: { id: ovl_dwin_open_do, src: img_dwin_open_do, align: TOP_LEFT, x: 123, y: 145, hidden: true }
-              - image: { id: ovl_dwin_vent_dc, src: img_dwin_vent_dc, align: TOP_LEFT, x: 181, y: 160, hidden: true }
-              - image: { id: ovl_dwin_vent_do, src: img_dwin_vent_do, align: TOP_LEFT, x: 123, y: 145, hidden: true }
+              - image: { id: ovl_door_driver_open, src: img_door_driver, align: TOP_LEFT, x: 116, y: 124, hidden: true }
+              - image: { id: ovl_unlock_driver, src: img_unlock_driver, align: TOP_LEFT, x: 177, y: 131, hidden: true }
+              - image: { id: ovl_driver_window_open_doorclosed, src: img_driver_window_open_doorclosed, align: TOP_LEFT, x: 181, y: 160, hidden: true }
+              - image: { id: ovl_driver_window_open_dooropen, src: img_driver_window_open_dooropen, align: TOP_LEFT, x: 123, y: 145, hidden: true }
+              - image: { id: ovl_driver_window_vent_doorclosed, src: img_driver_window_vent_doorclosed, align: TOP_LEFT, x: 181, y: 160, hidden: true }
+              - image: { id: ovl_driver_window_vent_dooropen, src: img_driver_window_vent_dooropen, align: TOP_LEFT, x: 123, y: 145, hidden: true }
               # Passenger (front-right) door + unlock + windows
               - image: { id: ovl_door_pass_open, src: img_door_pass, align: TOP_LEFT, x: 295, y: 128, hidden: true }
               - image: { id: ovl_unlock_pass, src: img_unlock_pass, align: TOP_LEFT, x: 295, y: 131, hidden: true }
-              - image: { id: ovl_win_open_dc, src: img_win_open_dc, align: TOP_LEFT, x: 296, y: 159, hidden: true }
-              - image: { id: ovl_win_open_do, src: img_win_open_do, align: TOP_LEFT, x: 323, y: 147, hidden: true }
-              - image: { id: ovl_win_vent_dc, src: img_win_vent_dc, align: TOP_LEFT, x: 295, y: 160, hidden: true }
-              - image: { id: ovl_win_vent_do, src: img_win_vent_do, align: TOP_LEFT, x: 323, y: 147, hidden: true }
+              - image: { id: ovl_win_open_doorclosed, src: img_win_open_doorclosed, align: TOP_LEFT, x: 296, y: 159, hidden: true }
+              - image: { id: ovl_win_open_dooropen, src: img_win_open_dooropen, align: TOP_LEFT, x: 323, y: 147, hidden: true }
+              - image: { id: ovl_win_vent_doorclosed, src: img_win_vent_doorclosed, align: TOP_LEFT, x: 295, y: 160, hidden: true }
+              - image: { id: ovl_win_vent_dooropen, src: img_win_vent_dooropen, align: TOP_LEFT, x: 323, y: 147, hidden: true }
               # Sliding (rear-right) door + unlock
               - image: { id: ovl_door_slide_open, src: img_door_slide, align: TOP_LEFT, x: 284, y: 203, hidden: true }
               - image: { id: ovl_unlock_slide, src: img_unlock_slide, align: TOP_LEFT, x: 284, y: 203, hidden: true }
@@ -654,7 +813,7 @@ lvgl:
         # ═══════════════════════════════════════════════════
         # ── Fuel ──
         - label: { id: lbl_fuel_title, text: "FUEL", text_font: roboto_small, text_color: 0x8B949E, align: TOP_LEFT, x: 540, y: 56 }
-        - label: { id: lbl_fuel_pct, text: "--%", text_font: roboto_medium, text_color: 0x555555, align: TOP_LEFT, x: 1086, y: 50 }
+        - label: { id: lbl_fuel_percent, text: "--%", text_font: roboto_medium, text_color: 0x555555, align: TOP_LEFT, x: 1086, y: 50 }
         - bar:
             id: bar_fuel
             styles: gauge_bar
@@ -670,7 +829,8 @@ lvgl:
               radius: 8
         # ── DEF ──
         - label: { id: lbl_def_title, text: "DEF", text_font: roboto_small, text_color: 0x8B949E, align: TOP_LEFT, x: 540, y: 146 }
-        - label: { id: lbl_def_pct, text: "--%", text_font: roboto_medium, text_color: 0x555555, align: TOP_LEFT, x: 1086, y: 140 }
+        - label: { id: lbl_def_range, text: "~-- mi", text_font: roboto_small, text_color: 0x555555, align: TOP_LEFT, x: 700, y: 146 }
+        - label: { id: lbl_def_percent, text: "--%", text_font: roboto_medium, text_color: 0x555555, align: TOP_LEFT, x: 1086, y: 140 }
         - bar:
             id: bar_def
             styles: gauge_bar
@@ -685,8 +845,8 @@ lvgl:
               bg_color: ${color_unavailable}
               radius: 8
         # ── Battery ──
-        - label: { id: lbl_batt_title, text: "BATTERY", text_font: roboto_small, text_color: 0x8B949E, align: TOP_LEFT, x: 540, y: 236 }
-        - label: { id: lbl_batt_pct, text: "--%", text_font: roboto_medium, text_color: 0x555555, align: TOP_LEFT, x: 1086, y: 230 }
+        - label: { id: lbl_battery_title, text: "BATTERY", text_font: roboto_small, text_color: 0x8B949E, align: TOP_LEFT, x: 540, y: 236 }
+        - label: { id: lbl_battery_percent, text: "--%", text_font: roboto_medium, text_color: 0x555555, align: TOP_LEFT, x: 1086, y: 230 }
         - bar:
             id: bar_battery
             styles: gauge_bar
@@ -724,7 +884,7 @@ lvgl:
               pad_column: 10
             widgets:
               - label: { id: lbl_interior_icon, text: "\U000F050F", text_font: mdi_badge, text_color: 0x79C0FF }
-              - label: { id: lbl_interior_val, text: "--°", text_font: roboto_medium, text_color: 0x555555 }
+              - label: { id: lbl_interior_value, text: "--°", text_font: roboto_medium, text_color: 0x555555 }
         - obj:
             id: badge_humidity
             styles: badge_card
@@ -744,7 +904,7 @@ lvgl:
               pad_column: 10
             widgets:
               - label: { id: lbl_humidity_icon, text: "\U000F058E", text_font: mdi_badge, text_color: 0x58A6FF }
-              - label: { id: lbl_humidity_val, text: "--%", text_font: roboto_medium, text_color: 0x555555 }
+              - label: { id: lbl_humidity_value, text: "--%", text_font: roboto_medium, text_color: 0x555555 }
         - obj:
             id: badge_fridge
             styles: badge_card
@@ -764,7 +924,7 @@ lvgl:
               pad_column: 10
             widgets:
               - label: { id: lbl_fridge_icon, text: "\U000F0290", text_font: mdi_badge, text_color: 0x81D4FA }
-              - label: { id: lbl_fridge_val, text: "--°", text_font: roboto_medium, text_color: 0x555555 }
+              - label: { id: lbl_fridge_value, text: "--°", text_font: roboto_medium, text_color: 0x555555 }
 
         # ═══════════════════════════════════════════════════
         # CHARGING graph (solar + alternator watts over time)
@@ -781,12 +941,14 @@ lvgl:
             pad_all: 0
             widgets:
               - label: { id: lbl_charge_title, text: "CHARGING (W)", text_font: roboto_small, text_color: 0x8B949E, align: TOP_LEFT, x: 16, y: 12 }
-              - label: { text: "SOLAR", text_font: roboto_small, text_color: 0xFFD700, align: TOP_LEFT, x: 360, y: 12 }
-              - label: { id: lbl_solar_w, text: "-- W", text_font: roboto_small, text_color: 0xFFD700, align: TOP_LEFT, x: 470, y: 12 }
-              - label: { text: "ALT", text_font: roboto_small, text_color: 0x58A6FF, align: TOP_LEFT, x: 360, y: 40 }
-              - label: { id: lbl_alt_w, text: "-- W", text_font: roboto_small, text_color: 0x58A6FF, align: TOP_LEFT, x: 470, y: 40 }
+              - label: { text: "Solar", text_font: roboto_small, text_color: 0xFFD700, align: TOP_LEFT, x: 200, y: 12 }
+              - label: { id: lbl_solar_watts, text: "-- W", text_font: roboto_small, text_color: 0xFFD700, align: TOP_LEFT, x: 300, y: 12 }
+              - label: { text: "Alternator", text_font: roboto_small, text_color: 0x58A6FF, align: TOP_LEFT, x: 392, y: 12 }
+              - label: { id: lbl_alternator_watts, text: "-- W", text_font: roboto_small, text_color: 0x58A6FF, align: TOP_LEFT, x: 452, y: 12 }
+              - label: { text: "Shore Power", text_font: roboto_small, text_color: 0x3FB950, align: TOP_LEFT, x: 544, y: 12 }
+              - label: { id: lbl_ac_watts, text: "-- W", text_font: roboto_small, text_color: 0x3FB950, align: TOP_LEFT, x: 604, y: 12 }
               - line:
-                  id: line_alt
+                  id: line_alternator
                   x: 16
                   y: 80
                   width: 648
@@ -807,3 +969,50 @@ lvgl:
                   points:
                     - [0, 270]
                     - [648, 270]
+              - line:
+                  id: line_ac
+                  x: 16
+                  y: 80
+                  width: 648
+                  height: 270
+                  line_color: 0x3FB950
+                  line_width: 3
+                  points:
+                    - [0, 270]
+                    - [648, 270]
+
+        # ═══════════════════════════════════════════════════
+        # QUICK ACTIONS — turn off water pump / A/C inverter (HA switches)
+        # ═══════════════════════════════════════════════════
+        - button:
+            id: btn_water_pump_off
+            x: 1220
+            y: 438
+            width: 330
+            height: 36
+            bg_color: 0x21262D
+            radius: 10
+            hidden: true
+            widgets:
+              - label: { text: "WATER PUMP OFF", align: CENTER, text_font: roboto_small, text_color: 0xF0F6FC }
+            on_click:
+              - homeassistant.service:
+                  service: switch.turn_off
+                  data:
+                    entity_id: switch.water_pump  # TODO VALIDATE
+        - button:
+            id: btn_ac_inverter_off
+            x: 1570
+            y: 438
+            width: 330
+            height: 36
+            bg_color: 0x21262D
+            radius: 10
+            hidden: true
+            widgets:
+              - label: { text: "A/C INVERTER OFF", align: CENTER, text_font: roboto_small, text_color: 0xF0F6FC }
+            on_click:
+              - homeassistant.service:
+                  service: switch.turn_off
+                  data:
+                    entity_id: switch.ac_inverter  # TODO VALIDATE
