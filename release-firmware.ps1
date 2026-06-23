@@ -9,7 +9,7 @@
     in Home Assistant.
 
 .PARAMETER Configs
-    One or more YAML config files to compile. Defaults to lightcontroller.yaml.
+    One or more YAML config files to compile. Required.
 
 .PARAMETER Version
     Semantic version for the release tag (e.g. 1.2.0). If omitted, auto-increments
@@ -29,12 +29,13 @@
     .\release-firmware.ps1 -Minor             # auto-increment minor
     .\release-firmware.ps1 -Major             # auto-increment major
     .\release-firmware.ps1 -Version 1.2.0     # explicit version
-    .\release-firmware.ps1 -Configs lightcontroller.yaml, other-device.yaml
+    .\release-firmware.ps1 -Configs led-van-controller.yaml, other-device.yaml
     .\release-firmware.ps1 -SkipRelease
 #>
 
 param(
-    [string[]]$Configs = @("lightcontroller.yaml"),
+    [Parameter(Mandatory = $true)]
+    [string[]]$Configs,
     [string]$Version,
     [switch]$Major,
     [switch]$Minor,
@@ -51,6 +52,129 @@ function Get-DeviceName($config) {
         return $Matches[1].Trim()
     }
     throw "Could not find device_name substitution in $config"
+}
+
+# Normalize any path to a repo-relative path using forward slashes
+function ConvertTo-RepoRelative($path) {
+    if ([System.IO.Path]::IsPathRooted($path)) {
+        $full = [System.IO.Path]::GetFullPath($path)
+        $root = [System.IO.Path]::GetFullPath($RepoRoot)
+        if ($full.StartsWith($root, [System.StringComparison]::OrdinalIgnoreCase)) {
+            $path = $full.Substring($root.Length).TrimStart('\', '/')
+        }
+    }
+    return ($path -replace '\\', '/')
+}
+
+# Extract YAML file references (includes + package path entries) from text
+function Find-YamlReferences($content) {
+    $refs = [System.Collections.Generic.List[string]]::new()
+
+    # `!include file.yaml`  and  `!include { file: file.yaml, vars: {...} }`
+    foreach ($m in [regex]::Matches($content, "!include(?:\s+|\s*\{\s*file:\s*)([^\s,}'""]+)")) {
+        $refs.Add($m.Groups[1].Value)
+    }
+
+    # `path: packages/common.yaml` (remote_packages / local package file lists)
+    foreach ($m in [regex]::Matches($content, "(?m)^\s*-?\s*path:\s*([^\s'""]+\.ya?ml)")) {
+        $refs.Add($m.Groups[1].Value)
+    }
+
+    # Bare list items that are yaml paths, e.g. `- packages/common.yaml`
+    foreach ($m in [regex]::Matches($content, "(?m)^\s*-\s*([\w./-]+\.ya?ml)\s*$")) {
+        $refs.Add($m.Groups[1].Value)
+    }
+
+    return $refs
+}
+
+# Resolve a referenced path against the repo root, then the including file's dir
+function Resolve-DepPath($ref, $includingDir) {
+    $candidates = [System.Collections.Generic.List[string]]::new()
+    $candidates.Add((ConvertTo-RepoRelative $ref))
+    if ($includingDir) {
+        $candidates.Add((ConvertTo-RepoRelative (Join-Path $includingDir $ref)))
+    }
+    foreach ($candidate in $candidates) {
+        $full = Join-Path $RepoRoot ($candidate -replace '/', '\')
+        if (Test-Path $full -PathType Leaf) {
+            return $candidate
+        }
+    }
+    return $null
+}
+
+# Recursively resolve the full YAML dependency set for a config (config itself,
+# plus everything reached via !include and packages: path entries)
+function Resolve-ConfigDependencies($config) {
+    $resolved = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    $queue = [System.Collections.Generic.Queue[string]]::new()
+    $queue.Enqueue((ConvertTo-RepoRelative $config))
+
+    while ($queue.Count -gt 0) {
+        $current = $queue.Dequeue()
+        if (-not $resolved.Add($current)) { continue }
+
+        $full = Join-Path $RepoRoot ($current -replace '/', '\')
+        if (-not (Test-Path $full -PathType Leaf)) { continue }
+
+        $content = Get-Content $full -Raw
+        $includingDir = Split-Path -Parent $current
+        foreach ($ref in (Find-YamlReferences $content)) {
+            $dep = Resolve-DepPath $ref $includingDir
+            if ($dep) { $queue.Enqueue($dep) }
+        }
+    }
+
+    return $resolved
+}
+
+# Look up the latest release for a device and the git commit it was built from.
+# Returns @{ Tag; Sha } or $null if there is no usable prior release.
+function Get-LatestReleaseInfo($device) {
+    $releasesJson = gh release list --limit 200 --json tagName 2>$null
+    if ($LASTEXITCODE -ne 0 -or -not $releasesJson) { return $null }
+
+    $prefix = "$device-v"
+    $latest = $releasesJson | ConvertFrom-Json |
+        Where-Object { $_.tagName -like "$prefix*" } |
+        ForEach-Object {
+            $versionText = $_.tagName.Substring($prefix.Length)
+            $parsed = $null
+            if ([version]::TryParse($versionText, [ref]$parsed)) {
+                [pscustomobject]@{ Tag = $_.tagName; Version = $parsed }
+            }
+        } |
+        Sort-Object Version -Descending |
+        Select-Object -First 1
+    if (-not $latest) { return $null }
+
+    $tempDir = Join-Path ([System.IO.Path]::GetTempPath()) ("rel-" + [System.Guid]::NewGuid().ToString("N"))
+    New-Item -ItemType Directory -Path $tempDir | Out-Null
+    try {
+        gh release download $latest.Tag --dir $tempDir --pattern "$device.manifest.json" 2>$null | Out-Null
+        $manifestFile = Join-Path $tempDir "$device.manifest.json"
+        if (-not (Test-Path $manifestFile)) { return $null }
+        $sha = (Get-Content $manifestFile -Raw | ConvertFrom-Json).build_metadata.git_sha
+    } finally {
+        Remove-Item -Recurse -Force $tempDir -ErrorAction SilentlyContinue
+    }
+    if (-not $sha) { return $null }
+
+    return [pscustomobject]@{ Tag = $latest.Tag; Sha = $sha }
+}
+
+# Return the list of dependency YAML files that changed (working tree vs the
+# given release commit) for a config.
+function Get-ChangedDependencies($config, $releaseSha) {
+    $deps = @(Resolve-ConfigDependencies $config)
+    Push-Location $RepoRoot
+    try {
+        $changed = git diff --name-only $releaseSha -- $deps 2>$null
+    } finally {
+        Pop-Location
+    }
+    return @($changed | Where-Object { $_ })
 }
 
 # Extract build metadata from ESPHome build artifacts
@@ -203,6 +327,59 @@ if (-not $SkipRelease) {
         }
     }
     Write-Host "✅ GitHub CLI authenticated" -ForegroundColor Green
+}
+
+# Analyze what changed since each config's last release (before bumping the
+# version, so the version-bump edit itself isn't counted as a change).
+$stalenessResults = @()
+if (-not $SkipRelease) {
+    Write-Host "`n🔎 Checking what changed since the last release..." -ForegroundColor Cyan
+    $anyChangesDetected = $false
+    $allHavePriorRelease = $true
+
+    foreach ($config in $Configs) {
+        $device = Get-DeviceName $config
+        $release = Get-LatestReleaseInfo $device
+        if (-not $release) {
+            $allHavePriorRelease = $false
+            $stalenessResults += [pscustomobject]@{ Config = $config; Device = $device; Tag = $null; Changed = @(); FirstRelease = $true; Unknown = $false }
+            Write-Host "   $device — no prior release (first release)" -ForegroundColor DarkGray
+            continue
+        }
+
+        Push-Location $RepoRoot
+        git cat-file -e "$($release.Sha)^{commit}" 2>$null
+        $reachable = ($LASTEXITCODE -eq 0)
+        Pop-Location
+        if (-not $reachable) {
+            # Can't compare — treat as changed so we don't wrongly prompt "no changes"
+            $anyChangesDetected = $true
+            $stalenessResults += [pscustomobject]@{ Config = $config; Device = $device; Tag = $release.Tag; Changed = @(); FirstRelease = $false; Unknown = $true }
+            Write-Host "   $device — release commit $($release.Sha) not in local history (run 'git fetch')" -ForegroundColor Yellow
+            continue
+        }
+
+        $changed = Get-ChangedDependencies $config $release.Sha
+        if ($changed.Count -gt 0) { $anyChangesDetected = $true }
+        $stalenessResults += [pscustomobject]@{ Config = $config; Device = $device; Tag = $release.Tag; Changed = $changed; FirstRelease = $false; Unknown = $false }
+
+        if ($changed.Count -eq 0) {
+            Write-Host "   $device — no dependency changes since $($release.Tag)" -ForegroundColor DarkGray
+        } else {
+            Write-Host "   $device — $($changed.Count) changed since $($release.Tag):" -ForegroundColor Yellow
+            $changed | Sort-Object | ForEach-Object { Write-Host "      - $_" -ForegroundColor Yellow }
+        }
+    }
+
+    # If nothing changed across all configs (and each had a prior release), confirm
+    if ($allHavePriorRelease -and -not $anyChangesDetected) {
+        Write-Host "`n⚠️  No dependency changes detected since the last release for any config." -ForegroundColor Yellow
+        $answer = Read-Host "Release a new version anyway? [y/N]"
+        if ($answer -notmatch '^[Yy]') {
+            Write-Host "Aborted — no new release created." -ForegroundColor DarkGray
+            exit 0
+        }
+    }
 }
 
 # Ensure ESPHome is up to date before compiling release firmware
@@ -373,11 +550,30 @@ Write-Host "`n🚀 Creating release $tag..." -ForegroundColor Cyan
 
 $deviceList = ($artifacts | ForEach-Object { "- ``$($_.Name).ota.bin``" }) -join "`n"
 $primaryMeta = $artifacts[0].BuildMeta
+
+# Build "changes since last release" section from the earlier staleness analysis
+$changesLines = foreach ($result in $stalenessResults) {
+    if ($result.FirstRelease) {
+        "- **$($result.Device)**: first release"
+    } elseif ($result.Unknown) {
+        "- **$($result.Device)**: previous release commit not available locally (changes undetermined)"
+    } elseif ($result.Changed.Count -eq 0) {
+        "- **$($result.Device)**: no YAML dependency changes since $($result.Tag)"
+    } else {
+        $files = ($result.Changed | Sort-Object | ForEach-Object { "  - ``$_``" }) -join "`n"
+        "- **$($result.Device)** (since $($result.Tag)):`n$files"
+    }
+}
+$changesSection = if ($changesLines) { $changesLines -join "`n" } else { "- No prior release data" }
+
 $notes = @"
 ## $primaryDevice Firmware Release $Version
 
 ### Devices
 $deviceList
+
+### Changes Since Last Release
+$changesSection
 
 ### Build Environment
 | Component | Version |
