@@ -78,16 +78,6 @@ globals:
     restore_value: no
     initial_value: '0'
   
-  - id: button_3_loop_count
-    type: int
-    restore_value: no
-    initial_value: '0'
-
-  - id: button_4_loop_count
-    type: int
-    restore_value: no
-    initial_value: '0'
-  
   - id: pcf8574_button_5_loop_count
     type: int
     restore_value: no
@@ -353,6 +343,106 @@ script:
             - script.execute: turn_on_exterior_flood_lights
           else:
             - script.execute: turn_off_exterior_flood_lights
+
+  # Turn ON all exterior lights (awning + capsule + roof) to 100%.
+  - id: exterior_all_on
+    then:
+      - logger.log:
+          format: "Script: exterior_all_on called"
+          level: INFO
+      - lambda: |-
+          auto turn_on_full = [](esphome::light::LightState *light_state) {
+            auto call = light_state->turn_on();
+            call.set_brightness(1.0f);
+            call.set_transition_length(300);
+            call.perform();
+          };
+          turn_on_full(id(light_awning_outside_light));
+          turn_on_full(id(light_awning_inside_light));
+          turn_on_full(id(light_exterior_driver_capsule));
+          turn_on_full(id(light_exterior_passenger_capsule));
+          turn_on_full(id(light_exterior_roof_rear));
+          turn_on_full(id(light_exterior_roof_driver));
+          turn_on_full(id(light_exterior_roof_passenger));
+
+  # Turn OFF all exterior lights (awning + capsule + roof).
+  - id: exterior_all_off
+    then:
+      - logger.log:
+          format: "Script: exterior_all_off called"
+          level: INFO
+      - light.turn_off: light_awning_outside_light
+      - light.turn_off: light_awning_inside_light
+      - light.turn_off: light_exterior_driver_capsule
+      - light.turn_off: light_exterior_passenger_capsule
+      - light.turn_off: light_exterior_roof_rear
+      - light.turn_off: light_exterior_roof_driver
+      - light.turn_off: light_exterior_roof_passenger
+
+  # Button 3 single click: turn on the first group not already on,
+  # in priority order awning -> capsule -> roof.
+  - id: button_3_single_click
+    then:
+      - lambda: |-
+          auto turn_on_full = [](esphome::light::LightState *light_state) {
+            auto call = light_state->turn_on();
+            call.set_brightness(1.0f);
+            call.set_transition_length(300);
+            call.perform();
+          };
+          bool awning_on = id(light_awning_outside_light).current_values.is_on() &&
+                           id(light_awning_inside_light).current_values.is_on();
+          bool capsule_on = id(light_exterior_driver_capsule).current_values.is_on() &&
+                            id(light_exterior_passenger_capsule).current_values.is_on();
+          bool roof_on = id(light_exterior_roof_rear).current_values.is_on() &&
+                         id(light_exterior_roof_driver).current_values.is_on() &&
+                         id(light_exterior_roof_passenger).current_values.is_on();
+          if (!awning_on) {
+            ESP_LOGI("button", "Button 3 single-click - turning on awning lights");
+            turn_on_full(id(light_awning_outside_light));
+            turn_on_full(id(light_awning_inside_light));
+          } else if (!capsule_on) {
+            ESP_LOGI("button", "Button 3 single-click - turning on capsule lights");
+            turn_on_full(id(light_exterior_driver_capsule));
+            turn_on_full(id(light_exterior_passenger_capsule));
+          } else if (!roof_on) {
+            ESP_LOGI("button", "Button 3 single-click - turning on roof lights");
+            turn_on_full(id(light_exterior_roof_rear));
+            turn_on_full(id(light_exterior_roof_driver));
+            turn_on_full(id(light_exterior_roof_passenger));
+          } else {
+            ESP_LOGI("button", "Button 3 single-click - all exterior lights already on");
+          }
+
+  # Button 4 single click: turn off capsule + roof if any are on (leaving
+  # awning), otherwise turn off the awning.
+  - id: button_4_single_click
+    then:
+      - lambda: |-
+          auto turn_off_light = [](esphome::light::LightState *light_state) {
+            light_state->turn_off().perform();
+          };
+          bool capsule_on = id(light_exterior_driver_capsule).current_values.is_on() ||
+                            id(light_exterior_passenger_capsule).current_values.is_on();
+          bool roof_on = id(light_exterior_roof_rear).current_values.is_on() ||
+                         id(light_exterior_roof_driver).current_values.is_on() ||
+                         id(light_exterior_roof_passenger).current_values.is_on();
+          bool awning_on = id(light_awning_outside_light).current_values.is_on() ||
+                           id(light_awning_inside_light).current_values.is_on();
+          if (capsule_on || roof_on) {
+            ESP_LOGI("button", "Button 4 single-click - turning off exterior lights except awning");
+            turn_off_light(id(light_exterior_driver_capsule));
+            turn_off_light(id(light_exterior_passenger_capsule));
+            turn_off_light(id(light_exterior_roof_rear));
+            turn_off_light(id(light_exterior_roof_driver));
+            turn_off_light(id(light_exterior_roof_passenger));
+          } else if (awning_on) {
+            ESP_LOGI("button", "Button 4 single-click - turning off awning lights");
+            turn_off_light(id(light_awning_outside_light));
+            turn_off_light(id(light_awning_inside_light));
+          } else {
+            ESP_LOGI("button", "Button 4 single-click - all exterior lights already off");
+          }
   
   # Extensible entry point for turning on lights - may include exterior lights in the future
   - id: turn_on_lights
@@ -683,120 +773,77 @@ binary_sensor:
     filters:
       - delayed_on: 50ms
       - delayed_off: 50ms
-    on_press:
-      - lambda: 'id(button_3_loop_count) = 0;'
-      - if:
-          condition:
-            and:
-              - light.is_off: light_exterior_driver_capsule
-              - light.is_off: light_exterior_passenger_capsule
-          then:
-            - logger.log:
-                format: "Button 3 pressed - capsule lights are off, turning on to 10%"
-                level: INFO
-            - light.turn_on:
-                id: light_exterior_driver_capsule
-                brightness: 10%
-            - light.turn_on:
-                id: light_exterior_passenger_capsule
-                brightness: 10%
-      - while:
-          condition:
-            binary_sensor.is_on: button_3
-          then:
-            - lambda: 'id(button_3_loop_count)++;'
-            # First, bring capsule lights to 100%
-            - if:
-                condition:
-                  lambda: |-
-                    return id(light_exterior_driver_capsule).current_values.get_brightness() < 0.99 ||
-                           id(light_exterior_passenger_capsule).current_values.get_brightness() < 0.99;
-                then:
-                  - logger.log:
-                      format: "Button 3 held - increasing capsule lights brightness 5%"
-                      level: INFO
-                  - light.dim_relative:
-                      id: light_exterior_driver_capsule
-                      relative_brightness: !lambda 'return id(brightness_step).state;'
-                      transition_length: 100ms
-                  - light.dim_relative:
-                      id: light_exterior_passenger_capsule
-                      relative_brightness: !lambda 'return id(brightness_step).state;'
-                      transition_length: 100ms
-                else:
-                  - if:
-                      condition:
-                        and:
-                          - light.is_off: light_exterior_roof_rear
-                          - light.is_off: light_exterior_roof_driver
-                          - light.is_off: light_exterior_roof_passenger
-                      then:
-                        - logger.log:
-                            format: "Button 3 pressed - roof lights are off, turning on to 10%"
-                            level: INFO
-                        - light.turn_on:
-                            id: light_exterior_roof_rear
-                            brightness: 10%
-                        - light.turn_on:
-                            id: light_exterior_roof_driver
-                            brightness: 10%
-                        - light.turn_on:
-                            id: light_exterior_roof_passenger
-                            brightness: 10%
-                  # Capsule lights at 100%, now work on roof lights
-                  - logger.log:
-                      format: "Button 3 held - capsule lights at 100%, increasing roof lights brightness 5%"
-                      level: INFO
-                  - light.dim_relative:
-                      id: light_exterior_roof_rear
-                      relative_brightness: !lambda 'return id(brightness_step).state;'
-                      transition_length: 100ms
-                  - light.dim_relative:
-                      id: light_exterior_roof_driver
-                      relative_brightness: !lambda 'return id(brightness_step).state;'
-                      transition_length: 100ms
-                  - light.dim_relative:
-                      id: light_exterior_roof_passenger
-                      relative_brightness: !lambda 'return id(brightness_step).state;'
-                      transition_length: 100ms
-            - delay: 100ms
-    on_release:
-      - logger.log:
-          format: "Button 3 released"
-          level: INFO
-      - lambda: |-
-          // Short press = 0-1 loop iterations (< ~400ms) -> jump capsule to 100% (only if roof lights already on)
-          // Long press = 2+ loop iterations (> ~400ms) -> stop at current brightness
-          ESP_LOGI("button", "Button 3 loop count: %d", id(button_3_loop_count));
-          if (id(button_3_loop_count) <= 1) {
-            ESP_LOGI("button", "Button 3 short press - setting capsule lights to 100%");
-            // Always set capsule lights to 100%
-            auto call1 = id(light_exterior_driver_capsule).turn_on();
-            call1.set_brightness(1.0);
-            call1.perform();
-            auto call2 = id(light_exterior_passenger_capsule).turn_on();
-            call2.set_brightness(1.0);
-            call2.perform();
-            
-            // Only set roof lights to 100% if they're already on
-            if (id(light_exterior_roof_rear).current_values.is_on() || 
-                id(light_exterior_roof_driver).current_values.is_on() || 
-                id(light_exterior_roof_passenger).current_values.is_on()) {
-              ESP_LOGI("button", "Button 3 short press - roof lights already on, setting to 100%");
-              auto call3 = id(light_exterior_roof_rear).turn_on();
-              call3.set_brightness(1.0);
-              call3.perform();
-              auto call4 = id(light_exterior_roof_driver).turn_on();
-              call4.set_brightness(1.0);
-              call4.perform();
-              auto call5 = id(light_exterior_roof_passenger).turn_on();
-              call5.set_brightness(1.0);
-              call5.perform();
-            }
-          } else {
-            ESP_LOGI("button", "Button 3 long press - stopping exterior lights at current brightness");
-          }
-          id(button_3_loop_count) = 0;
+    on_multi_click:
+      # Single click -> turn on next exterior group (awning -> capsule -> roof)
+      - timing:
+          - ON for at most 500ms
+          - OFF for at least 200ms
+        then:
+          - script.execute: button_3_single_click
+      # Double click -> turn on ALL exterior lights
+      - timing:
+          - ON for at most 500ms
+          - OFF for at most 500ms
+          - ON for at most 500ms
+          - OFF for at least 200ms
+        then:
+          - logger.log:
+              format: "Button 3 double-click - turning on ALL exterior lights"
+              level: INFO
+          - script.execute: exterior_all_on
+      # Press and hold -> gradually ramp up awning, then capsule, then roof
+      - timing:
+          - ON for at least 800ms
+        then:
+          - logger.log:
+              format: "Button 3 hold - ramping exterior lights up"
+              level: INFO
+          - while:
+              condition:
+                binary_sensor.is_on: button_3
+              then:
+                - lambda: |-
+                    float brightness_increment = id(brightness_step).state;
+                    auto is_full = [](esphome::light::LightState *light_state) {
+                      return light_state->current_values.is_on() &&
+                             light_state->current_values.get_brightness() >= 0.99f;
+                    };
+                    auto ramp_up = [](esphome::light::LightState *light_state, float increment) {
+                      if (!light_state->current_values.is_on()) {
+                        auto call = light_state->turn_on();
+                        call.set_brightness(0.05f);
+                        call.set_transition_length(100);
+                        call.perform();
+                      } else {
+                        float new_brightness = light_state->current_values.get_brightness() + increment;
+                        if (new_brightness > 1.0f) {
+                          new_brightness = 1.0f;
+                        }
+                        auto call = light_state->turn_on();
+                        call.set_brightness(new_brightness);
+                        call.set_transition_length(100);
+                        call.perform();
+                      }
+                    };
+                    bool awning_full = is_full(id(light_awning_outside_light)) &&
+                                       is_full(id(light_awning_inside_light));
+                    bool capsule_full = is_full(id(light_exterior_driver_capsule)) &&
+                                        is_full(id(light_exterior_passenger_capsule));
+                    bool roof_full = is_full(id(light_exterior_roof_rear)) &&
+                                     is_full(id(light_exterior_roof_driver)) &&
+                                     is_full(id(light_exterior_roof_passenger));
+                    if (!awning_full) {
+                      ramp_up(id(light_awning_outside_light), brightness_increment);
+                      ramp_up(id(light_awning_inside_light), brightness_increment);
+                    } else if (!capsule_full) {
+                      ramp_up(id(light_exterior_driver_capsule), brightness_increment);
+                      ramp_up(id(light_exterior_passenger_capsule), brightness_increment);
+                    } else if (!roof_full) {
+                      ramp_up(id(light_exterior_roof_rear), brightness_increment);
+                      ramp_up(id(light_exterior_roof_driver), brightness_increment);
+                      ramp_up(id(light_exterior_roof_passenger), brightness_increment);
+                    }
+                - delay: 100ms
 
   - id: !extend button_4
     internal: true
@@ -804,101 +851,71 @@ binary_sensor:
     filters:
       - delayed_on: 50ms
       - delayed_off: 50ms
-    on_press:
-      - lambda: 'id(button_4_loop_count) = 0;'
-      - if:
-          condition:
-            or:
-              - light.is_on: light_exterior_roof_rear
-              - light.is_on: light_exterior_roof_driver
-              - light.is_on: light_exterior_roof_passenger
-              - light.is_on: light_exterior_driver_capsule
-              - light.is_on: light_exterior_passenger_capsule
-          then:
-            - logger.log:
-                format: "Button 4 pressed - starting to dim exterior lights immediately"
-                level: INFO
-            - while:
-                condition:
-                  and:
-                    - binary_sensor.is_on: button_4
-                    - lambda: |-
-                        return id(light_exterior_roof_rear).current_values.get_brightness() > 0.1 ||
-                               id(light_exterior_roof_driver).current_values.get_brightness() > 0.1 ||
-                               id(light_exterior_roof_passenger).current_values.get_brightness() > 0.1 ||
-                               id(light_exterior_driver_capsule).current_values.get_brightness() > 0.1 ||
-                               id(light_exterior_passenger_capsule).current_values.get_brightness() > 0.1;
-                then:
-                  - lambda: 'id(button_4_loop_count)++;'
-                  # First, dim roof lights to 10% threshold
-                  - if:
-                      condition:
-                        lambda: |-
-                          return id(light_exterior_roof_rear).current_values.get_brightness() > 0.11 ||
-                                 id(light_exterior_roof_driver).current_values.get_brightness() > 0.11 ||
-                                 id(light_exterior_roof_passenger).current_values.get_brightness() > 0.11;
-                      then:
-                        - logger.log:
-                            format: "Button 4 held - dimming roof lights 5%"
-                            level: INFO
-                        - light.dim_relative:
-                            id: light_exterior_roof_rear
-                            relative_brightness: !lambda 'return -id(brightness_step).state;'
-                            transition_length: 100ms
-                        - light.dim_relative:
-                            id: light_exterior_roof_driver
-                            relative_brightness: !lambda 'return -id(brightness_step).state;'
-                            transition_length: 100ms
-                        - light.dim_relative:
-                            id: light_exterior_roof_passenger
-                            relative_brightness: !lambda 'return -id(brightness_step).state;'
-                            transition_length: 100ms
-                      else:
-                        # Roof lights at threshold, now work on capsule lights
-                        - logger.log:
-                            format: "Button 4 held - roof lights at threshold, dimming capsule lights 5%"
-                            level: INFO
-                        - light.dim_relative:
-                            id: light_exterior_driver_capsule
-                            relative_brightness: !lambda 'return -id(brightness_step).state;'
-                            transition_length: 100ms
-                        - light.dim_relative:
-                            id: light_exterior_passenger_capsule
-                            relative_brightness: !lambda 'return -id(brightness_step).state;'
-                            transition_length: 100ms
-                  - delay: 100ms
-            # Only turn off if we exited loop because of threshold, not because button was released
-            - if:
-                condition:
-                  binary_sensor.is_on: button_4
-                then:
-                  - logger.log:
-                      format: "Button 4 dimming reached threshold - turning off all exterior lights"
-                      level: INFO
-                  - light.turn_off: light_exterior_roof_rear
-                  - light.turn_off: light_exterior_roof_driver
-                  - light.turn_off: light_exterior_roof_passenger
-                  - light.turn_off: light_exterior_driver_capsule
-                  - light.turn_off: light_exterior_passenger_capsule
-    on_release:
-      - logger.log:
-          format: "Button 4 released"
-          level: INFO
-      - lambda: |-
-          // Short press = 0-1 loop iterations (< ~400ms)
-          // Long press = 2+ loop iterations (> ~400ms)
-          ESP_LOGI("button", "Button 4 loop count: %d", id(button_4_loop_count));
-          if (id(button_4_loop_count) <= 1) {
-            ESP_LOGI("button", "Button 4 short press - turning exterior lights off");
-            id(light_exterior_roof_rear).turn_off().perform();
-            id(light_exterior_roof_driver).turn_off().perform();
-            id(light_exterior_roof_passenger).turn_off().perform();
-            id(light_exterior_driver_capsule).turn_off().perform();
-            id(light_exterior_passenger_capsule).turn_off().perform();
-          } else {
-            ESP_LOGI("button", "Button 4 long press - stopping exterior lights at current brightness");
-          }
-          id(button_4_loop_count) = 0;
+    on_multi_click:
+      # Single click -> turn off exterior lights except awning, else awning
+      - timing:
+          - ON for at most 500ms
+          - OFF for at least 200ms
+        then:
+          - script.execute: button_4_single_click
+      # Double click -> turn off ALL exterior lights
+      - timing:
+          - ON for at most 500ms
+          - OFF for at most 500ms
+          - ON for at most 500ms
+          - OFF for at least 200ms
+        then:
+          - logger.log:
+              format: "Button 4 double-click - turning off ALL exterior lights"
+              level: INFO
+          - script.execute: exterior_all_off
+      # Press and hold -> gradually dim down roof, then capsule, then awning
+      - timing:
+          - ON for at least 800ms
+        then:
+          - logger.log:
+              format: "Button 4 hold - ramping exterior lights down"
+              level: INFO
+          - while:
+              condition:
+                binary_sensor.is_on: button_4
+              then:
+                - lambda: |-
+                    float brightness_decrement = id(brightness_step).state;
+                    auto is_light_on = [](esphome::light::LightState *light_state) {
+                      return light_state->current_values.is_on() &&
+                             light_state->current_values.get_brightness() > 0.06f;
+                    };
+                    auto ramp_down = [](esphome::light::LightState *light_state, float decrement) {
+                      if (!light_state->current_values.is_on()) {
+                        return;
+                      }
+                      float new_brightness = light_state->current_values.get_brightness() - decrement;
+                      if (new_brightness <= 0.05f) {
+                        light_state->turn_off().perform();
+                      } else {
+                        auto call = light_state->turn_on();
+                        call.set_brightness(new_brightness);
+                        call.set_transition_length(100);
+                        call.perform();
+                      }
+                    };
+                    if (is_light_on(id(light_exterior_roof_rear)) ||
+                        is_light_on(id(light_exterior_roof_driver)) ||
+                        is_light_on(id(light_exterior_roof_passenger))) {
+                      ramp_down(id(light_exterior_roof_rear), brightness_decrement);
+                      ramp_down(id(light_exterior_roof_driver), brightness_decrement);
+                      ramp_down(id(light_exterior_roof_passenger), brightness_decrement);
+                    } else if (is_light_on(id(light_exterior_driver_capsule)) ||
+                               is_light_on(id(light_exterior_passenger_capsule))) {
+                      ramp_down(id(light_exterior_driver_capsule), brightness_decrement);
+                      ramp_down(id(light_exterior_passenger_capsule), brightness_decrement);
+                    } else if (is_light_on(id(light_awning_outside_light)) ||
+                               is_light_on(id(light_awning_inside_light))) {
+                      ramp_down(id(light_awning_outside_light), brightness_decrement);
+                      ramp_down(id(light_awning_inside_light), brightness_decrement);
+                    }
+                - delay: 100ms
 
 # PFC8574 Buttons
 # Button    Pin         Name                            Action
@@ -1171,9 +1188,15 @@ binary_sensor:
       - logger.log:
           format: "Wizmote 3 button pressed"
           level: INFO
-      - light.turn_on:
-          id: light_exterior_driver_capsule
-          brightness: 100%
+      - if:
+          condition:
+            light.is_on: light_exterior_driver_capsule
+          then:
+            - light.turn_off: light_exterior_driver_capsule
+          else:
+            - light.turn_on:
+                id: light_exterior_driver_capsule
+                brightness: 100%
 
   - id: !extend wizmote_4
     internal: true
@@ -1181,9 +1204,15 @@ binary_sensor:
       - logger.log:
           format: "Wizmote 4 button pressed"
           level: INFO
-      - light.turn_on:
-          id: light_exterior_passenger_capsule
-          brightness: 100%
+      - if:
+          condition:
+            light.is_on: light_exterior_passenger_capsule
+          then:
+            - light.turn_off: light_exterior_passenger_capsule
+          else:
+            - light.turn_on:
+                id: light_exterior_passenger_capsule
+                brightness: 100%
 
   - id: !extend wizmote_up
     internal: true
