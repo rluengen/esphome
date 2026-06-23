@@ -133,6 +133,18 @@ globals:
     type: bool
     initial_value: "true"
 
+  # Wheel-speed conversion scalar (km/h per encoder count).
+  # CAN wheel speed is reported in clicks/second, NOT km/h. The ABS encoder
+  # produces 128 counts per wheel rotation, so:
+  #   km/h per count = tire_circumference_m * 3.6 / 128 = tire_circumference_m * 0.028125
+  # Default 0.068355 corresponds to the stock LT245/75R16 tire (2.4304 m).
+  # Recomputed whenever the Tire Circumference number changes (see number: below).
+  # Ref: https://github.com/bistromath/vs30-dbc/commit/f8229597dbf2d6b3f867de4ee7b300ca273cb9d5
+  - id: wheel_speed_scalar
+    type: float
+    restore_value: false
+    initial_value: "0.068355f"
+
 canbus:
   - id: !extend canbus0
     bit_rate: 250kbps  # PSM CAN B = 250kbps. Try 500kbps if on CAN C or Interior bus.
@@ -158,14 +170,14 @@ canbus:
                 ESP_LOGW("CAN", "0x0A1 Rear Wheel: frame too short (%d bytes, need 7)", x.size());
                 return;
               }
-              // WheelSpeedRight: start_bit=16, length=14, little-endian, scale=0.068355
+              // WheelSpeedRight: start_bit=16, length=14, little-endian, clicks/sec
               uint16_t raw_right = (x[2] | (x[3] << 8)) & 0x3FFF;
-              float speed_right = raw_right * 0.068355;
+              float speed_right = raw_right * id(wheel_speed_scalar);
               id(can_rear_wheel_speed_right).publish_state(speed_right);
 
-              // WheelSpeedLeft: start_bit=40, length=14, little-endian, scale=0.068355
+              // WheelSpeedLeft: start_bit=40, length=14, little-endian, clicks/sec
               uint16_t raw_left = (x[5] | (x[6] << 8)) & 0x3FFF;
-              float speed_left = raw_left * 0.068355;
+              float speed_left = raw_left * id(wheel_speed_scalar);
               id(can_rear_wheel_speed_left).publish_state(speed_left);
 
               // WheelMovingRight: start_bit=54, length=2
@@ -190,11 +202,11 @@ canbus:
                 return;
               }
               uint16_t raw_right = (x[2] | (x[3] << 8)) & 0x3FFF;
-              float speed_right = raw_right * 0.068355;
+              float speed_right = raw_right * id(wheel_speed_scalar);
               id(can_front_wheel_speed_right).publish_state(speed_right);
 
               uint16_t raw_left = (x[5] | (x[6] << 8)) & 0x3FFF;
-              float speed_left = raw_left * 0.068355;
+              float speed_left = raw_left * id(wheel_speed_scalar);
               id(can_front_wheel_speed_left).publish_state(speed_left);
 
               ESP_LOGI("CAN", "0x0A3 Front Wheels: R=%.1f km/h L=%.1f km/h", speed_right, speed_left);
@@ -305,6 +317,63 @@ canbus:
               }
               ESP_LOGI("CAN", "0x307 Central Locking: %s (0x%02X)", action, flags);
               id(can_central_locking_event).publish_state(action);
+
+# ==========================================================
+# Wheel-speed calibration
+# ==========================================================
+# CAN wheel speed is reported in encoder clicks/second (128 counts per
+# rotation), so accurate km/h requires the vehicle's actual rolling
+# circumference. Stock LT245/75R16 = 2.4304 m. Adjust this if you've
+# fitted larger/smaller tires for a more accurate CAN-derived speed.
+#
+# You can calibrate using EITHER:
+#   - Tire Circumference (meters), or
+#   - Tire Revolutions per Mile (as listed by most tire calculators)
+# The two fields stay in sync (1 mile = 1609.344 m). Circumference is the
+# canonical value and is restored across reboots.
+number:
+  - platform: template
+    id: tire_circumference
+    name: "Tire Circumference"
+    unit_of_measurement: "m"
+    icon: "mdi:tire"
+    entity_category: config
+    mode: box
+    min_value: 1.5
+    max_value: 3.5
+    step: 0.0001
+    initial_value: 2.4304
+    optimistic: true
+    restore_value: true
+    set_action:
+      - lambda: |-
+          // km/h per encoder count = circumference_m * 3.6 / 128 = circumference_m * 0.028125
+          id(wheel_speed_scalar) = x * 0.028125f;
+          // Keep the revs/mile field in sync for display (1 mile = 1609.344 m).
+          id(tire_revs_per_mile).publish_state(1609.344f / x);
+          ESP_LOGI("psm", "Tire circumference %.4f m (%.1f rev/mi) -> wheel speed scalar %.6f km/h/count",
+            x, 1609.344f / x, id(wheel_speed_scalar));
+
+  - platform: template
+    id: tire_revs_per_mile
+    name: "Tire Revolutions per Mile"
+    unit_of_measurement: "rev/mi"
+    icon: "mdi:rotate-right"
+    entity_category: config
+    mode: box
+    min_value: 300
+    max_value: 1200
+    step: 0.1
+    initial_value: 662.2  # stock LT245/75R16 (2.4304 m)
+    optimistic: true
+    restore_value: false
+    set_action:
+      - lambda: |-
+          // Convert rev/mile -> circumference and update the canonical value,
+          // which recomputes the scalar and syncs this field's display.
+          auto call = id(tire_circumference).make_call();
+          call.set_value(1609.344f / x);
+          call.perform();
 
 sensor:
   # Rear wheel speeds
