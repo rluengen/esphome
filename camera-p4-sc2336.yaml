@@ -1,0 +1,151 @@
+# =============================================================================
+# ESP32-P4 + SC2336 Low-Light Camera
+# =============================================================================
+#
+# A low-light-optimized camera node built on the ESP32-P4 (MIPI-CSI) using the
+# SmartSens SC2336 2MP starlight sensor. Modeled on camera.yaml (XIAO ESP32-S3),
+# but the P4 uses the MIPI-CSI interface instead of the legacy parallel DVP bus,
+# so the wiring and component options differ.
+#
+# -----------------------------------------------------------------------------
+# HARDWARE YOU NEED
+# -----------------------------------------------------------------------------
+# 1. ESP32-P4 carrier board with a MIPI-CSI connector
+#      - Waveshare ESP32-P4-Nano (what this config targets; you already own one)
+#      - or Espressif ESP32-P4-Function-EV-Kit (ships with an SC2336 module)
+#      The P4 has NO native Wi-Fi: these boards pair it with an ESP32-C6
+#      co-processor over the `esp32_hosted` SDIO link (see devices/waveshare-esp32-p4-nano.yaml).
+#
+# 2. SC2336 camera module on a MIPI-CSI ribbon (FPC)
+#      - 2MP (1920x1080), ~3.0um pixels -> strong low-light sensitivity
+#      - 2-lane MIPI-CSI, matches the P4-Nano / EV-Kit CSI connector
+#      - Common part numbers: "SC2336 MIPI 2-lane", DFRobot/Waveshare SC2336 module
+#      - Verify the FPC pin count/pitch matches your board's CSI connector
+#        (the P4-Nano uses a 15-pin 1.0mm FPC, same family as Raspberry Pi cams).
+#
+# 3. Lens
+#      - M12 (S-mount) board lens. For low light pick a FAST lens: f/1.6 or lower
+#        (f/1.0-f/1.2 is ideal). A wider aperture matters more than megapixels here.
+#      - Remove the IR-cut filter and add 850nm IR illumination if you need TRUE
+#        darkness (mono) operation; leave the IR-cut in for color-at-dusk use.
+#
+# 4. Optional: 850nm IR LED illuminator
+#      - For pitch-black operation. SC2336 is IR-sensitive once the IR-cut is removed.
+#
+# 5. Power
+#      - Board is 5V/3.3V. On a 12V van bus add a 12V->5V buck converter (same as
+#        your other ESP nodes). Budget ~0.5A headroom for the P4 + camera + C6 radio.
+#
+# -----------------------------------------------------------------------------
+# IMPORTANT: ESPHome P4 / MIPI-CSI camera support is still EXPERIMENTAL.
+# -----------------------------------------------------------------------------
+# The mainline `esp32_camera` component historically targets the DVP bus on the
+# ESP32/-S2/-S3. MIPI-CSI capture on the ESP32-P4 is newer and may require a
+# recent ESPHome release (or an external component) plus an IDF driver for the
+# SC2336. The `esp32_camera` block below uses the MIPI-CSI style configuration;
+# if your ESPHome version rejects an option, check the camera component docs for
+# the current P4 syntax. The DVP-only keys from camera.yaml (data_pins/vsync_pin/
+# href_pin/pixel_clock_pin and the FRAMESIZE_* runtime lambdas) do NOT apply here.
+# =============================================================================
+
+substitutions:
+  device_name: p4-camera
+  friendly_name: Van P4 Low-Light Camera
+  project_name: van-p4-camera
+  project_version: "1.0.0"
+  log_level: INFO
+
+esphome:
+  name: ${device_name}
+  name_add_mac_suffix: true
+  friendly_name: ${friendly_name}
+  project:
+    name: smartvan.${project_name}
+    version: ${project_version}
+
+packages:
+  remote_packages:
+    url: https://github.com/rluengen/esphome
+    ref: main
+    refresh: always
+    files:
+      # P4-Nano board definition: esp32 (esp-idf), Wi-Fi radio over the hosted C6.
+      - path: devices/waveshare-esp32-p4-nano.yaml
+      - path: packages/common.yaml
+        vars:
+          api_encryption_key: !secret encryption_key
+          ota_password: !secret ota_password
+      - path: packages/network/wifi.yaml
+        vars:
+          wifi_ssid: !secret wifi_ssid
+          wifi_password: !secret wifi_password
+      - path: packages/time/homeassistant.yaml
+      # OTA path for the hosted (P4 + C6) boards.
+      - path: packages/ota/esp32_hosted_http.yaml
+
+# The P4 has PSRAM; the camera frame buffers live here. The board package sets
+# flash/PSRAM timing, but declare PSRAM explicitly so the camera has buffer space.
+psram:
+  mode: octal
+  speed: 200MHz
+
+# I2C / SCCB control bus for the SC2336 sensor (exposure, gain, registers).
+# These pins are the P4-Nano CSI control bus broken out next to the MIPI connector.
+# Confirm against your board's schematic before flashing.
+i2c:
+  id: camera_i2c
+  sda: GPIO20
+  scl: GPIO21
+  frequency: 100kHz
+
+# -----------------------------------------------------------------------------
+# Camera: SC2336 over MIPI-CSI
+# -----------------------------------------------------------------------------
+# Low-light tuning notes:
+#   - 1920x1080 keeps the SC2336's large pixels 1:1 for best sensitivity.
+#   - Lower max_framerate (10-15 fps) lets the sensor use longer exposure in the
+#     dark; idle_framerate keeps the stream alive without burning bandwidth.
+#   - Higher jpeg_quality number = smaller/lower quality; 10-12 is a good balance.
+esp32_camera:
+  id: espcam
+  name: Low-Light Camera
+  i2c_id: camera_i2c
+  # MIPI-CSI sensor selection. The SC2336 module is driven over the CSI lanes;
+  # the external clock feeds the sensor's MCLK input.
+  external_clock:
+    pin: GPIO15
+    frequency: 24MHz
+  resolution: 1920x1080
+  jpeg_quality: 11
+  frame_buffer_count: 2
+  max_framerate: 15 fps
+  idle_framerate: 0.2 fps
+  on_stream_start:
+    - light.turn_on: status_led
+    - logger.log: "Camera stream started"
+  on_stream_stop:
+    - light.turn_off: status_led
+    - logger.log: "Camera stream stopped"
+
+# -----------------------------------------------------------------------------
+# Optional 850nm IR illuminator control (wire an IR LED driver to this GPIO).
+# Turn it on automatically while streaming for true-dark capture.
+# Set internal: false if you want a manual switch in Home Assistant.
+# -----------------------------------------------------------------------------
+output:
+  - platform: gpio
+    id: ir_illuminator_output
+    pin: GPIO22
+
+light:
+  - platform: binary
+    id: status_led
+    name: IR Illuminator
+    output: ir_illuminator_output
+
+# Live stream + snapshot endpoints, same pattern as camera.yaml.
+esp32_camera_web_server:
+  - port: 8080
+    mode: stream
+  - port: 8081
+    mode: snapshot
