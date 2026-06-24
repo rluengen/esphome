@@ -1654,7 +1654,7 @@ sensor:
 
   - platform: homeassistant
     id: vehicle_odometer
-    entity_id: sensor.vehicle_odometer  # TODO: Change to your actual odometer entity
+    entity_id: sensor.wican_fc012cdbd495_local_a6_odometer
     unit_of_measurement: "mi"
     internal: true
     on_value:
