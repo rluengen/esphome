@@ -231,12 +231,12 @@ interval:
           solar_history[POINT_COUNT-1]      = isnan(id(solar_watts))      ? 0.0f : id(solar_watts);
           alternator_history[POINT_COUNT-1] = isnan(id(alternator_watts)) ? 0.0f : id(alternator_watts);
           ac_history[POINT_COUNT-1]         = isnan(id(ac_watts))         ? 0.0f : id(ac_watts);
-          std::vector<lv_point_t> solar_points, alternator_points, ac_points;
-          solar_points.reserve(POINT_COUNT);
-          alternator_points.reserve(POINT_COUNT);
-          ac_points.reserve(POINT_COUNT);
+          esphome::FixedVector<lv_point_precise_t> solar_points, alternator_points, ac_points;
+          solar_points.init(POINT_COUNT);
+          alternator_points.init(POINT_COUNT);
+          ac_points.init(POINT_COUNT);
           for (int i = 0; i < POINT_COUNT; i++) {
-            lv_coord_t point_x = (lv_coord_t)((float)i * plot_width / (float)(POINT_COUNT - 1));
+            lv_value_precise_t point_x = (lv_value_precise_t)((float)i * plot_width / (float)(POINT_COUNT - 1));
             float solar_fraction = solar_history[i] / max_watts;
             if (solar_fraction < 0) solar_fraction = 0;
             if (solar_fraction > 1) solar_fraction = 1;
@@ -246,13 +246,13 @@ interval:
             float ac_fraction = ac_history[i] / max_watts;
             if (ac_fraction < 0) ac_fraction = 0;
             if (ac_fraction > 1) ac_fraction = 1;
-            solar_points.push_back(lv_point_t{ point_x, (lv_coord_t)(plot_height - solar_fraction * plot_height) });
-            alternator_points.push_back(lv_point_t{ point_x, (lv_coord_t)(plot_height - alternator_fraction * plot_height) });
-            ac_points.push_back(lv_point_t{ point_x, (lv_coord_t)(plot_height - ac_fraction * plot_height) });
+            solar_points.push_back(lv_point_precise_t{ point_x, (lv_value_precise_t)(plot_height - solar_fraction * plot_height) });
+            alternator_points.push_back(lv_point_precise_t{ point_x, (lv_value_precise_t)(plot_height - alternator_fraction * plot_height) });
+            ac_points.push_back(lv_point_precise_t{ point_x, (lv_value_precise_t)(plot_height - ac_fraction * plot_height) });
           }
-          id(line_solar)->set_points(solar_points);
-          id(line_alternator)->set_points(alternator_points);
-          id(line_ac)->set_points(ac_points);
+          id(line_solar)->set_points(std::move(solar_points));
+          id(line_alternator)->set_points(std::move(alternator_points));
+          id(line_ac)->set_points(std::move(ac_points));
 
 # ---- Fonts ----
 font:
