@@ -27,7 +27,7 @@ esp32:
       CONFIG_EXAMPLE_ENABLE_CAM_SENSOR_PIC_VFLIP: "y" 
       CONFIG_EXAMPLE_VIDEO_BUFFER_TYPE_DRIVER: "y" 
       CONFIG_ESP_VIDEO_ENABLE_HW_H264_VIDEO_DEVICE: "y"
-      CONFIG_ESP_VIDEO_ENABLE_HW_JPEG_VIDEO_DEVICE: " y"
+      CONFIG_ESP_VIDEO_ENABLE_HW_JPEG_VIDEO_DEVICE: "y"
     advanced:
       enable_idf_experimental_features: true
      # execute_from_psram: true
@@ -111,6 +111,7 @@ switch:
     pin:
       pi4ioe5v6408: pi4ioe2
       number: 7
+    restore_mode: ALWAYS_ON
 
   - platform: gpio
     id: wifi_antenna_int_ext

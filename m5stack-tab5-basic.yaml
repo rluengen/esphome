@@ -1,7 +1,7 @@
 esphome:
   name: tab5-ha-hmi
   friendly_name: M5Stack Tab5 Home Assistant HMI
-  min_version: 2025.9.3
+  min_version: 2026.6.0
   on_boot:
     priority: -100
     then:
@@ -18,6 +18,17 @@ esp32:
     type: esp-idf
     advanced:
       enable_idf_experimental_features: true
+
+packages:
+  remote_packages:
+    url: https://github.com/rluengen/esphome
+    ref: main
+    refresh: always
+    files:
+      - path: packages/display/sleep.yaml
+        vars:
+          touchscreen_id: touch
+          backlight_id: backlight
 
 external_components:
   - source: github://pr#12075
@@ -62,16 +73,17 @@ wifi:
 
   on_connect: 
     then:
-      - lvgl.widget.show: wifi_icon_label
+      - script.execute: update_wifi_icon
   on_disconnect: 
     then:
-      - lvgl.widget.hide: wifi_icon_label
+      - script.execute: update_wifi_icon
 
 i2c:
   - id: bsp_bus
     sda: GPIO31
     scl: GPIO32
     frequency: 400kHz
+    scan: true
 
 pi4ioe5v6408:
   - id: pi4ioe1
@@ -155,6 +167,13 @@ binary_sensor:
       pi4ioe5v6408: pi4ioe2
       number: 6
       mode: INPUT_PULLDOWN
+    on_state:
+      # Count charge-status flaps (used to infer a missing battery)
+      - lambda: 'id(charge_toggles) += 1;'
+      - logger.log:
+          format: "Charging: %s"
+          args: ['x ? "yes" : "no"']
+      - script.execute: update_battery
 
   - platform: gpio
     id: headphone_detect
@@ -188,6 +207,14 @@ select:
           else:
             - switch.turn_on: wifi_antenna_int_ext
 
+motion:
+  - platform: bmi270
+    i2c_id: bsp_bus
+    address: 0x68          # BMI270 is 0x68 or 0x69 - confirm via the I2C scan in the logs
+    accelerometer_range: 4G
+    gyroscope_range: 2000DPS
+    update_interval: 250ms   # poll-only component (no interrupt/on-change); 250ms = responsive wake
+
 sensor:
   - platform: ina226
     address: 0x41
@@ -195,11 +222,93 @@ sensor:
     max_current: 8.192A
     shunt_resistance: 0.005ohm
     bus_voltage:
+      id: battery_voltage
       name: Battery Voltage
+      on_value:
+        - logger.log:
+            format: "Battery voltage: %.2f V"
+            args: ['x']
     current:
+      id: battery_current
       name: Battery Current
-      # Positive means discharging
-      # Negative means charging
+      # Positive means discharging, negative means charging
+      on_value:
+        - logger.log:
+            format: "Battery current: %.3f A"
+            args: ['x']
+        - script.execute: update_battery
+
+  # Battery percentage from voltage (2S pack: 6.4V empty=3.2V/cell .. 8.4V full=4.2V/cell)
+  - platform: template
+    id: battery_percent
+    name: "Battery Percentage"
+    unit_of_measurement: "%"
+    accuracy_decimals: 0
+    device_class: battery
+    update_interval: 30s
+    lambda: |-
+      float v = id(battery_voltage).state;
+      if (isnan(v)) return NAN;
+      float pct = (v - 6.4f) / (8.4f - 6.4f) * 100.0f;
+      if (pct > 100.0f) pct = 100.0f;
+      if (pct < 0.0f) pct = 0.0f;
+      return pct;
+    on_value:
+      - logger.log:
+          format: "Battery level: %.0f%%"
+          args: ['x']
+      - script.execute: update_battery
+
+  # BMI270 6-axis IMU (accelerometer + gyroscope + temperature)
+  - platform: motion
+    type: acceleration_x
+    id: accel_x
+    name: "Accel X"
+  - platform: motion
+    type: acceleration_y
+    id: accel_y
+    name: "Accel Y"
+  - platform: motion
+    type: acceleration_z
+    id: accel_z
+    name: "Accel Z"
+  - platform: motion
+    type: gyroscope_x
+    id: gyro_x
+    name: "Gyro X"
+  - platform: motion
+    type: gyroscope_y
+    id: gyro_y
+    name: "Gyro Y"
+  - platform: motion
+    type: gyroscope_z
+    id: gyro_z
+    name: "Gyro Z"
+    # gyro_z publishes last in each update cycle, so all 6 axes are fresh here.
+    on_value:
+      - if:
+          condition:
+            # Pickup/move = rotation or off-gravity accel above the resting noise floor
+            lambda: |-
+              float gx = id(gyro_x).state, gy = id(gyro_y).state, gz = id(gyro_z).state;
+              float ax = id(accel_x).state, ay = id(accel_y).state, az = id(accel_z).state;
+              if (isnan(gx) || isnan(ax)) return false;
+              float gmag = sqrtf(gx*gx + gy*gy + gz*gz);   // deg/s (~0 at rest)
+              float amag = sqrtf(ax*ax + ay*ay + az*az);   // g (~1.0 at rest)
+              return gmag > 30.0f || fabsf(amag - 1.0f) > 0.15f;
+          then:
+            - logger.log: "Device moved - waking screen"
+            - script.execute: screen_bump_activity
+  - platform: bmi270
+    type: temperature
+    name: "IMU Temperature"
+
+  - platform: wifi_signal
+    id: wifi_rssi
+    name: "WiFi Signal"
+    update_interval: 15s
+    on_value:
+      - script.execute: update_wifi_icon
 
 
 touchscreen:
@@ -211,9 +320,6 @@ touchscreen:
     reset_pin:
       pi4ioe5v6408: pi4ioe1
       number: 5      
-    transform:
-      swap_xy: true
-      mirror_x: true
     calibration:
       x_min: 0
       x_max: 1280
@@ -232,7 +338,6 @@ display:
       height: 1280
       width: 720
     model: M5STACK-TAB5-V2
-    rotation: 270°
     reset_pin:
       pi4ioe5v6408: pi4ioe1
       number: 4
@@ -252,9 +357,157 @@ light:
     restore_mode: RESTORE_DEFAULT_ON
     default_transition_length: 250ms
 
+# Material Design Icons subset for the status-bar glyphs (battery, wifi, HA)
+font:
+  - file: "https://raw.githubusercontent.com/Templarian/MaterialDesign-Webfont/master/fonts/materialdesignicons-webfont.ttf"
+    id: mdi_icons
+    size: 24
+    bpp: 4
+    glyphs:
+      - "\U000F0079"  # mdi:battery (100%)
+      - "\U000F0082"  # mdi:battery-90
+      - "\U000F0081"  # mdi:battery-80
+      - "\U000F0080"  # mdi:battery-70
+      - "\U000F007F"  # mdi:battery-60
+      - "\U000F007E"  # mdi:battery-50
+      - "\U000F007D"  # mdi:battery-40
+      - "\U000F007C"  # mdi:battery-30
+      - "\U000F007B"  # mdi:battery-20
+      - "\U000F007A"  # mdi:battery-10
+      - "\U000F008E"  # mdi:battery-outline (empty)
+      - "\U000F0083"  # mdi:battery-alert (no reading)
+      - "\U000F0085"  # mdi:battery-charging-100
+      - "\U000F008B"  # mdi:battery-charging-90
+      - "\U000F008A"  # mdi:battery-charging-80
+      - "\U000F089E"  # mdi:battery-charging-70
+      - "\U000F0089"  # mdi:battery-charging-60
+      - "\U000F089D"  # mdi:battery-charging-50
+      - "\U000F0088"  # mdi:battery-charging-40
+      - "\U000F0087"  # mdi:battery-charging-30
+      - "\U000F0086"  # mdi:battery-charging-20
+      - "\U000F089C"  # mdi:battery-charging-10
+      - "\U000F06A5"  # mdi:power-plug (no battery / on USB)
+      - "\U000F1C3C"  # mdi:power-plug-battery-outline (external power, no battery)
+      - "\U000F05AA"  # mdi:wifi-off
+      - "\U000F091F"  # mdi:wifi-strength-1
+      - "\U000F0922"  # mdi:wifi-strength-2
+      - "\U000F0925"  # mdi:wifi-strength-3
+      - "\U000F0928"  # mdi:wifi-strength-4
+      - "\U000F092F"  # mdi:wifi-strength-outline (0 / very weak)
+
+  # Simple Icons (pinned version: its Private-Use codepoints shift between majors)
+  - file: "https://cdn.jsdelivr.net/npm/simple-icons-font@14.15.0/font/SimpleIcons.ttf"
+    id: si_icons
+    size: 24
+    bpp: 4
+    glyphs:
+      - "\uEF11"  # si:homeassistant (Simple Icons v14.15.0)
+
+# Inferred battery presence: a real pack (charging or full) holds a steady
+# charge-status line; with no battery the charger oscillates. Count the flaps.
+globals:
+  - id: charge_toggles
+    type: int
+    initial_value: "0"
+  - id: battery_present
+    type: bool
+    initial_value: "true"
+
+interval:
+  - interval: 5s
+    then:
+      - lambda: |-
+          id(battery_present) = (id(charge_toggles) < 3);
+          id(charge_toggles) = 0;
+      - script.execute: update_battery
+      - script.execute: update_wifi_icon
+
+# Updates the battery status icon (level glyph + charging bolt) and percentage
+script:
+  - id: update_battery
+    mode: restart
+    then:
+      - lvgl.label.update:
+          id: battery_icon_label
+          text: !lambda |-
+            // Charging when current flows into the pack (INA226: negative = charging)
+            float i = id(battery_current).state;
+            bool is_charging = id(charging).state && !isnan(i) && i < -0.04f;
+            // STAT asserted AND current into pack (INA226: negative) proves a pack is charging
+            bool have_batt = id(battery_present) || is_charging;
+            // External power, no battery -> charger flaps, pack absent
+            if (!have_batt) return std::string("\U000F1C3C");  // mdi:power-plug-battery-outline
+            float p = id(battery_percent).state;
+            if (isnan(p)) return std::string("\U000F0083");  // mdi:battery-alert (no reading)
+            int lvl = (int) (roundf(p / 10.0f) * 10);        // nearest 10%
+            if (lvl > 100) lvl = 100;
+            if (lvl < 0) lvl = 0;
+            if (is_charging) {
+              switch (lvl) {
+                case 100: return std::string("\U000F0085");  // mdi:battery-charging-100
+                case 90:  return std::string("\U000F008B");  // mdi:battery-charging-90
+                case 80:  return std::string("\U000F008A");  // mdi:battery-charging-80
+                case 70:  return std::string("\U000F089E");  // mdi:battery-charging-70
+                case 60:  return std::string("\U000F0089");  // mdi:battery-charging-60
+                case 50:  return std::string("\U000F089D");  // mdi:battery-charging-50
+                case 40:  return std::string("\U000F0088");  // mdi:battery-charging-40
+                case 30:  return std::string("\U000F0087");  // mdi:battery-charging-30
+                case 20:  return std::string("\U000F0086");  // mdi:battery-charging-20
+                default:  return std::string("\U000F089C");  // mdi:battery-charging-10
+              }
+            }
+            switch (lvl) {
+              case 100: return std::string("\U000F0079");    // mdi:battery (full)
+              case 90:  return std::string("\U000F0082");    // mdi:battery-90
+              case 80:  return std::string("\U000F0081");    // mdi:battery-80
+              case 70:  return std::string("\U000F0080");    // mdi:battery-70
+              case 60:  return std::string("\U000F007F");    // mdi:battery-60
+              case 50:  return std::string("\U000F007E");    // mdi:battery-50
+              case 40:  return std::string("\U000F007D");    // mdi:battery-40
+              case 30:  return std::string("\U000F007C");    // mdi:battery-30
+              case 20:  return std::string("\U000F007B");    // mdi:battery-20
+              case 10:  return std::string("\U000F007A");    // mdi:battery-10
+              default:  return std::string("\U000F008E");    // mdi:battery-outline (empty)
+            }
+          text_color: !lambda |-
+            float i = id(battery_current).state;
+            bool is_charging = id(charging).state && !isnan(i) && i < -0.04f;
+            bool have_batt = id(battery_present) || is_charging;
+            if (!have_batt) return lv_color_hex(0xA8DADC); // on USB, no battery
+            if (is_charging) return lv_color_hex(0x4CAF50);   // green while charging
+            float p = id(battery_percent).state;
+            if (!isnan(p) && p <= 15) return lv_color_hex(0xE53935); // red when low
+            return lv_color_hex(0xA8DADC);
+      - lvgl.label.update:
+          id: battery_pct_label
+          text: !lambda |-
+            float i = id(battery_current).state;
+            bool is_charging = id(charging).state && !isnan(i) && i < -0.04f;
+            if (!id(battery_present) && !is_charging) return std::string("");   // no SoC without a battery
+            float p = id(battery_percent).state;
+            if (isnan(p)) return std::string("--%");
+            return std::to_string((int) roundf(p)) + "%";
+
+  # Sets the wifi status glyph: signal strength when connected, wifi-off otherwise
+  - id: update_wifi_icon
+    mode: restart
+    then:
+      - lvgl.label.update:
+          id: wifi_icon_label
+          text: !lambda |-
+            if (!wifi::global_wifi_component->is_connected()) return std::string("\U000F05AA");  // mdi:wifi-off
+            float r = id(wifi_rssi).state;
+            if (isnan(r)) return std::string("\U000F092F");             // mdi:wifi-strength-outline (unknown)
+            if (r >= -55) return std::string("\U000F0928");             // mdi:wifi-strength-4
+            if (r >= -65) return std::string("\U000F0925");             // mdi:wifi-strength-3
+            if (r >= -75) return std::string("\U000F0922");             // mdi:wifi-strength-2
+            if (r >= -85) return std::string("\U000F091F");             // mdi:wifi-strength-1
+            return std::string("\U000F092F");                          // mdi:wifi-strength-outline (very weak)
+
 lvgl:
   buffer_size: 100%
   byte_order: little_endian
+  rotation: 270
   pages:
     - id: main_page
       bg_color: 0x0E1A2B
@@ -263,7 +516,7 @@ lvgl:
             id: time_label
             align: CENTER
             y: -40
-            text: "00:00"
+            text: "--:--"
             text_font: montserrat_48
             text_color: 0xF1FAEE
         - label:
@@ -275,22 +528,44 @@ lvgl:
             text_color: 0xA8DADC
   top_layer:
     widgets:
-      - label:
-          id: api_icon_label
+      # Top-right status bar. ROW_REVERSE => first child sits furthest right.
+      - obj:
+          id: status_bar
           align: TOP_RIGHT
-          x: -120
-          y: 16
-          hidden: true
-          text: "HA"
-          text_color: 0xA8DADC
-      - label:
-          id: wifi_icon_label
-          align: TOP_RIGHT
-          x: -20
-          y: 16
-          hidden: true
-          text: "WiFi"
-          text_color: 0xA8DADC
+          width: 100%
+          height: SIZE_CONTENT
+          y: 8
+          bg_opa: TRANSP
+          border_opa: TRANSP
+          pad_right: 16
+          layout:
+            type: FLEX
+            flex_flow: ROW_REVERSE
+            flex_align_main: END
+            flex_align_cross: CENTER
+            pad_column: 16
+          widgets:
+            - label:
+                id: battery_icon_label
+                text: "\U000F0079"  # mdi:battery (full)
+                text_font: mdi_icons
+                text_color: 0xA8DADC
+            - label:
+                id: battery_pct_label
+                text: "--%"
+                text_font: montserrat_20
+                text_color: 0xA8DADC
+            - label:
+                id: api_icon_label
+                hidden: true
+                text: "\uEF11"  # si:homeassistant
+                text_font: si_icons
+                text_color: 0xA8DADC
+            - label:
+                id: wifi_icon_label
+                text: "\U000F05AA"  # mdi:wifi-off (until connected)
+                text_font: mdi_icons
+                text_color: 0xA8DADC
 
 i2s_audio:
   - id: mic_bus

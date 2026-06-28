@@ -129,6 +129,24 @@ function Resolve-ConfigDependencies($config) {
     return $resolved
 }
 
+# Find the highest ESPHome min_version declared across a config and all of its
+# resolved YAML dependencies. Returns a [version], or $null if none declared.
+function Get-RequiredEsphomeVersion($config) {
+    $highest = $null
+    foreach ($dep in (Resolve-ConfigDependencies $config)) {
+        $full = Join-Path $RepoRoot ($dep -replace '/', '\')
+        if (-not (Test-Path $full -PathType Leaf)) { continue }
+        $content = Get-Content $full -Raw
+        foreach ($m in [regex]::Matches($content, "(?m)^\s*min_version:\s*[""']?(\d+\.\d+(?:\.\d+)?)")) {
+            $parsed = $null
+            if ([version]::TryParse($m.Groups[1].Value, [ref]$parsed)) {
+                if (-not $highest -or $parsed -gt $highest) { $highest = $parsed }
+            }
+        }
+    }
+    return $highest
+}
+
 # Look up the latest release for a device and the git commit it was built from.
 # Returns @{ Tag; Sha } or $null if there is no usable prior release.
 function Get-LatestReleaseInfo($device) {
@@ -408,6 +426,7 @@ if ($installedRaw -ne $latestRaw) {
             exit 1
         }
         Write-Host "✅ ESPHome upgraded to $latestRaw" -ForegroundColor Green
+        $installedRaw = $latestRaw
 
         # Clean build cache after upgrade to avoid stale artifacts
         $buildDir = Join-Path $RepoRoot ".esphome\build"
@@ -420,6 +439,19 @@ if ($installedRaw -ne $latestRaw) {
     }
 } else {
     Write-Host "✅ ESPHome $installedRaw is the latest version" -ForegroundColor Green
+}
+
+# Enforce each config's declared ESPHome min_version (fail fast before compiling)
+$installedParsed = $null
+[version]::TryParse($installedRaw, [ref]$installedParsed) | Out-Null
+foreach ($config in $Configs) {
+    $required = Get-RequiredEsphomeVersion $config
+    if (-not $required) { continue }
+    if ($installedParsed -and $installedParsed -lt $required) {
+        Write-Error "❌ $config requires ESPHome >= $required, but $installedRaw is installed. Upgrade with: pip install --upgrade esphome"
+        exit 1
+    }
+    Write-Host "✅ $config min_version >= $required satisfied by $installedRaw" -ForegroundColor Green
 }
 
 if (-not $Version) {
