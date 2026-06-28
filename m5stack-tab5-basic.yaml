@@ -1,16 +1,15 @@
-substitutions:
-
-# Device customization
-# Personalización del dispositivo
-
-  name: m5stack-tab5
-  friendly_name: M5stack Tab5
-
-####################################
-
 esphome:
-  name: ${name}
-  friendly_name: ${friendly_name}
+  name: tab5-ha-hmi
+  friendly_name: M5Stack Tab5 Home Assistant HMI
+  min_version: 2025.9.3
+  on_boot:
+    priority: -100
+    then:
+      # Make sure the display backlight is on at boot
+      - light.turn_on:
+          id: backlight
+          brightness: 100%
+      - lvgl.resume:
 
 esp32:
   board: esp32-p4-evboard
@@ -19,6 +18,11 @@ esp32:
     type: esp-idf
     advanced:
       enable_idf_experimental_features: true
+
+external_components:
+  - source: github://pr#12075
+    components: [st7123]
+    refresh: 1h
 
 esp32_hosted:
   variant: esp32c6
@@ -32,45 +36,36 @@ esp32_hosted:
   reset_pin: GPIO15
   slot: 1
 
+logger:
+  hardware_uart: USB_SERIAL_JTAG
+
 psram:
   mode: hex
   speed: 200MHz
 
-packages:
-  remote_packages:
-    url: https://github.com/rluengen/esphome
-    ref: main
-    refresh: always
-    files:
-      - path: packages/network/wifi.yaml
-        vars:
-          wifi_ssid: !secret wifi_ssid
-          wifi_password: !secret wifi_password
-      - path: packages/common.yaml
-        vars:
-          api_encryption_key: !secret encryption_key
+api:
+  encryption:
+    key: !secret encryption_key
+  on_client_connected: 
+    then:
+      - lvgl.widget.show: api_icon_label
+  on_client_disconnected: 
+    then:
+      - lvgl.widget.hide: api_icon_label
 
-logger:
-  hardware_uart: USB_SERIAL_JTAG
+ota:
+  platform: esphome
 
-# Sensors configuration
-# Configuración de sensores
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
 
-binary_sensor:
-  - platform: gpio
-    id: charging
-    name: "Charging Status"
-    pin:
-      pi4ioe5v6408: pi4ioe2
-      number: 6
-      mode: INPUT_PULLDOWN
-
-  - platform: gpio
-    id: headphone_detect
-    name: "Headphone Detect"
-    pin:
-      pi4ioe5v6408: pi4ioe1
-      number: 7
+  on_connect: 
+    then:
+      - lvgl.widget.show: wifi_icon_label
+  on_disconnect: 
+    then:
+      - lvgl.widget.hide: wifi_icon_label
 
 i2c:
   - id: bsp_bus
@@ -100,7 +95,83 @@ pi4ioe5v6408:
     # 6: I - charging status
     # 7: O - charge enable
 
+switch:
+  - platform: gpio
+    id: wifi_power
+    name: "WiFi Power"
+    pin:
+      pi4ioe5v6408: pi4ioe2
+      number: 0
+    restore_mode: ALWAYS_ON
+
+  - platform: gpio
+    id: usb_5v_power
+    name: "USB Power"
+    pin:
+      pi4ioe5v6408: pi4ioe2
+      number: 3
+
+  - platform: gpio
+    id: quick_charge
+    name: "Quick Charge"
+    pin:
+      pi4ioe5v6408: pi4ioe2
+      number: 5
+      inverted: true
+
+  - platform: gpio
+    id: charge_enable
+    name: "Charge Enable"
+    pin:
+      pi4ioe5v6408: pi4ioe2
+      number: 7
+
+  - platform: gpio
+    id: wifi_antenna_int_ext
+    pin:
+      pi4ioe5v6408: pi4ioe1
+      number: 0
+
+  - platform: gpio
+    id: speaker_enable
+    name: "Speaker Enable"
+    pin:
+      pi4ioe5v6408: pi4ioe1
+      number: 1
+    restore_mode: ALWAYS_ON
+
+  - platform: gpio
+    id: external_5v_power
+    name: "External 5V Power"
+    pin:
+      pi4ioe5v6408: pi4ioe1
+      number: 2
+
+binary_sensor:
+  - platform: gpio
+    id: charging
+    name: "Charging Status"
+    pin:
+      pi4ioe5v6408: pi4ioe2
+      number: 6
+      mode: INPUT_PULLDOWN
+
+  - platform: gpio
+    id: headphone_detect
+    name: "Headphone Detect"
+    pin:
+      pi4ioe5v6408: pi4ioe1
+      number: 7
+
 select:
+# The DAC Output select needs to be manually 
+# (or with an automation) changed to `LINE1` for the onboard speaker
+  - platform: es8388
+    dac_output:
+      name: DAC Output
+    adc_input_mic:
+      name: ADC Input Mic
+
   - platform: template
     id: wifi_antenna_select
     name: "WiFi Antenna"
@@ -117,13 +188,6 @@ select:
           else:
             - switch.turn_on: wifi_antenna_int_ext
 
-# The DAC Output select needs to be manually (or with an automation) changed to `LINE1` for the onboard speaker
-  - platform: es8388
-    dac_output:
-      name: DAC Output
-    adc_input_mic:
-      name: ADC Input Mic
-
 sensor:
   - platform: ina226
     address: 0x41
@@ -137,63 +201,48 @@ sensor:
       # Positive means discharging
       # Negative means charging
 
-switch:
-  - platform: gpio
-    id: wifi_power
-    name: "WiFi Power"
-    pin:
-      pi4ioe5v6408: pi4ioe2
-      number: 0
-    restore_mode: ALWAYS_ON
-  - platform: gpio
-    id: usb_5v_power
-    name: "USB Power"
-    pin:
-      pi4ioe5v6408: pi4ioe2
-      number: 3
-  - platform: gpio
-    id: quick_charge
-    name: "Quick Charge"
-    pin:
-      pi4ioe5v6408: pi4ioe2
-      number: 5
-      inverted: true
-  - platform: gpio
-    id: charge_enable
-    name: "Charge Enable"
-    pin:
-      pi4ioe5v6408: pi4ioe2
-      number: 7
-  - platform: gpio
-    id: wifi_antenna_int_ext
-    pin:
-      pi4ioe5v6408: pi4ioe1
-      number: 0
-  - platform: gpio
-    id: speaker_enable
-    name: "Speaker Enable"
-    pin:
-      pi4ioe5v6408: pi4ioe1
-      number: 1
-    restore_mode: ALWAYS_ON
-  - platform: gpio
-    id: external_5v_power
-    name: "External 5V Power"
-    pin:
-      pi4ioe5v6408: pi4ioe1
-      number: 2
 
-# Display configuration
-# Configuración de la pantalla
-
+touchscreen:
+  - platform: st7123
+    i2c_id: bsp_bus
+    interrupt_pin: GPIO23
+    display: lcd
+    update_interval: never
+    reset_pin:
+      pi4ioe5v6408: pi4ioe1
+      number: 5      
+    transform:
+      swap_xy: true
+      mirror_x: true
+    calibration:
+      x_min: 0
+      x_max: 1280
+      y_min: 0
+      y_max: 720
+    id: touch
+      
 esp_ldo:
   - voltage: 2.5V
     channel: 3
 
-font:
-  - file: "gfonts://Kanit"
-    id: font_title
-    size: 100
+display:
+  - platform: mipi_dsi
+    id: lcd
+    dimensions:
+      height: 1280
+      width: 720
+    model: M5STACK-TAB5-V2
+    rotation: 270°
+    reset_pin:
+      pi4ioe5v6408: pi4ioe1
+      number: 4
+
+
+output:
+  - platform: ledc
+    pin: GPIO22
+    id: backlight_pwm
+    frequency: 1000Hz
 
 light:
   - platform: monochromatic
@@ -203,62 +252,45 @@ light:
     restore_mode: RESTORE_DEFAULT_ON
     default_transition_length: 250ms
 
-output:
-  - platform: ledc
-    pin: GPIO22
-    id: backlight_pwm
-    frequency: 1000Hz
-
-touchscreen:
-  - platform: gt911
-    interrupt_pin: GPIO23
-    update_interval: never
-    reset_pin:
-      pi4ioe5v6408: pi4ioe1
-      number: 5
-    calibration:
-      x_min: 0
-      x_max: 720
-      y_min: 0
-      y_max: 1280
-    id: touch
-
-display:
-  - platform: mipi_dsi
-    dimensions:
-      height: 1280
-      width: 720
-    model: M5Stack-Tab5
-    reset_pin:
-      pi4ioe5v6408: pi4ioe1
-      number: 4
-    show_test_card: true
-    rotation: 90
-
 lvgl:
-  touchscreens: touch
   buffer_size: 100%
-  style_definitions:
-    - id: style_title
-      align: CENTER
-      text_font: font_title
-  widgets:
-    - label:
-        styles: style_title
-        text: 'Hola Aguacater@s!!'
-
-# Media configuration and voice assistant
-# Configuración multimedia y asistente de voz
-
-audio_dac:
-  - platform: es8388
-    id: es8388_dac
-
-audio_adc:
-  - platform: es7210
-    id: es7210_adc
-    bits_per_sample: 16bit
-    sample_rate: 16000
+  byte_order: little_endian
+  pages:
+    - id: main_page
+      bg_color: 0x0E1A2B
+      widgets:
+        - label:
+            id: time_label
+            align: CENTER
+            y: -40
+            text: "00:00"
+            text_font: montserrat_48
+            text_color: 0xF1FAEE
+        - label:
+            id: date_label
+            align: CENTER
+            y: 40
+            text: "1970-01-01 Thu"
+            text_font: montserrat_28
+            text_color: 0xA8DADC
+  top_layer:
+    widgets:
+      - label:
+          id: api_icon_label
+          align: TOP_RIGHT
+          x: -120
+          y: 16
+          hidden: true
+          text: "HA"
+          text_color: 0xA8DADC
+      - label:
+          id: wifi_icon_label
+          align: TOP_RIGHT
+          x: -20
+          y: 16
+          hidden: true
+          text: "WiFi"
+          text_color: 0xA8DADC
 
 i2s_audio:
   - id: mic_bus
@@ -266,40 +298,11 @@ i2s_audio:
     i2s_bclk_pin: GPIO27
     i2s_mclk_pin: GPIO30
 
-media_player:
-  - platform: speaker
-    name: None
-    id: speaker_player
-    announcement_pipeline:
-      speaker: tab5_speaker
-      format: FLAC
-      sample_rate: 48000
-      num_channels: 1
-    on_announcement:
-      # Stop the wake word (mWW or VA) if the mic is capturing
-      - if:
-          condition:
-            - microphone.is_capturing:
-          then:
-            - micro_wake_word.stop:
-    on_idle:
-      # Since VA isn't running, this is the end of user-intiated media playback. Restart the wake word.
-      - if:
-          condition:
-            not:
-              voice_assistant.is_running:
-          then:
-            - micro_wake_word.start:
-
-micro_wake_word:
-  id: mww
-  models:
-    - okay_nabu
-    - hey_mycroft
-    - hey_jarvis
-  on_wake_word_detected:
-    - voice_assistant.start:
-        wake_word: !lambda return wake_word;
+audio_adc:
+  - platform: es7210
+    id: es7210_adc
+    bits_per_sample: 16bit
+    sample_rate: 16000
 
 microphone:
   - platform: i2s_audio
@@ -309,15 +312,9 @@ microphone:
     bits_per_sample: 16bit
     adc_type: external
 
-# Commented out to avoid duplicates (see above)
-# Comentado para evitar duplicidades (ver arriba)
-#select:
-# The DAC Output select needs to be manually (or with an automation) changed to `LINE1` for the onboard speaker
-#  - platform: es8388
-#    dac_output:
-#      name: DAC Output
-#    adc_input_mic:
-#      name: ADC Input Mic
+audio_dac:
+  - platform: es8388
+    id: es8388_dac
 
 speaker:
   - platform: i2s_audio
@@ -330,26 +327,37 @@ speaker:
     bits_per_sample: 16bit
     sample_rate: 48000
 
-voice_assistant:
-  id: va
-  microphone: tab5_microphone
-  media_player: speaker_player
-  micro_wake_word: mww
-  on_end:
-    # Wait a short amount of time to see if an announcement starts
-    - wait_until:
-        condition:
-          - media_player.is_announcing:
-        timeout: 0.5s
-    # Announcement is finished and the I2S bus is free
-    - wait_until:
-        - and:
-            - not:
-                media_player.is_announcing:
-            - not:
-                speaker.is_playing:
-    - micro_wake_word.start:
-  on_client_connected:
-    - micro_wake_word.start:
-  on_client_disconnected:
-    - micro_wake_word.stop:
+media_player:
+  - platform: speaker
+    name: tab5_media_player
+    id: speaker_player
+    announcement_pipeline:
+      speaker: tab5_speaker
+      format: FLAC
+      sample_rate: 48000
+      num_channels: 1
+
+time:
+  - platform: homeassistant
+    id: ha_time
+    on_time_sync:
+      then:
+        rx8130.write_time:
+  - platform: rx8130
+    id: rx8130_time
+    update_interval: never
+    on_time:
+      # Update once ready
+      - seconds: /3
+        then:
+          - lvgl.label.update:
+              id: time_label
+              text: !lambda |-
+                auto t = id(ha_time).now();
+                return t.strftime("%H:%M").c_str();
+
+          - lvgl.label.update:
+              id: date_label
+              text: !lambda |-
+                auto t = id(ha_time).now();
+                return t.strftime("%Y-%m-%d %a").c_str();
