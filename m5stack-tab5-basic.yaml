@@ -137,6 +137,7 @@ switch:
     pin:
       pi4ioe5v6408: pi4ioe2
       number: 7
+    restore_mode: ALWAYS_ON
     on_turn_on:
       - lvgl.widget.update:
           id: charge_btn
@@ -669,7 +670,10 @@ time:
               id: time_label
               text: !lambda |-
                 auto t = id(ha_time).now();
-                return t.strftime("%H:%M").c_str();
+                int h = t.hour % 12; if (h == 0) h = 12;
+                char buf[16];
+                snprintf(buf, sizeof(buf), "%d:%02d %s", h, t.minute, t.hour < 12 ? "am" : "pm");
+                return std::string(buf);
 
           - lvgl.label.update:
               id: date_label
