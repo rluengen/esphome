@@ -137,6 +137,22 @@ switch:
     pin:
       pi4ioe5v6408: pi4ioe2
       number: 7
+    on_turn_on:
+      - lvgl.widget.update:
+          id: charge_btn
+          state:
+            checked: true
+      - lvgl.label.update:
+          id: charge_btn_label
+          text: "Charging"
+    on_turn_off:
+      - lvgl.widget.update:
+          id: charge_btn
+          state:
+            checked: false
+      - lvgl.label.update:
+          id: charge_btn_label
+          text: "Charge"
 
   - platform: gpio
     id: wifi_antenna_int_ext
@@ -167,6 +183,7 @@ binary_sensor:
       pi4ioe5v6408: pi4ioe2
       number: 6
       mode: INPUT_PULLDOWN
+    publish_initial_state: true
     on_state:
       # Count charge-status flaps (used to infer a missing battery)
       - lambda: 'id(charge_toggles) += 1;'
@@ -322,9 +339,9 @@ touchscreen:
       number: 5      
     calibration:
       x_min: 0
-      x_max: 1280
+      x_max: 720
       y_min: 0
-      y_max: 720
+      y_max: 1280
     id: touch
       
 esp_ldo:
@@ -432,7 +449,7 @@ script:
           text: !lambda |-
             // Charging when current flows into the pack (INA226: negative = charging)
             float i = id(battery_current).state;
-            bool is_charging = id(charging).state && !isnan(i) && i < -0.04f;
+            bool is_charging = id(charging).state || (!isnan(i) && i < -0.05f);
             // STAT asserted AND current into pack (INA226: negative) proves a pack is charging
             bool have_batt = id(battery_present) || is_charging;
             // External power, no battery -> charger flaps, pack absent
@@ -471,7 +488,7 @@ script:
             }
           text_color: !lambda |-
             float i = id(battery_current).state;
-            bool is_charging = id(charging).state && !isnan(i) && i < -0.04f;
+            bool is_charging = id(charging).state || (!isnan(i) && i < -0.05f);
             bool have_batt = id(battery_present) || is_charging;
             if (!have_batt) return lv_color_hex(0xA8DADC); // on USB, no battery
             if (is_charging) return lv_color_hex(0x4CAF50);   // green while charging
@@ -482,7 +499,7 @@ script:
           id: battery_pct_label
           text: !lambda |-
             float i = id(battery_current).state;
-            bool is_charging = id(charging).state && !isnan(i) && i < -0.04f;
+            bool is_charging = id(charging).state || (!isnan(i) && i < -0.05f);
             if (!id(battery_present) && !is_charging) return std::string("");   // no SoC without a battery
             float p = id(battery_percent).state;
             if (isnan(p)) return std::string("--%");
@@ -523,9 +540,25 @@ lvgl:
             id: date_label
             align: CENTER
             y: 40
-            text: "1970-01-01 Thu"
+            text: "--- --- -- ----"
             text_font: montserrat_28
             text_color: 0xA8DADC
+        - button:
+            id: charge_btn
+            align: CENTER
+            y: 140
+            width: 220
+            height: 64
+            checkable: true
+            on_click:
+              - logger.log: "Charge button tapped"
+              - switch.toggle: charge_enable
+            widgets:
+              - label:
+                  id: charge_btn_label
+                  align: CENTER
+                  text: "Charge"
+                  text_font: montserrat_20
   top_layer:
     widgets:
       # Top-right status bar. ROW_REVERSE => first child sits furthest right.
@@ -535,6 +568,7 @@ lvgl:
           width: 100%
           height: SIZE_CONTENT
           y: 8
+          clickable: false
           bg_opa: TRANSP
           border_opa: TRANSP
           pad_right: 16
@@ -618,6 +652,12 @@ time:
     on_time_sync:
       then:
         rx8130.write_time:
+  # Fallback once WiFi is up but HA isn't reachable; both sources sync the RTC
+  - platform: sntp
+    id: sntp_time
+    on_time_sync:
+      then:
+        rx8130.write_time:
   - platform: rx8130
     id: rx8130_time
     update_interval: never
@@ -635,4 +675,4 @@ time:
               id: date_label
               text: !lambda |-
                 auto t = id(ha_time).now();
-                return t.strftime("%Y-%m-%d %a").c_str();
+                return t.strftime("%A %B %d %Y").c_str();
