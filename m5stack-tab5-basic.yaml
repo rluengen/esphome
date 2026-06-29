@@ -138,22 +138,6 @@ switch:
       pi4ioe5v6408: pi4ioe2
       number: 7
     restore_mode: ALWAYS_ON
-    on_turn_on:
-      - lvgl.widget.update:
-          id: charge_btn
-          state:
-            checked: true
-      - lvgl.label.update:
-          id: charge_btn_label
-          text: "Charging"
-    on_turn_off:
-      - lvgl.widget.update:
-          id: charge_btn
-          state:
-            checked: false
-      - lvgl.label.update:
-          id: charge_btn_label
-          text: "Charge"
 
   - platform: gpio
     id: wifi_antenna_int_ext
@@ -440,8 +424,33 @@ interval:
       - script.execute: update_battery
       - script.execute: update_wifi_icon
 
-# Updates the battery status icon (level glyph + charging bolt) and percentage
+# Refreshes the clock + date labels from the first valid time source
 script:
+  - id: update_clock
+    mode: restart
+    then:
+      - lvgl.label.update:
+          id: time_label
+          text: !lambda |-
+            auto t = id(ha_time).now();
+            if (!t.is_valid()) t = id(sntp_time).now();
+            if (!t.is_valid()) t = id(rx8130_time).now();
+            if (!t.is_valid()) return std::string("--:--");
+            int hour = t.hour % 12;
+            if (hour == 0) hour = 12;
+            char buffer[16];
+            snprintf(buffer, sizeof(buffer), "%d:%02d %s", hour, t.minute, t.hour < 12 ? "am" : "pm");
+            return std::string(buffer);
+      - lvgl.label.update:
+          id: date_label
+          text: !lambda |-
+            auto t = id(ha_time).now();
+            if (!t.is_valid()) t = id(sntp_time).now();
+            if (!t.is_valid()) t = id(rx8130_time).now();
+            if (!t.is_valid()) return std::string("--- --- -- ----");
+            return t.strftime("%A %B %d %Y").c_str();
+
+# Updates the battery status icon (level glyph + charging bolt) and percentage
   - id: update_battery
     mode: restart
     then:
@@ -652,31 +661,23 @@ time:
     id: ha_time
     on_time_sync:
       then:
-        rx8130.write_time:
+        - rx8130.write_time:
+        # Fill the labels in immediately instead of waiting for the next minute
+        - script.execute: update_clock
   # Fallback once WiFi is up but HA isn't reachable; both sources sync the RTC
   - platform: sntp
     id: sntp_time
     on_time_sync:
       then:
-        rx8130.write_time:
+        - rx8130.write_time:
+        - script.execute: update_clock
   - platform: rx8130
     id: rx8130_time
     update_interval: never
     on_time:
-      # Update once ready
-      - seconds: /3
+      # The label only shows hours:minutes, so refresh on the minute boundary
+      # (seconds == 0) rather than every few seconds.
+      - seconds: 0
+        minutes: '*'
         then:
-          - lvgl.label.update:
-              id: time_label
-              text: !lambda |-
-                auto t = id(ha_time).now();
-                int h = t.hour % 12; if (h == 0) h = 12;
-                char buf[16];
-                snprintf(buf, sizeof(buf), "%d:%02d %s", h, t.minute, t.hour < 12 ? "am" : "pm");
-                return std::string(buf);
-
-          - lvgl.label.update:
-              id: date_label
-              text: !lambda |-
-                auto t = id(ha_time).now();
-                return t.strftime("%A %B %d %Y").c_str();
+          - script.execute: update_clock
