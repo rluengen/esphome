@@ -1,5 +1,6 @@
 # https://devices.esphome.io/devices/m5stack-tab5/
-
+esphome:
+  min_version: 2026.6.0
 esp32:
   board: esp32-p4-evboard
   flash_size: 16MB
@@ -7,32 +8,34 @@ esp32:
     type: esp-idf
     version: recommended
     sdkconfig_options:
-      CONFIG_ESP32P4_DATA_CACHE_64KB: "y"
-      CONFIG_ESP32P4_DATA_CACHE_LINE_64B: "y"
-      CONFIG_ESP32P4_INSTRUCTION_CACHE_32KB: "y"
-      # Moves instructions and read only data from flash into PSRAM on boot.
-      # Both enabled allows instructions to execute while a flash operation is in progress without needing to be placed in IRAM.
-      # Considerably speeds up mWW at the cost of using more PSRAM.
-      CONFIG_SPIRAM_RODATA: "y"
-      EXECUTE_FROM_PSRAM: "y" 
-      CONFIG_SPIRAM_FETCH_INSTRUCTIONS: "y"
-      CONFIG_BT_ALLOCATION_FROM_SPIRAM_FIRST: "y"
-      CONFIG_BT_BLE_DYNAMIC_ENV_MEMORY: "y"
-      CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC: "y"
-      CONFIG_MBEDTLS_SSL_PROTO_TLS1_3: "y"  # TLS1.3 support isn't enabled by default in IDF 5.1.5    
+    #   CONFIG_ESP32P4_DATA_CACHE_64KB: "y"
+    #   CONFIG_ESP32P4_DATA_CACHE_LINE_64B: "y"
+    #   CONFIG_ESP32P4_INSTRUCTION_CACHE_32KB: "y"
+    #   # Moves instructions and read only data from flash into PSRAM on boot.
+    #   # Both enabled allows instructions to execute while a flash operation is in progress without needing to be placed in IRAM.
+    #   # Considerably speeds up mWW at the cost of using more PSRAM.
+    #   CONFIG_SPIRAM_RODATA: "y"
+    #   EXECUTE_FROM_PSRAM: "y" 
+    #   CONFIG_SPIRAM_FETCH_INSTRUCTIONS: "y"
+    #   CONFIG_BT_ALLOCATION_FROM_SPIRAM_FIRST: "y"
+    #   CONFIG_BT_BLE_DYNAMIC_ENV_MEMORY: "y"
+    #   CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC: "y"
+    #   CONFIG_MBEDTLS_SSL_PROTO_TLS1_3: "y"  # TLS1.3 support isn't enabled by default in IDF 5.1.5    
       CONFIG_CAMERA_SC2336: "y"
-      CONFIG_SPIRAM: "y" 
-      CONFIG_SPIRAM_SPEED_200M: "y" 
-      CONFIG_EXAMPLE_ENABLE_CAM_SENSOR_PIC_HFLIP: "y" 
-      CONFIG_EXAMPLE_ENABLE_CAM_SENSOR_PIC_VFLIP: "y" 
-      CONFIG_EXAMPLE_VIDEO_BUFFER_TYPE_DRIVER: "y" 
-      CONFIG_ESP_VIDEO_ENABLE_HW_H264_VIDEO_DEVICE: "y"
-      CONFIG_ESP_VIDEO_ENABLE_HW_JPEG_VIDEO_DEVICE: "y"
+    #   CONFIG_SPIRAM: "y" 
+    #   CONFIG_SPIRAM_SPEED_200M: "y" 
+    #   CONFIG_EXAMPLE_ENABLE_CAM_SENSOR_PIC_HFLIP: "y" 
+    #   CONFIG_EXAMPLE_ENABLE_CAM_SENSOR_PIC_VFLIP: "y" 
+    #   CONFIG_EXAMPLE_VIDEO_BUFFER_TYPE_DRIVER: "y" 
+    #   CONFIG_ESP_VIDEO_ENABLE_HW_H264_VIDEO_DEVICE: "y"
+    #   CONFIG_ESP_VIDEO_ENABLE_HW_JPEG_VIDEO_DEVICE: "y"
     advanced:
       enable_idf_experimental_features: true
-     # execute_from_psram: true
 
-# rx8130 RTC chip is built-in since ESPHome 2025.12.0 (PR #10511 merged Nov 2025)
+external_components:
+  - source: github://pr#12075
+    components: [st7123]
+    refresh: 1h
 
 esp32_hosted:
   variant: esp32c6
@@ -45,7 +48,6 @@ esp32_hosted:
   d3_pin: GPIO8
   reset_pin: GPIO15
   slot: 1
-
 logger:
   hardware_uart: USB_SERIAL_JTAG
 
@@ -58,6 +60,7 @@ i2c:
     sda: GPIO31
     scl: GPIO32
     frequency: 400kHz
+    scan: true
 
 pi4ioe5v6408:
   - id: pi4ioe1
@@ -79,7 +82,7 @@ pi4ioe5v6408:
     # 4: O - poweroff pulse
     # 5: O - quick charge enable (inverted)
     # 6: I - charging status
-    # 7: O - charge enable 
+    # 7: O - charge enable
 
 switch:
   - platform: gpio
@@ -142,6 +145,7 @@ binary_sensor:
       pi4ioe5v6408: pi4ioe2
       number: 6
       mode: INPUT_PULLDOWN
+    publish_initial_state: true
 
   - platform: gpio
     id: headphone_detect
@@ -151,6 +155,14 @@ binary_sensor:
       number: 7
 
 select:
+# The DAC Output select needs to be manually 
+# (or with an automation) changed to `LINE1` for the onboard speaker
+  - platform: es8388
+    dac_output:
+      name: DAC Output
+    adc_input_mic:
+      name: ADC Input Mic
+
   - platform: template
     id: wifi_antenna_select
     name: "WiFi Antenna"
@@ -167,6 +179,14 @@ select:
           else:
             - switch.turn_on: wifi_antenna_int_ext
 
+motion:
+  - platform: bmi270
+    i2c_id: bsp_bus
+    address: 0x68          # BMI270 is 0x68 or 0x69 - confirm via the I2C scan in the logs
+    accelerometer_range: 4G
+    gyroscope_range: 2000DPS
+    update_interval: 250ms   # poll-only component (no interrupt/on-change); 250ms = responsive wake
+
 sensor:
   - platform: ina226
     address: 0x41
@@ -179,8 +199,6 @@ sensor:
     current:
       id: battery_current
       name: "Battery Current"
-      # Positive means discharging
-      # Negative means charging
 
     # Tab5 built-in battery discharges from full (8.23?V) to shutdown threshold (6.0?V)
   - platform: template
@@ -198,22 +216,55 @@ sensor:
     unit_of_measurement: "%"
     accuracy_decimals: 1
 
+  - platform: motion
+    type: acceleration_x
+    id: accel_x
+    name: "Accel X"
+
+  - platform: motion
+    type: acceleration_y
+    id: accel_y
+    name: "Accel Y"
+
+  - platform: motion
+    type: acceleration_z
+    id: accel_z
+    name: "Accel Z"
+
+  - platform: motion
+    type: gyroscope_x
+    id: gyro_x
+    name: "Gyro X"
+
+  - platform: motion
+    type: gyroscope_y
+    id: gyro_y
+    name: "Gyro Y"
+
+  - platform: motion
+    type: gyroscope_z
+    id: gyro_z
+    name: "Gyro Z"
+
+  - platform: bmi270
+    type: temperature
+    name: "Temperature"
+
 touchscreen:
-  - platform: gt911
+  - platform: st7123
+    i2c_id: bsp_bus
     interrupt_pin: GPIO23
+    display: lcd
     update_interval: never
     reset_pin:
       pi4ioe5v6408: pi4ioe1
-      number: 5
-    transform:
-      swap_xy: true
-      mirror_x: true
+      number: 5      
     calibration:
       x_min: 0
-      x_max: 1280
+      x_max: 720
       y_min: 0
-      y_max: 720
-    id: touchscreen_id
+      y_max: 1280
+    id: touch
 
 esp_ldo:
   - voltage: 2.5V
@@ -221,18 +272,14 @@ esp_ldo:
 
 display:
   - platform: mipi_dsi
+    id: lcd
     dimensions:
       height: 1280
       width: 720
-    model: M5Stack-Tab5
-    rotation: 270
+    model: M5STACK-TAB5-V2
     reset_pin:
       pi4ioe5v6408: pi4ioe1
       number: 4
-
-lvgl:
-  buffer_size: 100%
-  byte_order: little_endian
 
 output:
   - platform: ledc
@@ -304,8 +351,12 @@ time:
 
   - platform: homeassistant
     id: ha_time
-    # instead try to synchronize via network repeatedly ...
     on_time_sync:
       then:
-        # ... and update the RTC when the synchronization was successful
+        rx8130.write_time:
+        
+  - platform: sntp
+    id: sntp_time
+    on_time_sync:
+      then:
         rx8130.write_time:
