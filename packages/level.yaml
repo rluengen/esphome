@@ -1,0 +1,272 @@
+# Reusable vehicle-leveling package.
+#
+# Computes tilt (pitch/roll) from a 3-axis accelerometer, derives the height each
+# wheel must be raised to level the vehicle (from a configurable wheelbase/track),
+# exposes a "level" binary sensor, and provides zero/reset calibration buttons.
+# The accelerometer sensor IDs are parameterized so this can be reused on any board.
+#
+# Required substitutions:
+#   accel_x_id: id of the X-axis acceleration sensor (default: accel_x)
+#   accel_y_id: id of the Y-axis acceleration sensor (default: accel_y)
+#   accel_z_id: id of the Z-axis acceleration sensor (default: accel_z)
+#
+# Optional substitutions:
+#   update_interval: how often to recompute the angles/heights (default: 100ms)
+#   length_unit: unit label for wheelbase/track/lift (default: in)
+#   wheelbase_default: initial wheelbase, front<->rear axle (default: 144)
+#   track_width_default: initial track width, left<->right wheel (default: 79)
+#   level_tolerance_default: +/- degrees considered level (default: 1.5)
+#
+# Provides these IDs for consumers to reference (e.g. on a display):
+#   pitch (sensor): nose up/down angle in degrees, calibration applied
+#   roll (sensor): left/right tilt angle in degrees, calibration applied
+#   lift_front_left / lift_front_right / lift_rear_left / lift_rear_right (sensors):
+#     height to raise each corner to level the vehicle, in length_unit
+#   vehicle_level (binary_sensor): true when within the level tolerance
+#   wheelbase_inches / track_width_inches / level_tolerance_degrees (numbers): config
+#   pitch_offset / roll_offset (globals): calibration offsets in degrees
+#   calibrate_tilt (button): capture the current orientation as level (zero)
+#   reset_tilt_calibration (button): clear the calibration
+#
+# Usage:
+#   packages:
+#     remote_packages:
+#       url: https://github.com/rluengen/esphome
+#       ref: main
+#       files:
+#         - path: packages/level.yaml
+#           vars:
+#             accel_x_id: accel_x
+#             accel_y_id: accel_y
+#             accel_z_id: accel_z
+
+substitutions:
+  accel_x_id: accel_x
+  accel_y_id: accel_y
+  accel_z_id: accel_z
+  update_interval: 100ms
+  length_unit: "in"
+  wheelbase_default: "144"
+  track_width_default: "79"
+  level_tolerance_default: "1.5"
+
+globals:
+  # Tilt calibration offsets (degrees), subtracted from the raw angles so a chosen
+  # orientation reads 0. restore_value: yes -> the calibration survives reboots.
+  - id: pitch_offset
+    type: float
+    restore_value: yes
+    initial_value: "0.0"
+  - id: roll_offset
+    type: float
+    restore_value: yes
+    initial_value: "0.0"
+
+# Vehicle leveling geometry, adjustable from Home Assistant and persisted to flash.
+number:
+  - platform: template
+    name: "Wheelbase"
+    id: wheelbase_inches
+    unit_of_measurement: "${length_unit}"
+    min_value: 60
+    max_value: 300
+    step: 0.1
+    initial_value: ${wheelbase_default}
+    restore_value: true
+    optimistic: true
+    mode: box
+    icon: mdi:arrow-expand-horizontal
+
+  - platform: template
+    name: "Track Width"
+    id: track_width_inches
+    unit_of_measurement: "${length_unit}"
+    min_value: 30
+    max_value: 120
+    step: 0.1
+    initial_value: ${track_width_default}
+    restore_value: true
+    optimistic: true
+    mode: box
+    icon: mdi:arrow-expand-vertical
+
+  - platform: template
+    name: "Level Tolerance"
+    id: level_tolerance_degrees
+    unit_of_measurement: "°"
+    min_value: 0.1
+    max_value: 10
+    step: 0.1
+    initial_value: ${level_tolerance_default}
+    restore_value: true
+    optimistic: true
+    mode: box
+    icon: mdi:angle-acute
+
+sensor:
+  # Tilt angles derived from the accelerometer. update_interval: never -> these
+  # only recompute when driven by the interval below (or by a consumer).
+  - platform: template
+    id: pitch
+    name: "Pitch"
+    unit_of_measurement: "°"
+    accuracy_decimals: 2
+    update_interval: never
+    icon: mdi:axis-arrow
+    lambda: |-
+      float accel_x = id(${accel_x_id}).state;
+      float accel_y = id(${accel_y_id}).state;
+      float accel_z = id(${accel_z_id}).state;
+      if (isnan(accel_x) || isnan(accel_y) || isnan(accel_z)) return NAN;
+      float pitch_raw = atan2(accel_y, sqrt(pow(accel_x, 2) + pow(accel_z, 2))) * 57.2958;
+      return pitch_raw - id(pitch_offset);
+
+  - platform: template
+    id: roll
+    name: "Roll"
+    unit_of_measurement: "°"
+    accuracy_decimals: 2
+    update_interval: never
+    icon: mdi:axis-arrow
+    lambda: |-
+      float accel_x = id(${accel_x_id}).state;
+      float accel_z = id(${accel_z_id}).state;
+      if (isnan(accel_x) || isnan(accel_z)) return NAN;
+      float roll_raw = atan2(-accel_x, accel_z) * 57.2958;
+      return roll_raw - id(roll_offset);
+
+  # Per-wheel height needed to level the vehicle, derived from pitch/roll and the
+  # wheelbase/track geometry. pitch_lift uses the wheelbase (front<->rear), roll_lift
+  # uses the track width (left<->right). The per-corner signs assume nose-up pitch
+  # raises the front and the IMU's roll sign matches the `roll` sensor above; if a
+  # corner reports lift on the wrong side, negate that corner's roll_lift (or pitch_lift).
+  - platform: template
+    name: "Lift Front Left"
+    id: lift_front_left
+    unit_of_measurement: "${length_unit}"
+    accuracy_decimals: 1
+    icon: mdi:ruler
+    update_interval: never
+    lambda: |-
+      float pitch_degrees = id(pitch).state;
+      float roll_degrees = id(roll).state;
+      if (isnan(pitch_degrees) || isnan(roll_degrees)) return NAN;
+      float pitch_radians = pitch_degrees * 0.01745329252f;
+      float roll_radians = roll_degrees * 0.01745329252f;
+      float pitch_lift = (id(wheelbase_inches).state / 2.0f) * tanf(pitch_radians);
+      float roll_lift = (id(track_width_inches).state / 2.0f) * tanf(roll_radians);
+      float lift = -pitch_lift + roll_lift;
+      return lift > 0.0f ? lift : 0.0f;
+
+  - platform: template
+    name: "Lift Front Right"
+    id: lift_front_right
+    unit_of_measurement: "${length_unit}"
+    accuracy_decimals: 1
+    icon: mdi:ruler
+    update_interval: never
+    lambda: |-
+      float pitch_degrees = id(pitch).state;
+      float roll_degrees = id(roll).state;
+      if (isnan(pitch_degrees) || isnan(roll_degrees)) return NAN;
+      float pitch_radians = pitch_degrees * 0.01745329252f;
+      float roll_radians = roll_degrees * 0.01745329252f;
+      float pitch_lift = (id(wheelbase_inches).state / 2.0f) * tanf(pitch_radians);
+      float roll_lift = (id(track_width_inches).state / 2.0f) * tanf(roll_radians);
+      float lift = -pitch_lift - roll_lift;
+      return lift > 0.0f ? lift : 0.0f;
+
+  - platform: template
+    name: "Lift Rear Left"
+    id: lift_rear_left
+    unit_of_measurement: "${length_unit}"
+    accuracy_decimals: 1
+    icon: mdi:ruler
+    update_interval: never
+    lambda: |-
+      float pitch_degrees = id(pitch).state;
+      float roll_degrees = id(roll).state;
+      if (isnan(pitch_degrees) || isnan(roll_degrees)) return NAN;
+      float pitch_radians = pitch_degrees * 0.01745329252f;
+      float roll_radians = roll_degrees * 0.01745329252f;
+      float pitch_lift = (id(wheelbase_inches).state / 2.0f) * tanf(pitch_radians);
+      float roll_lift = (id(track_width_inches).state / 2.0f) * tanf(roll_radians);
+      float lift = pitch_lift + roll_lift;
+      return lift > 0.0f ? lift : 0.0f;
+
+  - platform: template
+    name: "Lift Rear Right"
+    id: lift_rear_right
+    unit_of_measurement: "${length_unit}"
+    accuracy_decimals: 1
+    icon: mdi:ruler
+    update_interval: never
+    lambda: |-
+      float pitch_degrees = id(pitch).state;
+      float roll_degrees = id(roll).state;
+      if (isnan(pitch_degrees) || isnan(roll_degrees)) return NAN;
+      float pitch_radians = pitch_degrees * 0.01745329252f;
+      float roll_radians = roll_degrees * 0.01745329252f;
+      float pitch_lift = (id(wheelbase_inches).state / 2.0f) * tanf(pitch_radians);
+      float roll_lift = (id(track_width_inches).state / 2.0f) * tanf(roll_radians);
+      float lift = pitch_lift - roll_lift;
+      return lift > 0.0f ? lift : 0.0f;
+
+binary_sensor:
+  # Level when both pitch and roll are within the configurable tolerance.
+  - platform: template
+    name: "Vehicle Level"
+    id: vehicle_level
+    filters:
+      - delayed_on_off: 1s
+    lambda: |-
+      float pitch_degrees = id(pitch).state;
+      float roll_degrees = id(roll).state;
+      if (isnan(pitch_degrees) || isnan(roll_degrees)) return false;
+      float tolerance = id(level_tolerance_degrees).state;
+      return fabsf(pitch_degrees) < tolerance && fabsf(roll_degrees) < tolerance;
+
+button:
+  # Captures the current orientation as "level": stores the raw pitch/roll into
+  # the offsets so the sensors read 0 here. Persisted via the restore_value globals.
+  - platform: template
+    name: "Zero Level"
+    id: calibrate_tilt
+    on_press:
+      - lambda: |-
+          float accel_x = id(${accel_x_id}).state;
+          float accel_y = id(${accel_y_id}).state;
+          float accel_z = id(${accel_z_id}).state;
+          if (isnan(accel_x) || isnan(accel_y) || isnan(accel_z)) {
+            ESP_LOGW("tilt", "Cannot calibrate - accelerometer reading not available");
+            return;
+          }
+          id(pitch_offset) = atan2(accel_y, sqrt(pow(accel_x, 2) + pow(accel_z, 2))) * 57.2958;
+          id(roll_offset) = atan2(-accel_x, accel_z) * 57.2958;
+          ESP_LOGI("tilt", "Calibrated: pitch_offset=%.2f roll_offset=%.2f", id(pitch_offset), id(roll_offset));
+      - component.update: pitch
+      - component.update: roll
+
+  # Clears the calibration so the sensors report the raw, uncorrected angles again.
+  - platform: template
+    name: "Reset Level"
+    id: reset_tilt_calibration
+    on_press:
+      - lambda: |-
+          id(pitch_offset) = 0.0f;
+          id(roll_offset) = 0.0f;
+          ESP_LOGI("tilt", "Level calibration reset");
+      - component.update: pitch
+      - component.update: roll
+
+interval:
+  # Recompute the tilt angles and per-wheel heights. pitch/roll publish first
+  # (synchronously), then the lifts which read their fresh state.
+  - interval: ${update_interval}
+    then:
+      - component.update: pitch
+      - component.update: roll
+      - component.update: lift_front_left
+      - component.update: lift_front_right
+      - component.update: lift_rear_left
+      - component.update: lift_rear_right
