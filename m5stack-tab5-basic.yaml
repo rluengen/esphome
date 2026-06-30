@@ -188,7 +188,7 @@ binary_sensor:
       pi4ioe5v6408: pi4ioe2
       number: 6
       mode: INPUT_PULLDOWN
-    publish_initial_state: true
+    trigger_on_initial_state: true
     on_state:
       # Count charge-status flaps (used to infer a missing battery)
       - lambda: 'id(charge_toggles) += 1;'
