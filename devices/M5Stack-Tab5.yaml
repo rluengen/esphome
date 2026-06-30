@@ -200,21 +200,22 @@ sensor:
       id: battery_current
       name: "Battery Current"
 
-    # Tab5 built-in battery discharges from full (8.23?V) to shutdown threshold (6.0?V)
+    # Battery percentage from pack voltage
+    # (2S Li-ion: 6.4V empty = 3.2V/cell .. 8.4V full = 4.2V/cell)
   - platform: template
     name: "Battery Percentage"
-    lambda: |-
-      float voltage = id(battery_voltage).state;
-      // Adjust these values based on your battery's actual min/max voltage
-      float min_voltage = 6.0;  // Discharged voltage
-      float max_voltage = 8.23;  // Fully charged voltage
-      float percentage = (voltage - min_voltage) / (max_voltage - min_voltage) * 100.0;
-      if (percentage > 100.0) return 100.0;
-      if (percentage < 0.0) return 0.0;
-      return percentage;
-    update_interval: 60s
+    id: battery_percent
+    device_class: battery
     unit_of_measurement: "%"
-    accuracy_decimals: 1
+    accuracy_decimals: 0
+    update_interval: 30s
+    lambda: |-
+      float v = id(battery_voltage).state;
+      if (isnan(v)) return NAN;
+      float pct = (v - 6.4f) / (8.4f - 6.4f) * 100.0f;
+      if (pct > 100.0f) pct = 100.0f;
+      if (pct < 0.0f) pct = 0.0f;
+      return pct;
 
   - platform: motion
     type: acceleration_x
