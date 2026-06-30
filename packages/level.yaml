@@ -114,11 +114,11 @@ sensor:
     update_interval: never
     icon: mdi:axis-arrow
     lambda: |-
-      float accel_x = id(${accel_x_id}).state;
-      float accel_y = id(${accel_y_id}).state;
-      float accel_z = id(${accel_z_id}).state;
-      if (isnan(accel_x) || isnan(accel_y) || isnan(accel_z)) return NAN;
-      float pitch_raw = atan2(accel_y, sqrt(pow(accel_x, 2) + pow(accel_z, 2))) * 57.2958;
+      float acceleration_x = id(${accel_x_id}).state;
+      float acceleration_y = id(${accel_y_id}).state;
+      float acceleration_z = id(${accel_z_id}).state;
+      if (isnan(acceleration_x) || isnan(acceleration_y) || isnan(acceleration_z)) return NAN;
+      float pitch_raw = atan2(acceleration_y, sqrt(pow(acceleration_x, 2) + pow(acceleration_z, 2))) * 57.2958;
       return pitch_raw - id(pitch_offset);
 
   - platform: template
@@ -129,10 +129,10 @@ sensor:
     update_interval: never
     icon: mdi:axis-arrow
     lambda: |-
-      float accel_x = id(${accel_x_id}).state;
-      float accel_z = id(${accel_z_id}).state;
-      if (isnan(accel_x) || isnan(accel_z)) return NAN;
-      float roll_raw = atan2(-accel_x, accel_z) * 57.2958;
+      float acceleration_x = id(${accel_x_id}).state;
+      float acceleration_z = id(${accel_z_id}).state;
+      if (isnan(acceleration_x) || isnan(acceleration_z)) return NAN;
+      float roll_raw = atan2(-acceleration_x, acceleration_z) * 57.2958;
       return roll_raw - id(roll_offset);
 
   # Per-wheel height needed to level the vehicle, derived from pitch/roll and the
@@ -234,15 +234,15 @@ button:
     id: calibrate_tilt
     on_press:
       - lambda: |-
-          float accel_x = id(${accel_x_id}).state;
-          float accel_y = id(${accel_y_id}).state;
-          float accel_z = id(${accel_z_id}).state;
-          if (isnan(accel_x) || isnan(accel_y) || isnan(accel_z)) {
+          float acceleration_x = id(${accel_x_id}).state;
+          float acceleration_y = id(${accel_y_id}).state;
+          float acceleration_z = id(${accel_z_id}).state;
+          if (isnan(acceleration_x) || isnan(acceleration_y) || isnan(acceleration_z)) {
             ESP_LOGW("tilt", "Cannot calibrate - accelerometer reading not available");
             return;
           }
-          id(pitch_offset) = atan2(accel_y, sqrt(pow(accel_x, 2) + pow(accel_z, 2))) * 57.2958;
-          id(roll_offset) = atan2(-accel_x, accel_z) * 57.2958;
+          id(pitch_offset) = atan2(acceleration_y, sqrt(pow(acceleration_x, 2) + pow(acceleration_z, 2))) * 57.2958;
+          id(roll_offset) = atan2(-acceleration_x, acceleration_z) * 57.2958;
           ESP_LOGI("tilt", "Calibrated: pitch_offset=%.2f roll_offset=%.2f", id(pitch_offset), id(roll_offset));
       - component.update: pitch
       - component.update: roll
