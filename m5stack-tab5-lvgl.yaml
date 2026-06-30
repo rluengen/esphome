@@ -85,6 +85,10 @@ sensor:
   # cycle, so all six axes are fresh here - use it to wake the screen on movement.
   - id: !extend gyro_z
     on_value:
+      # All six axes are fresh this cycle, so recompute the tilt angles now
+      # instead of letting the template sensors poll on their default interval.
+      - component.update: pitch
+      - component.update: roll
       - if:
           condition:
             # Pickup/move = rotation or off-gravity accel above the resting noise floor
@@ -105,6 +109,68 @@ sensor:
     update_interval: 15s
     on_value:
       - script.execute: update_wifi_icon
+
+  # Tilt angles derived from the accelerometer. update_interval: never -> these
+  # only recompute when driven by gyro_z's on_value (once per fresh IMU cycle).
+  - platform: template
+    id: pitch
+    name: "Pitch"
+    unit_of_measurement: "°"
+    accuracy_decimals: 2
+    update_interval: never
+    lambda: |-
+      float accel_x = id(accel_x).state;
+      float accel_y = id(accel_y).state;
+      float accel_z = id(accel_z).state;
+      if (isnan(accel_x) || isnan(accel_y) || isnan(accel_z)) return NAN;
+      float pitch_raw = atan2(accel_y, sqrt(pow(accel_x, 2) + pow(accel_z, 2))) * 57.2958;
+      return pitch_raw - id(pitch_offset);
+
+  - platform: template
+    id: roll
+    name: "Roll"
+    unit_of_measurement: "°"
+    accuracy_decimals: 2
+    update_interval: never
+    lambda: |-
+      float accel_x = id(accel_x).state;
+      float accel_z = id(accel_z).state;
+      if (isnan(accel_x) || isnan(accel_z)) return NAN;
+      float roll_raw = atan2(-accel_x, accel_z) * 57.2958;
+      return roll_raw - id(roll_offset);
+
+button:
+  # Captures the current orientation as "level": stores the raw pitch/roll into
+  # the offsets so the sensors read 0 here. Persisted via the restore_value globals.
+  - platform: template
+    name: "Zero Pitch & Roll"
+    id: calibrate_tilt
+    on_press:
+      - lambda: |-
+          float accel_x = id(accel_x).state;
+          float accel_y = id(accel_y).state;
+          float accel_z = id(accel_z).state;
+          if (isnan(accel_x) || isnan(accel_y) || isnan(accel_z)) {
+            ESP_LOGW("tilt", "Cannot calibrate - accelerometer reading not available");
+            return;
+          }
+          id(pitch_offset) = atan2(accel_y, sqrt(pow(accel_x, 2) + pow(accel_z, 2))) * 57.2958;
+          id(roll_offset) = atan2(-accel_x, accel_z) * 57.2958;
+          ESP_LOGI("tilt", "Calibrated: pitch_offset=%.2f roll_offset=%.2f", id(pitch_offset), id(roll_offset));
+      - component.update: pitch
+      - component.update: roll
+
+  # Clears the calibration so the sensors report the raw, uncorrected angles again.
+  - platform: template
+    name: "Reset Tilt Calibration"
+    id: reset_tilt_calibration
+    on_press:
+      - lambda: |-
+          id(pitch_offset) = 0.0f;
+          id(roll_offset) = 0.0f;
+          ESP_LOGI("tilt", "Tilt calibration reset");
+      - component.update: pitch
+      - component.update: roll
 
 # Material Design Icons subset for the status-bar glyphs (battery, wifi, HA)
 font:
@@ -161,15 +227,55 @@ globals:
   - id: battery_present
     type: bool
     initial_value: "true"
+  # Tilt calibration offsets (degrees). Captured by the "Zero Pitch & Roll"
+  # button and subtracted from the raw angles so a chosen position reads 0.
+  # restore_value: yes -> the calibration survives reboots.
+  - id: pitch_offset
+    type: float
+    restore_value: yes
+    initial_value: "0.0"
+  - id: roll_offset
+    type: float
+    restore_value: yes
+    initial_value: "0.0"
 
 interval:
+  # Battery-presence detection + charger control.
+  # With no battery the charger oscillates into the open battery terminal, so the
+  # STAT line (`charging`) flaps. We count those flaps each window:
+  #   - flapping while the charger is enabled -> no battery -> disable the charger
+  #     to stop the oscillation (and the wasted power / log spam)
+  #   - a steady line while the charger is enabled -> a real battery is present
   - interval: 5s
     then:
       - lambda: |-
-          id(battery_present) = (id(charge_toggles) < 3);
+          bool flapping = id(charge_toggles) >= 3;
           id(charge_toggles) = 0;
+          // Only judge presence while the charger is enabled; with the charger
+          // off there is nothing to flap and the STAT line is meaningless.
+          if (id(charge_enable).state) {
+            if (flapping) {
+              id(battery_present) = false;
+              id(charge_enable).turn_off();
+              ESP_LOGW("battery", "No battery detected (charger flapping) - disabling charger");
+            } else {
+              id(battery_present) = true;
+            }
+          }
       - script.execute: update_battery
       - script.execute: update_wifi_icon
+
+  # Periodically re-enable the charger to check whether a battery was attached.
+  # If a pack is present the STAT line stays steady and charging continues; if
+  # not, the 5s detector above sees the flapping again and switches it back off.
+  - interval: 60s
+    then:
+      - if:
+          condition:
+            switch.is_off: charge_enable
+          then:
+            - logger.log: "Re-probing for battery - enabling charger"
+            - switch.turn_on: charge_enable
 
 # Refreshes the clock + date labels from the first valid time source
 script:
