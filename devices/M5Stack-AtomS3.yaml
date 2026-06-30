@@ -1,0 +1,66 @@
+# https://docs.m5stack.com/en/core/AtomS3
+#
+# M5Stack AtomS3 (ESP32-S3FN8) board definition.
+# Exposes the onboard MPU6886 6-axis IMU as accel_x/y/z + gyro_x/y/z so the
+# device can feed packages/level.yaml directly. BLE is available on the
+# ESP32-S3 for presence detection (see the top-level config).
+esphome:
+  min_version: 2026.6.0
+
+esp32:
+  board: esp32-s3-devkitc-1
+  flash_size: 8MB
+  framework:
+    type: esp-idf
+    version: recommended
+
+# AtomS3 uses native USB CDC for logging/flashing.
+logger:
+  hardware_uart: USB_SERIAL_JTAG
+
+# Internal I2C bus shared by the MPU6886 (back pads). SDA = GPIO38, SCL = GPIO39.
+i2c:
+  - id: internal_bus
+    sda: GPIO38
+    scl: GPIO39
+    frequency: 400kHz
+    scan: true
+
+# Onboard 6-axis IMU (accelerometer + gyroscope).
+sensor:
+  - platform: mpu6886
+    i2c_id: internal_bus
+    address: 0x68
+    update_interval: 250ms
+    accel_x:
+      id: accel_x
+      name: "Accel X"
+    accel_y:
+      id: accel_y
+      name: "Accel Y"
+    accel_z:
+      id: accel_z
+      name: "Accel Z"
+    gyro_x:
+      id: gyro_x
+      name: "Gyro X"
+    gyro_y:
+      id: gyro_y
+      name: "Gyro Y"
+    gyro_z:
+      id: gyro_z
+      name: "Gyro Z"
+    temperature:
+      name: "IMU Temperature"
+
+# Programmable front button (also the screen button).
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: GPIO41
+      inverted: true
+      mode:
+        input: true
+        pullup: true
+    id: front_button
+    name: "Front Button"
