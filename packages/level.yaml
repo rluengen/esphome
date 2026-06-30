@@ -5,6 +5,9 @@
 # exposes a "level" binary sensor, and provides zero/reset calibration buttons.
 # The accelerometer sensor IDs are parameterized so this can be reused on any board.
 #
+# Reference / inspiration ("tilty"):
+#   https://gist.github.com/SmartyVan/6f9f6c4c5633caa1c91a6c8e067f44ff
+#
 # Required substitutions:
 #   accel_x_id: id of the X-axis acceleration sensor (default: accel_x)
 #   accel_y_id: id of the Y-axis acceleration sensor (default: accel_y)
