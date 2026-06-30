@@ -80,6 +80,19 @@ binary_sensor:
           args: ['x ? "yes" : "no"']
       - script.execute: update_battery
 
+  # Level when both pitch and roll are within the configurable tolerance.
+  - platform: template
+    name: "Vehicle Level"
+    id: vehicle_level
+    filters:
+      - delayed_on_off: 1s
+    lambda: |-
+      float pitch_degrees = id(pitch).state;
+      float roll_degrees = id(roll).state;
+      if (isnan(pitch_degrees) || isnan(roll_degrees)) return false;
+      float tolerance = id(level_tolerance_degrees).state;
+      return fabsf(pitch_degrees) < tolerance && fabsf(roll_degrees) < tolerance;
+
 sensor:
   # `gyro_z` (from the M5Stack-Tab5 package) publishes last in each IMU update
   # cycle, so all six axes are fresh here - use it to wake the screen on movement.
@@ -89,6 +102,11 @@ sensor:
       # instead of letting the template sensors poll on their default interval.
       - component.update: pitch
       - component.update: roll
+      # Per-wheel leveling heights depend on pitch/roll, so refresh them too.
+      - component.update: lift_front_left
+      - component.update: lift_front_right
+      - component.update: lift_rear_left
+      - component.update: lift_rear_right
       - if:
           condition:
             # Pickup/move = rotation or off-gravity accel above the resting noise floor
@@ -118,6 +136,7 @@ sensor:
     unit_of_measurement: "°"
     accuracy_decimals: 2
     update_interval: never
+    icon: mdi:axis-arrow
     lambda: |-
       float accel_x = id(accel_x).state;
       float accel_y = id(accel_y).state;
@@ -132,6 +151,7 @@ sensor:
     unit_of_measurement: "°"
     accuracy_decimals: 2
     update_interval: never
+    icon: mdi:axis-arrow
     lambda: |-
       float accel_x = id(accel_x).state;
       float accel_z = id(accel_z).state;
@@ -139,11 +159,88 @@ sensor:
       float roll_raw = atan2(-accel_x, accel_z) * 57.2958;
       return roll_raw - id(roll_offset);
 
+  # Per-wheel height needed to level the vehicle, derived from pitch/roll and the
+  # wheelbase/track geometry. pitch_lift uses the wheelbase (front<->rear), roll_lift
+  # uses the track width (left<->right). The per-corner signs assume nose-up pitch
+  # raises the front and the IMU's roll sign matches the `roll` sensor above; if a
+  # corner reports lift on the wrong side, negate that corner's roll_lift (or pitch_lift).
+  - platform: template
+    name: "Lift Front Left"
+    id: lift_front_left
+    unit_of_measurement: "in"
+    accuracy_decimals: 1
+    icon: mdi:ruler
+    update_interval: never
+    lambda: |-
+      float pitch_degrees = id(pitch).state;
+      float roll_degrees = id(roll).state;
+      if (isnan(pitch_degrees) || isnan(roll_degrees)) return NAN;
+      float pitch_radians = pitch_degrees * 0.01745329252f;
+      float roll_radians = roll_degrees * 0.01745329252f;
+      float pitch_lift = (id(wheelbase_inches).state / 2.0f) * tanf(pitch_radians);
+      float roll_lift = (id(track_width_inches).state / 2.0f) * tanf(roll_radians);
+      float lift = -pitch_lift + roll_lift;
+      return lift > 0.0f ? lift : 0.0f;
+
+  - platform: template
+    name: "Lift Front Right"
+    id: lift_front_right
+    unit_of_measurement: "in"
+    accuracy_decimals: 1
+    icon: mdi:ruler
+    update_interval: never
+    lambda: |-
+      float pitch_degrees = id(pitch).state;
+      float roll_degrees = id(roll).state;
+      if (isnan(pitch_degrees) || isnan(roll_degrees)) return NAN;
+      float pitch_radians = pitch_degrees * 0.01745329252f;
+      float roll_radians = roll_degrees * 0.01745329252f;
+      float pitch_lift = (id(wheelbase_inches).state / 2.0f) * tanf(pitch_radians);
+      float roll_lift = (id(track_width_inches).state / 2.0f) * tanf(roll_radians);
+      float lift = -pitch_lift - roll_lift;
+      return lift > 0.0f ? lift : 0.0f;
+
+  - platform: template
+    name: "Lift Rear Left"
+    id: lift_rear_left
+    unit_of_measurement: "in"
+    accuracy_decimals: 1
+    icon: mdi:ruler
+    update_interval: never
+    lambda: |-
+      float pitch_degrees = id(pitch).state;
+      float roll_degrees = id(roll).state;
+      if (isnan(pitch_degrees) || isnan(roll_degrees)) return NAN;
+      float pitch_radians = pitch_degrees * 0.01745329252f;
+      float roll_radians = roll_degrees * 0.01745329252f;
+      float pitch_lift = (id(wheelbase_inches).state / 2.0f) * tanf(pitch_radians);
+      float roll_lift = (id(track_width_inches).state / 2.0f) * tanf(roll_radians);
+      float lift = pitch_lift + roll_lift;
+      return lift > 0.0f ? lift : 0.0f;
+
+  - platform: template
+    name: "Lift Rear Right"
+    id: lift_rear_right
+    unit_of_measurement: "in"
+    accuracy_decimals: 1
+    icon: mdi:ruler
+    update_interval: never
+    lambda: |-
+      float pitch_degrees = id(pitch).state;
+      float roll_degrees = id(roll).state;
+      if (isnan(pitch_degrees) || isnan(roll_degrees)) return NAN;
+      float pitch_radians = pitch_degrees * 0.01745329252f;
+      float roll_radians = roll_degrees * 0.01745329252f;
+      float pitch_lift = (id(wheelbase_inches).state / 2.0f) * tanf(pitch_radians);
+      float roll_lift = (id(track_width_inches).state / 2.0f) * tanf(roll_radians);
+      float lift = pitch_lift - roll_lift;
+      return lift > 0.0f ? lift : 0.0f;
+
 button:
   # Captures the current orientation as "level": stores the raw pitch/roll into
   # the offsets so the sensors read 0 here. Persisted via the restore_value globals.
   - platform: template
-    name: "Zero Pitch & Roll"
+    name: "Zero Level"
     id: calibrate_tilt
     on_press:
       - lambda: |-
@@ -162,13 +259,13 @@ button:
 
   # Clears the calibration so the sensors report the raw, uncorrected angles again.
   - platform: template
-    name: "Reset Tilt Calibration"
+    name: "Reset Level"
     id: reset_tilt_calibration
     on_press:
       - lambda: |-
           id(pitch_offset) = 0.0f;
           id(roll_offset) = 0.0f;
-          ESP_LOGI("tilt", "Tilt calibration reset");
+          ESP_LOGI("tilt", "Level calibration reset");
       - component.update: pitch
       - component.update: roll
 
@@ -238,6 +335,64 @@ globals:
     type: float
     restore_value: yes
     initial_value: "0.0"
+  # Bubble position as a pixel offset from the center of the level field; eased
+  # toward the target each tick for smooth motion. 0,0 = centered (level).
+  - id: bubble_translate_x
+    type: float
+    restore_value: no
+    initial_value: "0.0"
+  - id: bubble_translate_y
+    type: float
+    restore_value: no
+    initial_value: "0.0"
+
+# Vehicle leveling geometry, adjustable from Home Assistant and persisted to flash.
+number:
+  - platform: template
+    name: "Wheelbase"
+    id: wheelbase_inches
+    unit_of_measurement: "in"
+    min_value: 60
+    max_value: 300
+    step: 0.1
+    initial_value: 144
+    restore_value: true
+    optimistic: true
+    mode: box
+    icon: mdi:arrow-expand-horizontal
+
+  - platform: template
+    name: "Track Width"
+    id: track_width_inches
+    unit_of_measurement: "in"
+    min_value: 30
+    max_value: 120
+    step: 0.1
+    initial_value: 79
+    restore_value: true
+    optimistic: true
+    mode: box
+    icon: mdi:arrow-expand-vertical
+
+  - platform: template
+    name: "Level Tolerance"
+    id: level_tolerance_degrees
+    unit_of_measurement: "°"
+    min_value: 0.1
+    max_value: 10
+    step: 0.1
+    initial_value: 1.5
+    restore_value: true
+    optimistic: true
+    mode: box
+    icon: mdi:angle-acute
+
+# Spirit-level bubble image (generate/regenerate with scripts/make_bubble.py)
+image:
+  - file: images/bubble.png
+    id: bubble_img
+    type: RGB565
+    transparency: alpha_channel
 
 interval:
   # Battery-presence detection + charger control.
@@ -276,6 +431,29 @@ interval:
           then:
             - logger.log: "Re-probing for battery - enabling charger"
             - switch.turn_on: charge_enable
+
+  # Spirit-level bubble animation. Map pitch/roll to a pixel offset from the
+  # center of the level field and ease the bubble toward it. The bubble floats
+  # toward the raised side (invert a sign below if it moves the wrong way).
+  - interval: 50ms
+    then:
+      - lambda: |-
+          const float max_angle_degrees = 15.0f;   // tilt that pushes the bubble to the rim
+          const float max_offset_pixels = 106.0f;  // (field 260 - bubble 48) / 2
+          float pitch_degrees = id(pitch).state;
+          float roll_degrees = id(roll).state;
+          if (isnan(pitch_degrees) || isnan(roll_degrees)) return;
+          float roll_clamped = fmaxf(fminf(roll_degrees, max_angle_degrees), -max_angle_degrees);
+          float pitch_clamped = fmaxf(fminf(pitch_degrees, max_angle_degrees), -max_angle_degrees);
+          float target_x = (roll_clamped / max_angle_degrees) * max_offset_pixels;
+          float target_y = (-pitch_clamped / max_angle_degrees) * max_offset_pixels;
+          const float smoothing = 0.2f;
+          id(bubble_translate_x) += smoothing * (target_x - id(bubble_translate_x));
+          id(bubble_translate_y) += smoothing * (target_y - id(bubble_translate_y));
+      - lvgl.widget.update:
+          id: level_bubble
+          translate_x: !lambda 'return (int) id(bubble_translate_x);'
+          translate_y: !lambda 'return (int) id(bubble_translate_y);'
 
 # Refreshes the clock + date labels from the first valid time source
 script:
@@ -422,6 +600,48 @@ lvgl:
                   align: CENTER
                   text: "Charge"
                   text_font: montserrat_20
+        # Spirit-level bubble. Crosshair + center ring mark level; the bubble
+        # image is moved via translate_x/translate_y by the 50ms interval above.
+        - obj:
+            id: level_field
+            align: LEFT_MID
+            x: 60
+            width: 260
+            height: 260
+            radius: 130
+            clip_corner: true
+            bg_color: 0x14243A
+            bg_opa: COVER
+            border_color: 0x456073
+            border_width: 2
+            clickable: false
+            scrollable: false
+            scrollbar_mode: "OFF"
+            pad_all: 0
+            widgets:
+              - line:
+                  points: [{x: 18, y: 128}, {x: 238, y: 128}]
+                  line_color: 0x456073
+                  line_width: 2
+              - line:
+                  points: [{x: 128, y: 18}, {x: 128, y: 238}]
+                  line_color: 0x456073
+                  line_width: 2
+              - obj:
+                  align: CENTER
+                  width: 54
+                  height: 54
+                  radius: 27
+                  bg_opa: TRANSP
+                  border_color: 0x4CAF50
+                  border_width: 2
+                  clickable: false
+              - image:
+                  id: level_bubble
+                  src: bubble_img
+                  align: CENTER
+                  translate_x: 0
+                  translate_y: 0
   top_layer:
     widgets:
       # Top-right status bar. ROW_REVERSE => first child sits furthest right.
