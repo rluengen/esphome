@@ -27,7 +27,8 @@
 #     height to raise each corner to level the vehicle, in length_unit
 #   vehicle_level (binary_sensor): true when within the level tolerance
 #   wheelbase_inches / track_width_inches / level_tolerance_degrees (numbers): config
-#   pitch_offset / roll_offset (globals): calibration offsets in degrees
+#   reference_gravity_x / reference_gravity_y / reference_gravity_z (globals):
+#     stored "level" gravity unit vector used to cancel mounting orientation
 #   calibrate_tilt (button): capture the current orientation as level (zero)
 #   reset_tilt_calibration (button): clear the calibration
 #
@@ -54,13 +55,20 @@ substitutions:
   level_tolerance_default: "1.5"
 
 globals:
-  # Tilt calibration offsets (degrees), subtracted from the raw angles so a chosen
-  # orientation reads 0. restore_value: yes -> the calibration survives reboots.
-  - id: pitch_offset
+  # Stored "level" reference: the gravity unit vector captured at calibration, in
+  # the sensor's own axes. Rotating every live reading so this vector points to +Z
+  # cancels arbitrary mounting orientation (any tilt, not just small angles).
+  # All three zero -> uncalibrated, so the raw sensor-frame angles are reported.
+  # restore_value: yes -> the calibration survives reboots.
+  - id: reference_gravity_x
     type: float
     restore_value: yes
     initial_value: "0.0"
-  - id: roll_offset
+  - id: reference_gravity_y
+    type: float
+    restore_value: yes
+    initial_value: "0.0"
+  - id: reference_gravity_z
     type: float
     restore_value: yes
     initial_value: "0.0"
@@ -121,8 +129,44 @@ sensor:
       float acceleration_y = id(${accel_y_id}).state;
       float acceleration_z = id(${accel_z_id}).state;
       if (isnan(acceleration_x) || isnan(acceleration_y) || isnan(acceleration_z)) return NAN;
-      float pitch_raw = atan2(acceleration_y, sqrt(pow(acceleration_x, 2) + pow(acceleration_z, 2))) * 57.2958;
-      return pitch_raw - id(pitch_offset);
+      // Rotate the live reading into the calibrated "level" frame (see the roll
+      // sensor for the full explanation); leveled_* is the measured vector with
+      // the stored reference gravity rotated onto +Z.
+      float leveled_x = acceleration_x;
+      float leveled_y = acceleration_y;
+      float leveled_z = acceleration_z;
+      float reference_x = id(reference_gravity_x);
+      float reference_y = id(reference_gravity_y);
+      float reference_z = id(reference_gravity_z);
+      float reference_magnitude = sqrtf(reference_x * reference_x + reference_y * reference_y + reference_z * reference_z);
+      if (reference_magnitude > 0.0001f) {
+        float gravity_x = reference_x / reference_magnitude;
+        float gravity_y = reference_y / reference_magnitude;
+        float gravity_z = reference_z / reference_magnitude;
+        float cosine = gravity_z;
+        float axis_x = gravity_y;
+        float axis_y = -gravity_x;
+        float axis_magnitude = sqrtf(axis_x * axis_x + axis_y * axis_y);
+        if (axis_magnitude < 0.0001f) {
+          if (cosine < 0.0f) {
+            leveled_y = -acceleration_y;
+            leveled_z = -acceleration_z;
+          }
+        } else {
+          float unit_axis_x = axis_x / axis_magnitude;
+          float unit_axis_y = axis_y / axis_magnitude;
+          float sine = axis_magnitude;
+          float one_minus_cosine = 1.0f - cosine;
+          float axis_dot_acceleration = unit_axis_x * acceleration_x + unit_axis_y * acceleration_y;
+          float cross_x = unit_axis_y * acceleration_z;
+          float cross_y = -unit_axis_x * acceleration_z;
+          float cross_z = unit_axis_x * acceleration_y - unit_axis_y * acceleration_x;
+          leveled_x = acceleration_x * cosine + cross_x * sine + unit_axis_x * axis_dot_acceleration * one_minus_cosine;
+          leveled_y = acceleration_y * cosine + cross_y * sine + unit_axis_y * axis_dot_acceleration * one_minus_cosine;
+          leveled_z = acceleration_z * cosine + cross_z * sine;
+        }
+      }
+      return atan2f(leveled_y, sqrtf(leveled_x * leveled_x + leveled_z * leveled_z)) * 57.2957795f;
 
   - platform: template
     id: roll
@@ -133,10 +177,51 @@ sensor:
     icon: mdi:axis-arrow
     lambda: |-
       float acceleration_x = id(${accel_x_id}).state;
+      float acceleration_y = id(${accel_y_id}).state;
       float acceleration_z = id(${accel_z_id}).state;
-      if (isnan(acceleration_x) || isnan(acceleration_z)) return NAN;
-      float roll_raw = atan2(-acceleration_x, acceleration_z) * 57.2958;
-      return roll_raw - id(roll_offset);
+      if (isnan(acceleration_x) || isnan(acceleration_y) || isnan(acceleration_z)) return NAN;
+      // Gravity-reference leveling: rotate the measured acceleration so the stored
+      // reference gravity vector (captured at "Zero Level") points to +Z. This
+      // cancels any fixed mounting orientation, so pitch/roll read true vehicle
+      // tilt no matter how the sensor is installed. The rotation is the shortest
+      // arc taking the reference onto +Z (Rodrigues' rotation formula); it does
+      // not resolve heading/yaw, so a 90-degree-rotated mount may swap which axis
+      // is pitch vs roll until a separate forward reference is added.
+      float leveled_x = acceleration_x;
+      float leveled_y = acceleration_y;
+      float leveled_z = acceleration_z;
+      float reference_x = id(reference_gravity_x);
+      float reference_y = id(reference_gravity_y);
+      float reference_z = id(reference_gravity_z);
+      float reference_magnitude = sqrtf(reference_x * reference_x + reference_y * reference_y + reference_z * reference_z);
+      if (reference_magnitude > 0.0001f) {
+        float gravity_x = reference_x / reference_magnitude;
+        float gravity_y = reference_y / reference_magnitude;
+        float gravity_z = reference_z / reference_magnitude;
+        float cosine = gravity_z;
+        float axis_x = gravity_y;
+        float axis_y = -gravity_x;
+        float axis_magnitude = sqrtf(axis_x * axis_x + axis_y * axis_y);
+        if (axis_magnitude < 0.0001f) {
+          if (cosine < 0.0f) {
+            leveled_y = -acceleration_y;
+            leveled_z = -acceleration_z;
+          }
+        } else {
+          float unit_axis_x = axis_x / axis_magnitude;
+          float unit_axis_y = axis_y / axis_magnitude;
+          float sine = axis_magnitude;
+          float one_minus_cosine = 1.0f - cosine;
+          float axis_dot_acceleration = unit_axis_x * acceleration_x + unit_axis_y * acceleration_y;
+          float cross_x = unit_axis_y * acceleration_z;
+          float cross_y = -unit_axis_x * acceleration_z;
+          float cross_z = unit_axis_x * acceleration_y - unit_axis_y * acceleration_x;
+          leveled_x = acceleration_x * cosine + cross_x * sine + unit_axis_x * axis_dot_acceleration * one_minus_cosine;
+          leveled_y = acceleration_y * cosine + cross_y * sine + unit_axis_y * axis_dot_acceleration * one_minus_cosine;
+          leveled_z = acceleration_z * cosine + cross_z * sine;
+        }
+      }
+      return atan2f(-leveled_x, leveled_z) * 57.2957795f;
 
   # Per-wheel height needed to level the vehicle, derived from pitch/roll and the
   # wheelbase/track geometry. pitch_lift uses the wheelbase (front<->rear), roll_lift
@@ -244,9 +329,15 @@ button:
             ESP_LOGW("tilt", "Cannot calibrate - accelerometer reading not available");
             return;
           }
-          id(pitch_offset) = atan2(acceleration_y, sqrt(pow(acceleration_x, 2) + pow(acceleration_z, 2))) * 57.2958;
-          id(roll_offset) = atan2(-acceleration_x, acceleration_z) * 57.2958;
-          ESP_LOGI("tilt", "Calibrated: pitch_offset=%.2f roll_offset=%.2f", id(pitch_offset), id(roll_offset));
+          float magnitude = sqrtf(acceleration_x * acceleration_x + acceleration_y * acceleration_y + acceleration_z * acceleration_z);
+          if (magnitude < 0.0001f) {
+            ESP_LOGW("tilt", "Cannot calibrate - acceleration magnitude is zero");
+            return;
+          }
+          id(reference_gravity_x) = acceleration_x / magnitude;
+          id(reference_gravity_y) = acceleration_y / magnitude;
+          id(reference_gravity_z) = acceleration_z / magnitude;
+          ESP_LOGI("tilt", "Calibrated level reference: gravity=(%.3f, %.3f, %.3f)", id(reference_gravity_x), id(reference_gravity_y), id(reference_gravity_z));
       - component.update: pitch
       - component.update: roll
 
@@ -256,8 +347,9 @@ button:
     id: reset_tilt_calibration
     on_press:
       - lambda: |-
-          id(pitch_offset) = 0.0f;
-          id(roll_offset) = 0.0f;
+          id(reference_gravity_x) = 0.0f;
+          id(reference_gravity_y) = 0.0f;
+          id(reference_gravity_z) = 0.0f;
           ESP_LOGI("tilt", "Level calibration reset");
       - component.update: pitch
       - component.update: roll
