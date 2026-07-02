@@ -76,17 +76,21 @@ wifi:
       - script.execute: update_wifi_icon
 
 binary_sensor:
-  # `charging` is defined in the M5Stack-Tab5 package; extend it to count
-  # charge-status flaps (to infer a missing battery) and refresh the LVGL icon.
+  # `charging` (the charger STAT line) is defined in the M5Stack-Tab5 package;
+  # extend it to refresh the LVGL battery icon whenever the charge state changes.
   - id: !extend charging
     on_state:
+      # Every STAT edge bumps the flap counter the presence detector samples.
       - lambda: 'id(charge_toggles) += 1;'
-      - logger.log:
-          format: "Charging: %s"
-          args: ['x ? "yes" : "no"']
       - script.execute: update_battery
 
 sensor:
+  # `battery_percent` (package sensor, recomputed every 30s) drives the battery
+  # icon on change, so no periodic poll is needed to keep it fresh.
+  - id: !extend battery_percent
+    on_value:
+      - script.execute: update_battery
+
   # `gyro_z` (from the M5Stack-Tab5 package) publishes last in each IMU update
   # cycle, so all six axes are fresh here - use it to wake the screen on movement.
   - id: !extend gyro_z
@@ -105,11 +109,47 @@ sensor:
             - logger.log: "Device moved - waking screen"
             - script.execute: screen_bump_activity
 
+  # Main Can Lights brightness (0-255 from HA) -> Lights-tab slider + bulb icon.
+  - platform: template
+    id: ha_bright_main_cans
+    internal: true
+    on_value:
+      - lvgl.slider.update:
+          id: sld_main_cans
+          value: !lambda 'return isnan(x) ? 0 : (int) x;'
+      - lvgl.label.update:
+          id: lbl_icon_main_cans
+          text: !lambda 'return std::string((!isnan(x) && x > 0) ? "\U000F0336" : "\U000F0335");'
+          text_color: !lambda 'return (!isnan(x) && x > 0) ? lv_color_hex(0xFFD700) : lv_color_hex(0x808080);'
+      # Lights nav badge: "1" when the main cans are on, hidden when off.
+      - lvgl.label.update:
+          id: badge_lights
+          text: !lambda 'return (!isnan(x) && x > 0) ? std::string("1") : std::string("");'
+      - lvgl.widget.update:
+          id: badge_lights
+          hidden: !lambda 'return !(!isnan(x) && x > 0);'
+
+# HA drops the brightness attribute entirely when a light is off, so import it as
+# text and normalize missing/None to 0 before publishing the numeric brightness.
+text_sensor:
+  - platform: homeassistant
+    id: ha_bright_main_cans_raw
+    entity_id: light.quinled_van_lightcontroller_main_can_lights
+    attribute: brightness
+    internal: true
+    on_value:
+      - lambda: |-
+          float brightness = 0.0f;
+          if (!x.empty() && x != "None" && x != "unknown" && x != "unavailable") {
+            brightness = strtof(x.c_str(), nullptr);
+          }
+          id(ha_bright_main_cans).publish_state(brightness);
+
 # Material Design Icons subset for the status-bar glyphs (battery, wifi, HA)
 font:
   - file: "https://raw.githubusercontent.com/Templarian/MaterialDesign-Webfont/master/fonts/materialdesignicons-webfont.ttf"
     id: mdi_icons
-    size: 24
+    size: 32
     bpp: 4
     glyphs:
       - "\U000F0079"  # mdi:battery (100%)
@@ -134,7 +174,6 @@ font:
       - "\U000F0087"  # mdi:battery-charging-30
       - "\U000F0086"  # mdi:battery-charging-20
       - "\U000F089C"  # mdi:battery-charging-10
-      - "\U000F06A5"  # mdi:power-plug (no battery / on USB)
       - "\U000F1C3C"  # mdi:power-plug-battery-outline (external power, no battery)
       - "\U000F05AA"  # mdi:wifi-off
       - "\U000F091F"  # mdi:wifi-strength-1
@@ -142,18 +181,41 @@ font:
       - "\U000F0925"  # mdi:wifi-strength-3
       - "\U000F0928"  # mdi:wifi-strength-4
       - "\U000F092F"  # mdi:wifi-strength-outline (0 / very weak)
+      - "\U000F0335"  # mdi:lightbulb (light off)
+      - "\U000F0336"  # mdi:lightbulb-on (light on)
+      - "\U000F14F1"  # mdi:spirit-level (level bubble)
+      - "\U000F1253"  # mdi:lightbulb-group (Lights tab)
+      - "\U000F02DC"  # mdi:home (Home tab)
+      - "\U000F0241"  # mdi:flash (Power tab)
+      - "\U000F058C"  # mdi:water (Water tab)
+      - "\U000F0595"  # mdi:weather-partly-cloudy (Weather tab)
 
   # Simple Icons (pinned version: its Private-Use codepoints shift between majors)
   - file: "https://cdn.jsdelivr.net/npm/simple-icons-font@14.15.0/font/SimpleIcons.ttf"
     id: si_icons
-    size: 24
+    size: 32
     bpp: 4
     glyphs:
       - "\uEF11"  # si:homeassistant (Simple Icons v14.15.0)
 
-# Inferred battery presence: a real pack (charging or full) holds a steady
-# charge-status line; with no battery the charger oscillates. Count the flaps.
+  # Larger MDI subset for the bottom-nav tab icons + the light toggle bulb.
+  - file: "https://raw.githubusercontent.com/Templarian/MaterialDesign-Webfont/master/fonts/materialdesignicons-webfont.ttf"
+    id: mdi_tab
+    size: 40
+    bpp: 4
+    glyphs:
+      - "\U000F02DC"  # mdi:home
+      - "\U000F1253"  # mdi:lightbulb-group
+      - "\U000F0241"  # mdi:flash
+      - "\U000F058C"  # mdi:water
+      - "\U000F0595"  # mdi:weather-partly-cloudy
+      - "\U000F0335"  # mdi:lightbulb (light off)
+      - "\U000F0336"  # mdi:lightbulb-on (light on)
+
 globals:
+  # Battery-presence inference: with no pack the charger oscillates into the open
+  # terminal, so the charger STAT line (`charging`) flaps. The interval below
+  # counts those toggles per window - a flapping line means no battery is fitted.
   - id: charge_toggles
     type: int
     initial_value: "0"
@@ -170,6 +232,11 @@ globals:
     type: float
     restore_value: no
     initial_value: "0.0"
+  # Pending Main Can Lights brightness (0-255) awaiting the debounced HA call.
+  - id: pending_bright_main_cans
+    type: int
+    restore_value: no
+    initial_value: "0"
 
 # Spirit-level bubble image (generate/regenerate with scripts/make_bubble.py)
 image:
@@ -179,42 +246,20 @@ image:
     transparency: alpha_channel
 
 interval:
-  # Battery-presence detection + charger control.
-  # With no battery the charger oscillates into the open battery terminal, so the
-  # STAT line (`charging`) flaps. We count those flaps each window:
-  #   - flapping while the charger is enabled -> no battery -> disable the charger
-  #     to stop the oscillation (and the wasted power / log spam)
-  #   - a steady line while the charger is enabled -> a real battery is present
+  # Battery-presence detection. Flapping is a "many edges in a window" signature,
+  # so unlike the icon refreshes this genuinely needs a periodic sample. While the
+  # charger is enabled, a flapping STAT line = charger oscillating into an open
+  # terminal = no pack fitted; a steady line = a real battery. Refresh the icon
+  # only when the inferred result flips.
   - interval: 5s
     then:
       - lambda: |-
-          bool flapping = id(charge_toggles) >= 3;
-          id(charge_toggles) = 0;
-          // Only judge presence while the charger is enabled; with the charger
-          // off there is nothing to flap and the STAT line is meaningless.
+          bool was_present = id(battery_present);
           if (id(charge_enable).state) {
-            if (flapping) {
-              id(battery_present) = false;
-              id(charge_enable).turn_off();
-              ESP_LOGW("battery", "No battery detected (charger flapping) - disabling charger");
-            } else {
-              id(battery_present) = true;
-            }
+            id(battery_present) = (id(charge_toggles) < 3);
           }
-      - script.execute: update_battery
-      - script.execute: update_wifi_icon
-
-  # Periodically re-enable the charger to check whether a battery was attached.
-  # If a pack is present the STAT line stays steady and charging continues; if
-  # not, the 5s detector above sees the flapping again and switches it back off.
-  - interval: 60s
-    then:
-      - if:
-          condition:
-            switch.is_off: charge_enable
-          then:
-            - logger.log: "Re-probing for battery - enabling charger"
-            - switch.turn_on: charge_enable
+          id(charge_toggles) = 0;
+          if (id(battery_present) != was_present) id(update_battery).execute();
 
   # Spirit-level bubble animation. Map pitch/roll to a pixel offset from the
   # center of the level field and ease the bubble toward it. The bubble floats
@@ -222,16 +267,21 @@ interval:
   - interval: 50ms
     then:
       - lambda: |-
-          const float max_angle_degrees = 15.0f;   // tilt that pushes the bubble to the rim
+          const float max_angle_degrees = 45.0f;   // tilt (deg) that reaches the rim; raise to keep the bubble more centered
           const float max_offset_pixels = 106.0f;  // (field 260 - bubble 48) / 2
           float pitch_degrees = id(pitch).state;
           float roll_degrees = id(roll).state;
           if (isnan(pitch_degrees) || isnan(roll_degrees)) return;
+          // Linear, uniform map (no deadzone, no expo) so the bubble tracks tilt
+          // predictably and never "accelerates" across; each axis clamps at the rim.
           float roll_clamped = fmaxf(fminf(roll_degrees, max_angle_degrees), -max_angle_degrees);
           float pitch_clamped = fmaxf(fminf(pitch_degrees, max_angle_degrees), -max_angle_degrees);
           float target_x = (roll_clamped / max_angle_degrees) * max_offset_pixels;
           float target_y = (-pitch_clamped / max_angle_degrees) * max_offset_pixels;
-          const float smoothing = 0.2f;
+          // Heavy low-pass so accelerometer noise near level averages out (less
+          // variance in the middle) instead of flinging the bubble side to side.
+          // Lower = calmer/slower, higher = snappier (1.0 disables smoothing).
+          const float smoothing = 0.1f;
           id(bubble_translate_x) += smoothing * (target_x - id(bubble_translate_x));
           id(bubble_translate_y) += smoothing * (target_y - id(bubble_translate_y));
       - lvgl.widget.update:
@@ -262,8 +312,10 @@ script:
             auto t = id(ha_time).now();
             if (!t.is_valid()) t = id(sntp_time).now();
             if (!t.is_valid()) t = id(rtc_time).now();
-            if (!t.is_valid()) return std::string("--- --- -- ----");
-            return t.strftime("%A %B %d %Y").c_str();
+            if (!t.is_valid()) return std::string("-/-/----");
+            char buffer[16];
+            snprintf(buffer, sizeof(buffer), "%d/%d/%d", t.month, t.day_of_month, t.year);
+            return std::string(buffer);
 
 # Updates the battery status icon (level glyph + charging bolt) and percentage
   - id: update_battery
@@ -272,13 +324,13 @@ script:
       - lvgl.label.update:
           id: battery_icon_label
           text: !lambda |-
-            // Charging when current flows into the pack (INA226: negative = charging)
+            // Charging when current flows into the pack (INA226: negative = charging);
+            // external power present when the pack is not discharging (i below ~0).
             float i = id(battery_current).state;
             bool is_charging = id(charging).state || (!isnan(i) && i < -0.05f);
-            // STAT asserted AND current into pack (INA226: negative) proves a pack is charging
-            bool have_batt = id(battery_present) || is_charging;
-            // External power, no battery -> charger flaps, pack absent
-            if (!have_batt) return std::string("\U000F1C3C");  // mdi:power-plug-battery-outline
+            bool on_external = is_charging || (!isnan(i) && i < 0.05f);
+            // On external power with no pack fitted -> plug glyph instead of a level.
+            if (on_external && !id(battery_present)) return std::string("\U000F1C3C");  // mdi:power-plug-battery-outline
             float p = id(battery_percent).state;
             if (isnan(p)) return std::string("\U000F0083");  // mdi:battery-alert (no reading)
             int lvl = (int) (roundf(p / 10.0f) * 10);        // nearest 10%
@@ -314,8 +366,8 @@ script:
           text_color: !lambda |-
             float i = id(battery_current).state;
             bool is_charging = id(charging).state || (!isnan(i) && i < -0.05f);
-            bool have_batt = id(battery_present) || is_charging;
-            if (!have_batt) return lv_color_hex(0xA8DADC); // on USB, no battery
+            bool on_external = is_charging || (!isnan(i) && i < 0.05f);
+            if (on_external && !id(battery_present)) return lv_color_hex(0xA8DADC); // plugged in, no pack
             if (is_charging) return lv_color_hex(0x4CAF50);   // green while charging
             float p = id(battery_percent).state;
             if (!isnan(p) && p <= 15) return lv_color_hex(0xE53935); // red when low
@@ -325,7 +377,8 @@ script:
           text: !lambda |-
             float i = id(battery_current).state;
             bool is_charging = id(charging).state || (!isnan(i) && i < -0.05f);
-            if (!id(battery_present) && !is_charging) return std::string("");   // no SoC without a battery
+            bool on_external = is_charging || (!isnan(i) && i < 0.05f);
+            if (on_external && !id(battery_present)) return std::string("");  // no SoC without a pack
             float p = id(battery_percent).state;
             if (isnan(p)) return std::string("--%");
             return std::to_string((int) roundf(p)) + "%";
@@ -346,6 +399,45 @@ script:
             if (r >= -85) return std::string("\U000F091F");             // mdi:wifi-strength-1
             return std::string("\U000F092F");                          // mdi:wifi-strength-outline (very weak)
 
+  # Debounce the Main Can Lights slider so dragging doesn't flood HA with calls.
+  # 0 = off; anything higher turns on at that brightness.
+  - id: debounce_main_cans
+    mode: restart
+    then:
+      - delay: 300ms
+      - if:
+          condition:
+            lambda: 'return id(pending_bright_main_cans) <= 0;'
+          then:
+            - homeassistant.service:
+                service: light.turn_off
+                data:
+                  entity_id: light.quinled_van_lightcontroller_main_can_lights
+          else:
+            - homeassistant.service:
+                service: light.turn_on
+                data:
+                  entity_id: light.quinled_van_lightcontroller_main_can_lights
+                  brightness: !lambda 'return id(pending_bright_main_cans);'
+
+  # Bottom-nav tab switching: show one content panel (idx 0..4), hide the rest,
+  # and recolor each tab icon/label (active = bright, inactive = grey).
+  - id: select_tab
+    parameters:
+      idx: int
+    then:
+      - lambda: |-
+          lv_obj_t *panels[5] = { id(content_home), id(content_lights), id(content_power), id(content_water), id(content_weather) };
+          lv_obj_t *icons[5]  = { id(lbl_tab_home_icon), id(lbl_tab_lights_icon), id(lbl_tab_power_icon), id(lbl_tab_water_icon), id(lbl_tab_weather_icon) };
+          lv_obj_t *names[5]  = { id(lbl_tab_home_name), id(lbl_tab_lights_name), id(lbl_tab_power_name), id(lbl_tab_water_name), id(lbl_tab_weather_name) };
+          for (int i = 0; i < 5; i++) {
+            if (i == idx) lv_obj_clear_flag(panels[i], LV_OBJ_FLAG_HIDDEN);
+            else          lv_obj_add_flag(panels[i], LV_OBJ_FLAG_HIDDEN);
+            lv_color_t c = (i == idx) ? lv_color_hex(0xF1FAEE) : lv_color_hex(0x8B949E);
+            lv_obj_set_style_text_color(icons[i], c, LV_PART_MAIN);
+            lv_obj_set_style_text_color(names[i], c, LV_PART_MAIN);
+          }
+
 lvgl:
   buffer_size: 100%
   byte_order: little_endian
@@ -354,80 +446,499 @@ lvgl:
     - id: main_page
       bg_color: 0x0E1A2B
       widgets:
-        - label:
-            id: time_label
-            align: CENTER
-            y: -40
-            text: "--:--"
-            text_font: montserrat_48
-            text_color: 0xF1FAEE
-        - label:
-            id: date_label
-            align: CENTER
-            y: 40
-            text: "--- --- -- ----"
-            text_font: montserrat_28
-            text_color: 0xA8DADC
-        - button:
-            id: charge_btn
-            align: CENTER
-            y: 140
-            width: 220
-            height: 64
-            checkable: true
-            on_click:
-              - logger.log: "Charge button tapped"
-              - switch.toggle: charge_enable
-            widgets:
-              - label:
-                  id: charge_btn_label
-                  align: CENTER
-                  text: "Charge"
-                  text_font: montserrat_20
-        # Spirit-level bubble. Crosshair + center ring mark level; the bubble
-        # image is moved via translate_x/translate_y by the 50ms interval above.
+        # Content panels (one visible at a time); the bottom nav switches them.
         - obj:
-            id: level_field
-            align: LEFT_MID
-            x: 60
-            width: 260
-            height: 260
-            radius: 130
-            clip_corner: true
-            bg_color: 0x14243A
-            bg_opa: COVER
-            border_color: 0x456073
-            border_width: 2
+            id: content_home
+            x: 0
+            y: 0
+            width: 100%
+            height: 100%
+            bg_opa: TRANSP
+            border_width: 0
             clickable: false
             scrollable: false
             scrollbar_mode: "OFF"
-            pad_all: 0
             widgets:
-              - line:
-                  points: [{x: 18, y: 128}, {x: 238, y: 128}]
-                  line_color: 0x456073
-                  line_width: 2
-              - line:
-                  points: [{x: 128, y: 18}, {x: 128, y: 238}]
-                  line_color: 0x456073
-                  line_width: 2
+              # Spirit-level bubble. Crosshair + center ring mark level; the
+              # bubble image is moved by the 50ms interval above.
               - obj:
+                  id: level_field
                   align: CENTER
-                  width: 54
-                  height: 54
-                  radius: 27
-                  bg_opa: TRANSP
-                  border_color: 0x4CAF50
+                  width: 260
+                  height: 260
+                  radius: 130
+                  clip_corner: true
+                  bg_color: 0x14243A
+                  bg_opa: COVER
+                  border_color: 0x456073
                   border_width: 2
                   clickable: false
-              - image:
-                  id: level_bubble
-                  src: bubble_img
-                  align: CENTER
-                  translate_x: 0
-                  translate_y: 0
+                  scrollable: false
+                  scrollbar_mode: "OFF"
+                  pad_all: 0
+                  widgets:
+                    - line:
+                        points: [{x: 18, y: 128}, {x: 238, y: 128}]
+                        line_color: 0x456073
+                        line_width: 2
+                    - line:
+                        points: [{x: 128, y: 18}, {x: 128, y: 238}]
+                        line_color: 0x456073
+                        line_width: 2
+                    - obj:
+                        align: CENTER
+                        width: 54
+                        height: 54
+                        radius: 27
+                        bg_opa: TRANSP
+                        border_color: 0x4CAF50
+                        border_width: 2
+                        clickable: false
+                    - image:
+                        id: level_bubble
+                        src: bubble_img
+                        align: CENTER
+                        translate_x: 0
+                        translate_y: 0
+        - obj:
+            id: content_lights
+            x: 0
+            y: 0
+            width: 100%
+            height: 100%
+            bg_opa: TRANSP
+            border_width: 0
+            hidden: true
+            clickable: false
+            scrollable: false
+            scrollbar_mode: "OFF"
+            widgets:
+              # Light rows stack top-to-bottom; each = toggle (left) + wide slider (right).
+              - obj:
+                  id: lights_list
+                  align: TOP_MID
+                  y: 76
+                  width: 96%
+                  height: SIZE_CONTENT
+                  bg_opa: TRANSP
+                  border_width: 0
+                  pad_all: 0
+                  clickable: false
+                  scrollable: false
+                  scrollbar_mode: "OFF"
+                  layout:
+                    type: FLEX
+                    flex_flow: COLUMN
+                    pad_row: 12
+                  widgets:
+                    # -- Main Can Lights --
+                    - obj:
+                        width: 100%
+                        height: 100
+                        bg_color: 0x14243A
+                        bg_opa: COVER
+                        border_color: 0x456073
+                        border_width: 2
+                        radius: 12
+                        clickable: false
+                        scrollable: false
+                        scrollbar_mode: "OFF"
+                        pad_all: 14
+                        layout:
+                          type: FLEX
+                          flex_flow: ROW
+                          flex_align_cross: CENTER
+                          pad_column: 16
+                        widgets:
+                          - button:
+                              width: 72
+                              height: 72
+                              bg_color: 0x2D2D44
+                              radius: 36
+                              on_click:
+                                - homeassistant.service:
+                                    service: light.toggle
+                                    data:
+                                      entity_id: light.quinled_van_lightcontroller_main_can_lights
+                              widgets:
+                                - label:
+                                    id: lbl_icon_main_cans
+                                    text_font: mdi_tab
+                                    text_color: 0x808080
+                                    text: "\U000F0335"  # mdi:lightbulb (off)
+                                    align: CENTER
+                          - obj:
+                              flex_grow: 1
+                              height: 72
+                              bg_opa: TRANSP
+                              border_width: 0
+                              pad_all: 0
+                              clickable: false
+                              scrollable: false
+                              scrollbar_mode: "OFF"
+                              layout:
+                                type: FLEX
+                                flex_flow: COLUMN
+                                flex_align_main: CENTER
+                                pad_row: 8
+                              widgets:
+                                - label:
+                                    text: "Main Can Lights"
+                                    text_font: montserrat_18
+                                    text_color: 0xF1FAEE
+                                - slider:
+                                    id: sld_main_cans
+                                    width: 100%
+                                    height: 24
+                                    bg_color: 0x2D2D44
+                                    indicator:
+                                      bg_color: 0xFFD700
+                                    knob:
+                                      bg_color: 0xFFFFFF
+                                      radius: 14
+                                    min_value: 0
+                                    max_value: 255
+                                    value: 0
+                                    on_value:
+                                      - if:
+                                          condition:
+                                            lambda: 'return (int)x != (isnan(id(ha_bright_main_cans).state) ? 0 : (int)id(ha_bright_main_cans).state);'
+                                          then:
+                                            - lambda: 'id(pending_bright_main_cans) = (int)x;'
+                                            - script.execute: debounce_main_cans
+        # Power / Water / Weather are stubs for now - drop real widgets in later.
+        - obj:
+            id: content_power
+            x: 0
+            y: 0
+            width: 100%
+            height: 100%
+            bg_opa: TRANSP
+            border_width: 0
+            hidden: true
+            clickable: false
+            scrollable: false
+            scrollbar_mode: "OFF"
+            widgets:
+              - obj:
+                  align: TOP_MID
+                  y: 80
+                  width: 92%
+                  height: 200
+                  bg_color: 0x14243A
+                  bg_opa: COVER
+                  border_color: 0x456073
+                  border_width: 2
+                  radius: 12
+                  clickable: false
+                  scrollable: false
+                  scrollbar_mode: "OFF"
+                  widgets:
+                    - label:
+                        text: "Power"
+                        text_font: montserrat_28
+                        text_color: 0xF1FAEE
+                        align: TOP_MID
+                        y: 24
+                    - label:
+                        text: "Coming soon"
+                        text_font: montserrat_16
+                        text_color: 0x8B949E
+                        align: CENTER
+        - obj:
+            id: content_water
+            x: 0
+            y: 0
+            width: 100%
+            height: 100%
+            bg_opa: TRANSP
+            border_width: 0
+            hidden: true
+            clickable: false
+            scrollable: false
+            scrollbar_mode: "OFF"
+            widgets:
+              - obj:
+                  align: TOP_MID
+                  y: 80
+                  width: 92%
+                  height: 200
+                  bg_color: 0x14243A
+                  bg_opa: COVER
+                  border_color: 0x456073
+                  border_width: 2
+                  radius: 12
+                  clickable: false
+                  scrollable: false
+                  scrollbar_mode: "OFF"
+                  widgets:
+                    - label:
+                        text: "Water"
+                        text_font: montserrat_28
+                        text_color: 0xF1FAEE
+                        align: TOP_MID
+                        y: 24
+                    - label:
+                        text: "Coming soon"
+                        text_font: montserrat_16
+                        text_color: 0x8B949E
+                        align: CENTER
+        - obj:
+            id: content_weather
+            x: 0
+            y: 0
+            width: 100%
+            height: 100%
+            bg_opa: TRANSP
+            border_width: 0
+            hidden: true
+            clickable: false
+            scrollable: false
+            scrollbar_mode: "OFF"
+            widgets:
+              - obj:
+                  align: TOP_MID
+                  y: 80
+                  width: 92%
+                  height: 200
+                  bg_color: 0x14243A
+                  bg_opa: COVER
+                  border_color: 0x456073
+                  border_width: 2
+                  radius: 12
+                  clickable: false
+                  scrollable: false
+                  scrollbar_mode: "OFF"
+                  widgets:
+                    - label:
+                        text: "Weather"
+                        text_font: montserrat_28
+                        text_color: 0xF1FAEE
+                        align: TOP_MID
+                        y: 24
+                    - label:
+                        text: "Coming soon"
+                        text_font: montserrat_16
+                        text_color: 0x8B949E
+                        align: CENTER
   top_layer:
     widgets:
+      # Bottom navigation bar (5 tabs). Each tab is a flex-grow button laid out as
+      # a column (icon above label); Lights also carries a corner count badge.
+      - obj:
+          id: nav_bar
+          align: BOTTOM_MID
+          width: 100%
+          height: 96
+          clickable: false
+          scrollable: false
+          scrollbar_mode: "OFF"
+          bg_color: 0x0B1524
+          bg_opa: COVER
+          border_color: 0x1E2D40
+          border_width: 2
+          pad_all: 0
+          radius: 0
+          layout:
+            type: FLEX
+            flex_flow: ROW
+            flex_align_cross: CENTER
+          widgets:
+            # -- Home tab --
+            - button:
+                id: btn_tab_home
+                flex_grow: 1
+                height: 88
+                bg_opa: TRANSP
+                border_width: 0
+                shadow_width: 0
+                pad_all: 6
+                layout:
+                  type: FLEX
+                  flex_flow: COLUMN
+                  flex_align_main: CENTER
+                  flex_align_cross: CENTER
+                  pad_row: 2
+                on_click:
+                  - script.execute:
+                      id: select_tab
+                      idx: 0
+                widgets:
+                  - label:
+                      id: lbl_tab_home_icon
+                      text: "\U000F02DC"  # mdi:home
+                      text_font: mdi_tab
+                      text_color: 0xF1FAEE
+                  - label:
+                      id: lbl_tab_home_name
+                      text: "Home"
+                      text_font: montserrat_14
+                      text_color: 0xF1FAEE
+            # -- Lights tab --
+            - button:
+                id: btn_tab_lights
+                flex_grow: 1
+                height: 88
+                bg_opa: TRANSP
+                border_width: 0
+                shadow_width: 0
+                pad_all: 6
+                layout:
+                  type: FLEX
+                  flex_flow: COLUMN
+                  flex_align_main: CENTER
+                  flex_align_cross: CENTER
+                  pad_row: 2
+                on_click:
+                  - script.execute:
+                      id: select_tab
+                      idx: 1
+                widgets:
+                  - label:
+                      id: lbl_tab_lights_icon
+                      text: "\U000F1253"  # mdi:lightbulb-group
+                      text_font: mdi_tab
+                      text_color: 0x8B949E
+                  - label:
+                      id: lbl_tab_lights_name
+                      text: "Lights"
+                      text_font: montserrat_14
+                      text_color: 0x8B949E
+                  - label:
+                      id: badge_lights
+                      ignore_layout: true
+                      text: ""
+                      text_font: montserrat_14
+                      text_color: 0xFFFFFF
+                      bg_color: 0xE53935
+                      bg_opa: COVER
+                      radius: 10
+                      pad_left: 6
+                      pad_right: 6
+                      pad_top: 1
+                      pad_bottom: 1
+                      align: TOP_RIGHT
+                      x: -22
+                      y: 6
+                      hidden: true
+            # -- Power tab --
+            - button:
+                id: btn_tab_power
+                flex_grow: 1
+                height: 88
+                bg_opa: TRANSP
+                border_width: 0
+                shadow_width: 0
+                pad_all: 6
+                layout:
+                  type: FLEX
+                  flex_flow: COLUMN
+                  flex_align_main: CENTER
+                  flex_align_cross: CENTER
+                  pad_row: 2
+                on_click:
+                  - script.execute:
+                      id: select_tab
+                      idx: 2
+                widgets:
+                  - label:
+                      id: lbl_tab_power_icon
+                      text: "\U000F0241"  # mdi:flash
+                      text_font: mdi_tab
+                      text_color: 0x8B949E
+                  - label:
+                      id: lbl_tab_power_name
+                      text: "Power"
+                      text_font: montserrat_14
+                      text_color: 0x8B949E
+            # -- Water tab --
+            - button:
+                id: btn_tab_water
+                flex_grow: 1
+                height: 88
+                bg_opa: TRANSP
+                border_width: 0
+                shadow_width: 0
+                pad_all: 6
+                layout:
+                  type: FLEX
+                  flex_flow: COLUMN
+                  flex_align_main: CENTER
+                  flex_align_cross: CENTER
+                  pad_row: 2
+                on_click:
+                  - script.execute:
+                      id: select_tab
+                      idx: 3
+                widgets:
+                  - label:
+                      id: lbl_tab_water_icon
+                      text: "\U000F058C"  # mdi:water
+                      text_font: mdi_tab
+                      text_color: 0x8B949E
+                  - label:
+                      id: lbl_tab_water_name
+                      text: "Water"
+                      text_font: montserrat_14
+                      text_color: 0x8B949E
+            # -- Weather tab --
+            - button:
+                id: btn_tab_weather
+                flex_grow: 1
+                height: 88
+                bg_opa: TRANSP
+                border_width: 0
+                shadow_width: 0
+                pad_all: 6
+                layout:
+                  type: FLEX
+                  flex_flow: COLUMN
+                  flex_align_main: CENTER
+                  flex_align_cross: CENTER
+                  pad_row: 2
+                on_click:
+                  - script.execute:
+                      id: select_tab
+                      idx: 4
+                widgets:
+                  - label:
+                      id: lbl_tab_weather_icon
+                      text: "\U000F0595"  # mdi:weather-partly-cloudy
+                      text_font: mdi_tab
+                      text_color: 0x8B949E
+                  - label:
+                      id: lbl_tab_weather_name
+                      text: "Weather"
+                      text_font: montserrat_14
+                      text_color: 0x8B949E
+
+      # Centered clock: time + date at the top of the header.
+      - obj:
+          id: titlebar_clock
+          align: TOP_MID
+          y: 8
+          width: SIZE_CONTENT
+          height: SIZE_CONTENT
+          clickable: false
+          bg_opa: TRANSP
+          border_opa: TRANSP
+          layout:
+            type: FLEX
+            flex_flow: ROW
+            flex_align_cross: CENTER
+            pad_column: 12
+          widgets:
+            - label:
+                id: time_label
+                text: "--:--"
+                text_font: montserrat_28
+                text_color: 0xF1FAEE
+            - label:
+                id: date_label
+                text: "-/-/----"
+                text_font: montserrat_28
+                text_color: 0xA8DADC
+
       # Top-right status bar. ROW_REVERSE => first child sits furthest right.
       - obj:
           id: status_bar
@@ -454,7 +965,7 @@ lvgl:
             - label:
                 id: battery_pct_label
                 text: "--%"
-                text_font: montserrat_20
+                text_font: montserrat_28
                 text_color: 0xA8DADC
             - label:
                 id: api_icon_label
